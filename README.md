@@ -9,7 +9,7 @@
 [![Target SDK](https://img.shields.io/badge/target%20SDK-36-green)](https://developer.android.com/about/versions/16)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-3DDC84?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Tests](https://img.shields.io/badge/tests-910%20passing-success)](#development)
+[![Tests](https://img.shields.io/badge/tests-910%20passing-success)](docs/BUILDING.md)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-79589E)](LICENSE)
 
 </div>
