@@ -27,8 +27,16 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
+      # The hosted runner already ships a complete Android SDK, so we install
+      # only the packages this project needs. android-actions/setup-android is
+      # deliberately avoided: it rejects the sdkmanager version that ships on
+      # current runner images and fails before the build even starts.
+      - name: Install Android SDK packages
+        run: |
+          SDKMANAGER="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          echo "Using $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Cache Gradle
         uses: gradle/actions/setup-gradle@v4
