@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive launcher icon.
+
+  The artwork is the supplied integral icon, prepared for the launcher: scaled
+  to the central 72/108 safe area and centred, because the launcher masks the
+  background layer to its own shape and the original 48 px vertical margin
+  would have lost the tips of the glyph.
+
+  The image is supplied as both the background and the foreground layer. Some
+  launchers composite only one of the two, or scale the foreground about its
+  centre, and with a single layer the icon came back as a generic placeholder.
+  The glyph sits well inside the safe area, so the foreground's 1.5x scaling
+  does not crop it.
+
+  The monochrome layer is the glyph alone on transparency, which is what themed
+  icons expect: it is tinted to the system colour rather than shown as artwork.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_image" />
+    <foreground android:drawable="@drawable/ic_launcher_image" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>

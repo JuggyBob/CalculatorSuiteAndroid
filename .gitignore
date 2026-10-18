@@ -1,0 +1,61 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+release-artifacts/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+captures/
+com_crashlytics_export_strings.xml
+
+# Machine-specific: contains the local Android SDK path. Never commit.
+local.properties
+
+# Keystores and signing material — must never be committed
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+keystore.properties
+signing.properties
+
+# Environment / secrets
+.env
+.env.*
+*.secret
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Editors
+.vscode/
+*.swp
+*.swo
+*~
+
+# Kotlin
+.kotlin/

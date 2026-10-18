@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or support request
+    url: https://github.com/JuggyBob/CalculatorSuiteAndroid/blob/main/SUPPORT.md
+    about: How to get help, and what to include in a support request
+  - name: Security vulnerability
+    url: https://github.com/JuggyBob/CalculatorSuiteAndroid/security/advisories/new
+    about: Report privately. Please do not open a public issue for a vulnerability.
+  - name: Documentation and how-to questions
+    url: https://github.com/JuggyBob/CalculatorSuiteAndroid/tree/main/docs
+    about: The features catalogue, user guide, calculus guide and build instructions
