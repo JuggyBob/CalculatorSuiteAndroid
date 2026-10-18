@@ -2,7 +2,7 @@
 
 The Calculus tool takes **one expression** and runs ten different operations on it, showing its working for each.
 
-> **This guide is deliberately specific about limits.** Some of the symbolic engine's boundaries produce surprising results, and a document that glossed over them would be worse than useless. Everything in [Limitations](#8-limitations-read-this) is verified against the code.
+> **This guide is deliberately specific about limits.** Some of the symbolic engine's boundaries produce surprising results, and a document that glossed over them would be worse than useless. Everything in [Limitations](#8-limitations--read-this) is verified against the code.
 
 ---
 

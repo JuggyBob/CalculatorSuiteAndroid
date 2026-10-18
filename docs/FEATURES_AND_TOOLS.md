@@ -762,7 +762,7 @@ They differ by design: 1 January 23:00 → 2 January 01:00 is a calendar interva
 | | [Loan](#loan-financeloan) | `finance.loan` |
 | | [Interest](#interest-financeinterest) | `finance.interest` |
 | | [Sales tax](#sales-tax-financetax) | `finance.tax` |
-| | [Tip](#tip-finanacetip) | `finance.tip` |
+| | [Tip](#tip-financetip) | `finance.tip` |
 | | [Unit price](#unit-price-financeunit_price) | `finance.unit_price` |
 | Health | [Body mass index](#body-mass-index-healthbmi) | `health.bmi` |
 | | [Caloric burn](#caloric-burn-healthcalories) | `health.calories` |
