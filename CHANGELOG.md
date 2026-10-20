@@ -8,9 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [2.0.0] — 2026-10-20
 
-A major release. **Seventeen more tools** (49 → 66), an **AI problem solver** that reads a photograph of a mathematical problem and works it out with the app's own engines, a **customisable accent colour** that reaches every part of the app, and a long list of correctness and layout fixes. `versionName = 2.0.0`, `versionCode = 2`, `minSdk 26`, `targetSdk 36`.
+A major release. **Seventeen more tools** (49 → 66), an **AI problem solver** that reads a photograph of a mathematical problem and works it out with the app's own engines, a **customisable accent colour** that reaches every part of the app, and a long list of correctness and layout fixes. `versionName = 2.0.0`, `versionCode = 3`, `minSdk 26`, `targetSdk 36`.
 
 This release upgrades over 1.0.0 in place: the signing key is unchanged, so the app can be installed straight over the old one.
+
+> **Republished with a higher version code.** The first 2.0.0 APK carried the version code 2, which installs over 1.0.0 (version code 1) cleanly, and it was signed with the same key. The APK published under this tag now carries the version code **3**, so that it installs over the first 2.0.0 build as well as over 1.0.0. The version name is unchanged, and the signing key is the same one, so it is still an in-place upgrade of either.
+
+> **If Android says the app "conflicts with an existing package"**, the copy already on the phone was signed with a *different* key — most often a debug build. Android will not replace one app with another signed by another key, whatever the version code is. Uninstall the old copy once (`Settings → Apps → Calc Suite → Uninstall`, or `adb uninstall com.calcsuite`) and the release installs over anything afterwards.
 
 ### Added — the AI problem solver
 
@@ -73,7 +77,14 @@ All three advanced tools compute real values for the example in front of them an
 
 Each of these is covered by a regression test.
 
-- **The sign bound tighter than the power** in the calculus parser, so `-x^2` meant `(-x)^2` — the opposite of what the parser's own grammar says, what the printer assumes and what the rest of the app does. The sign is now looser than the power, and `-2^2` is `-4` everywhere.
+- **The sign bound tighter than the power** in the calculus parser, so `-x^2` meant `(-x)^2` — the opposite of what the parser's own grammar says, what the printer assumes and what the rest of the app does. The sign is now looser than the power, and the two readings are kept apart:
+
+  | Written | Read as | Value |
+  |---|---|---|
+  | `-2^2` | the negative of `2^2` | **-4** |
+  | `(-2)^2` | the square of minus two | **4** |
+
+  A negative number raised to an even power is positive **when the sign is part of the base**, as in `(-2)^2 = 4`, and it is negative **when the sign stands in front of the power**, as in `-2^2 = -(2^2) = -4`. That is the usual convention, and it is the one the whole app now follows: the standard calculator, the calculus tools and the printer. Both forms are pinned by a test.
 - **A negative factor in a product was printed without brackets**, so `x * -2` was shown as `x-2`, a different expression. The printer now brackets it.
 - **The curl** was using the wrong six derivatives and returned the wrong vector.
 - **The least-squares solver** was checking the data against the number of columns instead of the number of rows, and refused every fit. The same mistake made **Projections in Functional Analysis crash**; the three sections now check their shapes before they compute.

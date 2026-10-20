@@ -12,7 +12,10 @@ android {
         applicationId = "com.calcsuite"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
+        // The 2.0.0 release was republished with a higher version code, so
+        // that it installs over the first 2.0.0 build (version code 2) and
+        // over 1.0.0 (version code 1) alike. The version name is unchanged.
+        versionCode = 3
         versionName = "2.0.0"
     }
 
