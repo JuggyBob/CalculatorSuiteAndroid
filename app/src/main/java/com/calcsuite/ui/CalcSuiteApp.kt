@@ -28,6 +28,10 @@ import com.calcsuite.ui.screens.SearchScreen
 import com.calcsuite.ui.screens.SettingsScreen
 import com.calcsuite.ui.screens.ScientificScreen
 import com.calcsuite.ui.screens.ToolHostScreen
+import com.calcsuite.ui.ai.AiSettingsScreen
+import com.calcsuite.ui.ai.AiSolveScreen
+import com.calcsuite.ui.ai.AiViewModel
+import com.calcsuite.ui.theme.Accent
 import com.calcsuite.ui.theme.CalcSuiteTheme
 import com.calcsuite.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
@@ -43,6 +47,12 @@ object Routes {
     const val CATEGORY = "category/{categoryId}"
     const val TOOL = "tool/{toolId}"
 
+    /** The AI feature: a photograph of a problem, read and worked out. */
+    const val AI = "ai"
+
+    /** Where the AI feature is set up. */
+    const val AI_SETTINGS = "ai/settings"
+
     fun category(id: String) = "category/$id"
     fun tool(id: String) = "tool/$id"
 }
@@ -56,6 +66,9 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
     val favorites by container.settings.favorites.collectAsStateWithLifecycle(emptySet())
     val recents by container.settings.recents.collectAsStateWithLifecycle(emptyList())
     val history by container.history.history.collectAsStateWithLifecycle(emptyList())
+    val aiSettings by container.ai.settings.collectAsStateWithLifecycle(
+        com.calcsuite.ai.AiSettings.DEFAULT,
+    )
     val scope = rememberCoroutineScope()
     val nav = rememberNavController()
 
@@ -92,7 +105,11 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
         }
     }
 
-    CalcSuiteTheme(themeMode = settings.themeMode, dynamicColor = settings.dynamicColor) {
+    CalcSuiteTheme(
+        themeMode = settings.themeMode,
+        dynamicColor = settings.dynamicColor,
+        accent = Accent.decode(settings.accent),
+    ) {
         ProvideSettings(settings) {
             // Opaque, theme-aware backdrop for every destination. Screens that
             // are transparent (or leave padding gaps) must never expose the
@@ -119,6 +136,7 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                         onOpenCategory = { nav.navigate(Routes.category(it.id)) },
                         onOpenSearch = { nav.navigate(Routes.SEARCH) },
                         onOpenHistory = { nav.navigate(Routes.HISTORY) },
+                        onOpenAi = { nav.navigate(Routes.AI) },
                         onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                         onOpenScientific = { nav.navigate(Routes.SCIENTIFIC) },
                         onCycleAngle = ::cycleAngle,
@@ -167,7 +185,54 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                         },
                         onSetHaptics = { scope.launch { container.settings.setHaptics(it) } },
                         onSetDynamicColor = { scope.launch { container.settings.setDynamicColor(it) } },
+                        accent = Accent.decode(settings.accent),
+                        onSetAccent = {
+                            scope.launch { container.settings.setAccent(it.encode()) }
+                        },
                         onClearHistory = { scope.launch { container.history.clear() } },
+                    )
+                }
+                composable(Routes.AI) {
+                    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<AiViewModel>()
+                    AiSolveScreen(
+                        viewModel = viewModel,
+                        configured = aiSettings.isConfigured,
+                        onOpenSettings = { nav.navigate(Routes.AI_SETTINGS) },
+                        onBack = { nav.popBackStack() },
+                        onCopy = { text ->
+                            scope.launch { container.history.addCopy(text) }
+                        },
+                    )
+                }
+                composable(Routes.AI_SETTINGS) {
+                    AiSettingsScreen(
+                        settings = aiSettings,
+                        onSetProvider = { provider ->
+                            scope.launch { container.ai.setProvider(provider) }
+                        },
+                        onSetModel = { model ->
+                            scope.launch { container.ai.setModel(model) }
+                        },
+                        onSetApiKey = { key ->
+                            scope.launch { container.ai.setApiKey(aiSettings.provider, key) }
+                        },
+                        onClearApiKey = {
+                            scope.launch { container.ai.clearApiKey() }
+                        },
+                        onTestConnection = { provider, model, key ->
+                            com.calcsuite.ai.AiConnectionTest.check(
+                                provider = provider,
+                                model = model,
+                                apiKey = key,
+                                savedKey = if (key.isBlank()) {
+                                    container.ai.apiKey(provider)
+                                } else {
+                                    key
+                                },
+                            )
+                        },
+                        onBack = { nav.popBackStack() },
+                        scope = scope,
                     )
                 }
                 composable(

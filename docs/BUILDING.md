@@ -39,7 +39,7 @@ cd CalculatorSuiteAndroid
 ## Everyday commands
 
 ```bash
-# Run the 910 JVM unit tests
+# Run the 1267 JVM unit tests
 ./gradlew :app:testDebugUnitTest
 
 # Run Android Lint
@@ -90,7 +90,9 @@ The release build is **not minified** (`isMinifyEnabled = false`) and `proguard-
 
 ### Producing a signed release
 
-The signed APK published in the 1.0.0 release was produced with a locally held key. To reproduce the process, create a keystore and reference it from `~/.gradle/gradle.properties` (never from a file in the repository):
+The signed APK published in the 1.0.0 and 2.0.0 releases was produced with a locally held key, and both were signed with the **same key**, so 2.0.0 installs straight over 1.0.0.
+
+The signing configuration is already in `app/build.gradle.kts`, and it is used only when the properties are present, so an ordinary checkout still builds an unsigned release and the continuous build is unaffected. Create a keystore and reference it from `~/.gradle/gradle.properties` (never from a file in the repository):
 
 ```properties
 RELEASE_STORE_FILE=/absolute/path/to/your/release.jks
@@ -99,22 +101,21 @@ RELEASE_KEY_ALIAS=…
 RELEASE_KEY_PASSWORD=…
 ```
 
-Then add a `signingConfigs` block to `app/build.gradle.kts`:
+Then build the release:
 
-```kotlin
-android {
-    signingConfigs {
-        create("release") {
-            storeFile = file(providers.gradleProperty("RELEASE_STORE_FILE").get())
-            storePassword = providers.gradleProperty("RELEASE_STORE_PASSWORD").get()
-            keyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").get()
-            keyPassword = providers.gradleProperty("RELEASE_KEY_PASSWORD").get()
-        }
-    }
-    buildTypes {
-        getByName("release") { signingConfig = signingConfigs.getByName("release") }
-    }
-}
+```bash
+./gradlew :app:assembleRelease
+# -> app/build/outputs/apk/release/app-release.apk
+```
+
+The four properties can also be given in the environment, which keeps them out of the shell history and out of any file:
+
+```powershell
+$env:ORG_GRADLE_PROJECT_RELEASE_STORE_FILE = "C:\path\to\release.p12"
+$env:ORG_GRADLE_PROJECT_RELEASE_STORE_PASSWORD = $password
+$env:ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS = "key0"
+$env:ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD = $password
+.\gradlew.bat :app:assembleRelease
 ```
 
 > Never commit a keystore, its passwords, or a properties file containing them. `.gitignore` already excludes `*.jks`, `*.keystore`, `*.p12`, `*.pem`, `*.key`, `keystore.properties` and `.env*`, but a guard rail is not a substitute for care.
@@ -136,7 +137,7 @@ sha256sum app-release.apk          # Linux / macOS / Git Bash
 Get-FileHash app-release.apk -Algorithm SHA256   # PowerShell
 ```
 
-The published 1.0.0 APK verifies under **APK Signature Scheme v2** and reports `versionName='1.0.0'`, `versionCode='1'`, `minSdkVersion='26'`, `targetSdkVersion='36'`.
+The published 2.0.0 APK verifies under **APK Signature Scheme v2** and reports `versionName='2.0.0'`, `versionCode='2'`, `minSdkVersion='26'`, `targetSdkVersion='36'`. The 1.0.0 APK reports the same signer, which is what lets 2.0.0 upgrade it in place.
 
 ## Running the app
 

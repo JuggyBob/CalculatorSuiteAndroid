@@ -2,6 +2,7 @@ package com.calcsuite.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -78,10 +79,20 @@ private val DarkScheme = darkColorScheme(
 
 enum class ThemeMode { System, Light, Dark }
 
+/**
+ * The app's own colour scheme, before an accent is applied.
+ *
+ * It is exposed so that the accent can be tested against the scheme it
+ * starts from.
+ */
+fun baseScheme(dark: Boolean): ColorScheme = if (dark) DarkScheme else LightScheme
+
 @Composable
 fun CalcSuiteTheme(
     themeMode: ThemeMode = ThemeMode.System,
     dynamicColor: Boolean = false,
+    /** The accent the user has chosen. */
+    accent: Accent = Accent.DEFAULT,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode) {
@@ -90,12 +101,15 @@ fun CalcSuiteTheme(
         ThemeMode.Dark -> true
     }
     val context = LocalContext.current
-    val scheme = when {
+    val base = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> DarkScheme
         else -> LightScheme
     }
+    // The accent only changes the accent family, so the surfaces and the text
+    // keep the app's own colours.
+    val scheme = accentScheme(base, accent.colour, dark)
     MaterialTheme(
         colorScheme = scheme,
         typography = CalcTypography,

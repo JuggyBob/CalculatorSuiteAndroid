@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,9 +45,6 @@ import com.calcsuite.data.ToolRegistry
 import com.calcsuite.ui.components.ToolIcon
 import com.calcsuite.ui.components.clickableRow
 
-/** Registry id of the Calculus tool, pinned so the main menu cannot drift. */
-private const val CALCULUS_TOOL_ID = "algebra.calculus"
-
 @Composable
 fun MainScreen(
     favorites: Set<String>,
@@ -54,6 +53,7 @@ fun MainScreen(
     onOpenCategory: (ToolCategory) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenAi: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenScientific: () -> Unit,
     onCycleAngle: () -> Unit,
@@ -81,13 +81,21 @@ fun MainScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        "49 tools · works offline",
+                        // The count comes from the registry, so it can never
+                        // drift out of step with the tools that exist.
+                        "${ToolRegistry.all.size} tools · works offline",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = onOpenHistory) {
                     Icon(Icons.Filled.History, contentDescription = "History")
+                }
+                IconButton(onClick = onOpenAi) {
+                    Icon(
+                        Icons.Filled.Psychology,
+                        contentDescription = "Solve a problem from a picture",
+                    )
                 }
                 IconButton(onClick = onOpenSettings) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
@@ -178,7 +186,11 @@ fun MainScreen(
             }
 
             val recentTools = remember(recents, favorites) {
-                recents.mapNotNull { ToolRegistry.byId(it) }.filter { it.id !in favorites }
+                // The list is keyed by the tool id, so the same tool must not
+                // appear twice even if the stored list still holds an old id.
+                recents.mapNotNull { ToolRegistry.byId(it) }
+                    .distinctBy { it.id }
+                    .filter { it.id !in favorites }
             }
             if (recentTools.isNotEmpty()) {
                 ToolStrip(
@@ -235,34 +247,6 @@ fun MainScreen(
                 }
             }
 
-            // Calculus sits directly under the scientific calculator because it
-            // builds on it: the same expression syntax, radians, constants.
-            val calculus = remember { ToolRegistry.byId(CALCULUS_TOOL_ID) }
-            if (calculus != null) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickableRow { onOpenTool(calculus.id) },
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    Row(
-                        Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        ToolIcon(calculus, modifier = Modifier.size(24.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(calculus.title, style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                calculus.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
 
             Spacer(Modifier.height(20.dp))
         }
@@ -353,7 +337,14 @@ private fun CategoryCard(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            Text(category.label, style = MaterialTheme.typography.titleSmall)
+            // The label is given room for two lines, so that a long name such
+            // as "Advanced Mathematics" does not make its card taller than
+            // the others.
+            Text(
+                category.label,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.heightIn(min = 40.dp),
+            )
             Text(
                 "$count ${if (count == 1) "tool" else "tools"}",
                 style = MaterialTheme.typography.bodySmall,

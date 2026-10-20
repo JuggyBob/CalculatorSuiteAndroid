@@ -38,6 +38,25 @@ class HistoryRepository(context: Context) {
         prefs[KEY_HISTORY] = encode(updated)
     }
 
+    /**
+     * Records a result that was copied, so that it is in the history like any
+     * other calculation.
+     *
+     * Only the text of the answer is kept: the picture the problem was read
+     * from is never stored.
+     */
+    suspend fun addCopy(text: String) = add(
+        HistoryEntry(
+            id = System.currentTimeMillis() * 1000 + (0..999).random(),
+            toolId = "ai.solve",
+            toolTitle = "AI problem solver",
+            category = "Calculator",
+            input = "Problem solved from a picture",
+            result = text,
+            timestamp = System.currentTimeMillis(),
+        ),
+    )
+
     suspend fun remove(id: Long) = store.edit { prefs ->
         val current = decode(prefs[KEY_HISTORY] ?: "")
         prefs[KEY_HISTORY] = encode(current.filterNot { it.id == id })

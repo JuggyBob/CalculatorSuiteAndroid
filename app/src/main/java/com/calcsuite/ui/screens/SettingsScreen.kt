@@ -1,12 +1,18 @@
 package com.calcsuite.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,18 +34,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.calcsuite.core.Num
 import com.calcsuite.core.ThousandsSeparator
 import com.calcsuite.data.Settings
+import com.calcsuite.data.ToolCategory
 import com.calcsuite.data.ToolRegistry
 import com.calcsuite.expr.AngleMode
 import com.calcsuite.ui.components.InfoNote
+import com.calcsuite.ui.components.clickableRow
 import com.calcsuite.ui.components.SectionCard
 import com.calcsuite.ui.components.SegmentedChoice
 import com.calcsuite.ui.components.SettingRow
 import com.calcsuite.ui.components.ToggleRow
 import com.calcsuite.ui.components.rememberFmt
+import com.calcsuite.ui.theme.Accent
+import com.calcsuite.ui.theme.AccentPreset
 import com.calcsuite.ui.theme.ThemeMode
 import java.math.BigDecimal
 
@@ -62,6 +77,9 @@ fun SettingsScreen(
     onSetThousandsSeparator: (ThousandsSeparator) -> Unit,
     onSetHaptics: (Boolean) -> Unit,
     onSetDynamicColor: (Boolean) -> Unit,
+    /** The accent the user has chosen, and the way to change it. */
+    accent: Accent = Accent.DEFAULT,
+    onSetAccent: (Accent) -> Unit = {},
     onClearHistory: () -> Unit,
 ) {
     var confirmClear by remember { mutableStateOf(false) }
@@ -109,6 +127,7 @@ fun SettingsScreen(
                     checked = settings.dynamicColor,
                     onCheckedChange = onSetDynamicColor,
                 )
+                AccentRow(accent = accent, onSetAccent = onSetAccent)
             }
 
             SectionCard(title = "Calculation") {
@@ -213,7 +232,8 @@ fun SettingsScreen(
             }
 
             Text(
-                "Calc Suite 1.0 · ${ToolRegistry.all.size} tools across 7 categories",
+                "Calc Suite 1.0 \u00b7 ${ToolRegistry.all.size} tools across " +
+                    "${ToolCategory.entries.size} categories",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp),
@@ -235,6 +255,102 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { confirmClear = false }) { Text("Cancel") }
             },
+        )
+    }
+}
+
+/**
+ * The accent colour: a row of swatches for the presets, and a button that
+ * opens the picker for a colour of the user's own choosing.
+ */
+@Composable
+private fun AccentRow(
+    accent: Accent,
+    onSetAccent: (Accent) -> Unit,
+) {
+    var picking by remember { mutableStateOf(false) }
+
+    Column {
+        Text(
+            "Accent colour",
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Text(
+            "The colour used for buttons, highlights and the curves in the graphs.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for (preset in AccentPreset.entries) {
+                val selected = accent.preset == preset && !accent.isCustom
+                AccentSwatch(
+                    colour = preset.colour,
+                    selected = selected,
+                    label = preset.label,
+                    onClick = { onSetAccent(Accent(preset = preset)) },
+                )
+            }
+            // The custom colour, shown with the colour the user chose.
+            AccentSwatch(
+                colour = accent.colour,
+                selected = accent.isCustom,
+                label = if (accent.isCustom) "Custom colour" else "Custom colour",
+                onClick = { picking = true },
+            )
+        }
+        if (accent.isCustom) {
+            TextButton(
+                onClick = { onSetAccent(Accent(preset = AccentPreset.DEFAULT)) },
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Text("Back to the default green")
+            }
+        }
+    }
+
+    if (picking) {
+        AccentPickerSheet(
+            initial = accent.colour,
+            onApply = {
+                onSetAccent(Accent(preset = null, custom = it))
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
+    }
+}
+
+/**
+ * One round swatch, with a ring around it when it is the one in use.
+ */
+@Composable
+private fun AccentSwatch(
+    colour: Color,
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(colour)
+                .then(
+                    if (selected) {
+                        Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    } else {
+                        Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    },
+                )
+                .clickableRow { onClick() }
+                .semantics {
+                    contentDescription = if (selected) "$label, in use" else label
+                },
         )
     }
 }

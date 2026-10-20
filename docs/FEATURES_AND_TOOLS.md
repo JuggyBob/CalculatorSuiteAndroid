@@ -1,6 +1,6 @@
 # Features and Tools
 
-Every one of the **49 registered tools** across **7 categories**, with its inputs, the mathematics it actually uses, its results, how it validates input, its limits, and a worked example.
+Every one of the **66 registered tools** across **8 categories**, with its inputs, the mathematics it actually uses, its results, how it validates input, its limits, and a worked example.
 
 | Category | Tools |
 |---|---|
@@ -11,6 +11,10 @@ Every one of the **49 registered tools** across **7 categories**, with its input
 | [Health](#5-health--3-tools) | 3 |
 | [Date & Time](#6-date--time--3-tools) | 3 |
 | [Other](#7-other--2-tools) | 2 |
+| [Calculus](#8-calculus--14-tools) | 14 |
+| [Advanced Mathematics](#9-advanced-mathematics--3-tools) | 3 |
+
+**Not a tool, but a feature.** The **AI problem solver** (the brain button beside the history button on the main screen) reads a photograph of a mathematical problem, has a chosen AI provider pick the right tool below, and lets that tool's own engine do the mathematics. It is described in the [User Guide](USER_GUIDE.md#the-ai-problem-solver).
 
 **Notation used throughout.** *Exact* means the result is computed with arbitrary-precision arithmetic (`BigDecimal` at 34 significant digits, or `BigInteger`) and is not rounded until display. *Numerical* means a numeric method was used, the result is prefixed `≈`, and the panel names the method.
 
@@ -221,24 +225,23 @@ The `%` on a field is a display suffix only — no unit conversion happens. `15`
 
 ---
 
-### Calculus (`algebra.calculus`)
+### Inequalities (`algebra.inequalities`)
 
-**Purpose.** Ten calculus operations plus an interactive graph, from one expression field.
+**Purpose.** Solve an inequality, or a system of them, and show the answer as a set and as a picture.
 
-**Documentation.** This tool has its own guide, which covers the expression syntax, every operation, graphing and an honest account of the symbolic engine's limits: **[Calculus Guide](CALCULUS_GUIDE.md)**.
+**Inputs.** An **Expression** field, a **Mode** selector — *Single*, *Compound*, *System* or *Two vars* — and, in the two-variable mode, the **Feasible region** drawn on a plane with the point `(x, y)` marked.
 
-At a glance: symbolic and numerical differentiation including partials; indefinite and definite integration; limits; infinite series with convergence; Taylor/Maclaurin to order 12; Σ and Π; roots and extrema; RK4 differential equations; and a graph you can pan, pinch-zoom, overlay `f′` on, and shade an area under.
+**Method.** The expression is parsed into a relation over the variables, the boundary is found exactly where it can be, and the sign of the expression is then scanned either side of every critical point. The two-variable mode draws the half-planes the inequalities describe.
 
-**Worked example.** Input `x^3-5/2^1/10`:
+**Results.** The solution in interval notation, the set-builder form, the critical points, a sign chart, and — in the two-variable mode — the region itself.
 
-| Operation | Result |
-|---|---|
-| `d/dx` | `3x^2` |
-| `∫` (indefinite) | `x^4 ÷ 4 − 0.25x + C`, *"Antiderivative — found exactly"* |
-| `∫` 0 → 3 | ≈ 19.5 (adaptive Simpson) |
-| `T` (order 6, centre 0) | `f(a) = −0.25`, then `0`, `0`, `1`, `0`, `0`, `0` |
+**Validation.** An expression that cannot be read, a relation with no variable, and a system whose inequalities contradict each other are each reported in words rather than guessed at.
 
-**Related.** Scientific calculator, Equations.
+**Limitations.** The single-variable mode is exact for linear and quadratic expressions and numerical beyond that; the scanning is over a bounded interval, so a solution far from the origin can be missed. The two-variable mode handles half-planes and their intersections, not curved boundaries.
+
+**Examples.** `2x + 3 < 11` → `x < 4`. `x^2 - 4 >= 0` → `(-∞, -2] ∪ [2, ∞)`.
+
+**Related.** Equations, Extrema & Optimization.
 
 ---
 
@@ -719,6 +722,354 @@ They differ by design: 1 January 23:00 → 2 January 01:00 is a calendar interva
 
 ---
 
+## 8. Calculus — 14 tools
+
+The old catch-all Calculus tool has been split into fourteen focused ones. They share one expression engine, so the syntax is the same everywhere, and the guide that explains it in depth is the **[Calculus Guide](CALCULUS_GUIDE.md)**.
+
+### Derivatives (`calculus.derivatives`)
+
+**Purpose.** Differentiate an expression, to any order, with the working shown.
+
+**Inputs.** `f(x) =`, the variable to differentiate with respect to, an optional **Second variable** for a mixed partial, and the **Order** of the derivative.
+
+**Method.** Symbolic differentiation by the sum, product, quotient, power and chain rules, with the result simplified after each step so that higher orders can be taken. A numerical derivative is offered alongside for comparison.
+
+**Results.** The derivative, the steps that produced it, and the value at a chosen point.
+
+**Validation.** An expression that cannot be parsed, an order below one, and a function that is not differentiable at the point are each reported in words.
+
+**Limitations.** The derivative is with respect to one variable at a time; a mixed partial takes the second variable in the field. Expressions are read as one function of one variable, so `3xy` needs the multiplication signs putting in.
+
+**Examples.** `x^3 - 4x + 1` → `3x^2 - 4`. `sin(x)*x` → `sin(x) + x*cos(x)`.
+
+**Related.** Integrals, Taylor & Maclaurin, Multivariable Calculus.
+
+---
+
+### Integrals (`calculus.integrals`)
+
+**Purpose.** Antiderivatives and definite integrals.
+
+**Inputs.** `f(x) =`, the variable of integration, and the **Lower limit a** and **Upper limit b** for a definite integral.
+
+**Method.** Indefinite integration is exact where a pattern applies and is reported as such; where no elementary antiderivative exists, the tool says so rather than inventing one. Definite integrals use adaptive Simpson's rule.
+
+**Results.** The antiderivative with its constant, or the value of the definite integral. A numerical answer is prefixed `≈` and names its method.
+
+**Validation.** Limits that are not numbers, and an expression that cannot be parsed.
+
+**Limitations.** The pattern-matcher can return a result labelled "exact" for a power whose base is not the integration variable (`∫sin(x)²dx`); prefer the definite integral for such expressions. `∫2/x dx` is reported as having no elementary antiderivative, because only a numerator of exactly `1` is recognised as a logarithm. The definite integral is a numerical value, not a closed form.
+
+**Examples.** `x^2` from 0 to 1 → ≈ 0.333333333 (adaptive Simpson). `3x + 2` → `1.5x^2 + 2x + C`, *"Antiderivative — found exactly"*.
+
+**Related.** Derivatives, Function Graphing.
+
+---
+
+### Limits (`calculus.limits`)
+
+**Purpose.** Find the value a function approaches.
+
+**Inputs.** `f(x) =`, the variable, the point it approaches, and the **Approach** — both sides, from the right or from the left.
+
+**Method.** Direct substitution where the function is continuous there; otherwise the limit is taken numerically from the chosen side, and when the two sides disagree the limit is reported as not existing.
+
+**Results.** The limit, the method used, and the steps.
+
+**Validation.** A point that is not a number, and an expression that cannot be parsed.
+
+**Limitations.** The numerical route is a one-sided scan, so a limit that needs a path rather than a direction is not found. Infinite limits are reported as such.
+
+**Examples.** `(x^2 - 1)/(x - 1)` at 1 → `2`. `sin(x)/x` at 0 → `1`.
+
+**Related.** Derivatives, Function Graphing.
+
+---
+
+### Taylor & Maclaurin (`calculus.taylor`)
+
+**Purpose.** Expand a function as a power series about a point.
+
+**Inputs.** `f(x) =`, the variable, the **Centre a**, and the **Order**.
+
+**Method.** The derivatives at the centre are found exactly, up to the order asked for, and the series is assembled from them.
+
+**Results.** The series, term by term, with the coefficients shown, and the value at the centre.
+
+**Validation.** An order below zero or above twelve, and a centre that is not a number.
+
+**Limitations.** The expansion is about one point and is useful only near it. A function that is not differentiable enough at the centre is reported as such.
+
+**Examples.** `sin(x)` about 0, order 6 → `x - x^3/6 + x^5/120`.
+
+**Related.** Derivatives, Infinite Series.
+
+---
+
+### Summations & Products (`calculus.summations`)
+
+**Purpose.** Add up or multiply out the terms of a sequence.
+
+**Inputs.** The term, the index (`k`), and the **From k** and **To k** bounds.
+
+**Method.** The index is taken from the term itself, so `∑k` with the variable `x` still sums over `k`. The sum is exact where the terms are exact.
+
+**Results.** The value, and the step-by-step accumulation.
+
+**Validation.** A range that is empty or runs backwards, an index that does not appear in the term, and a range that is too long are each reported.
+
+**Limitations.** The terms are evaluated one at a time, so a very long range is slow. The index has to be the variable of the term; a term in another variable is refused.
+
+**Examples.** `n^2` from 1 to 10 → `385`. `n` from 1 to 10 → `55`.
+
+**Related.** Infinite Series.
+
+---
+
+### Infinite Series (`calculus.series`)
+
+**Purpose.** Decide whether a series with general terms converges.
+
+**Inputs.** The general term, the index, and the **First index k** and **Last index k**.
+
+**Method.** The behaviour of the term is examined, and for a geometric series the ratio decides; the partial sums are computed to show what is happening.
+
+**Results.** A verdict — convergent or divergent, with the reason — and the partial sums.
+
+**Validation.** A range that is empty or runs backwards, and an index that does not appear in the term.
+
+**Limitations.** The verdict is a numerical one; a series whose convergence needs a subtlety the tests do not cover may be judged from its partial sums alone.
+
+**Examples.** `1/n^2` from 1 to 1000 → converges. `(-1)^n` from 1 to 100 → the partial sums do not settle.
+
+**Related.** Summations & Products, Taylor & Maclaurin.
+
+---
+
+### Equation Solving & Roots (`calculus.roots`)
+
+**Purpose.** Find the real roots of an expression over an interval.
+
+**Inputs.** `f(x) =`, and the **Interval from** and **Interval to** to search.
+
+**Method.** The interval is sampled for sign changes, and each candidate is polished with Newton's method.
+
+**Results.** The roots, and the steps that found them.
+
+**Validation.** An interval that is not increasing, an interval that is not a pair of numbers, and an expression that cannot be parsed.
+
+**Limitations.** The search is by sampling, so a root that touches zero without crossing it may be missed. Only real roots are found.
+
+**Examples.** `x^2 - 4` from -10 to 10 → `-2`, `2`.
+
+**Related.** Extrema & Optimization, Equations.
+
+---
+
+### Extrema & Optimization (`calculus.extrema`)
+
+**Purpose.** Find the stationary points of a function over an interval.
+
+**Inputs.** `f(x) =`, and the **Interval from** and **Interval to**.
+
+**Method.** The derivative is found and its roots are located, and each is classified as a maximum or a minimum by the second derivative.
+
+**Results.** The stationary points with their values and their kind, and the steps.
+
+**Validation.** An interval that is not increasing, and an expression that cannot be parsed.
+
+**Limitations.** The interval is sampled, so a very narrow feature may be missed. Endpoints of the interval are not reported as extrema.
+
+**Examples.** `x^3 - 3x` from -5 to 5 → a local maximum at `x = -1` and a local minimum at `x = 1`.
+
+**Related.** Equation Solving & Roots, Multivariable Calculus.
+
+---
+
+### Function Graphing (`calculus.graph`)
+
+**Purpose.** Plot a function and read the mathematics off it.
+
+**Inputs.** `f(x) =`, the variable, and an optional **Area from a** and **Area to b** to shade.
+
+**Method.** The function is sampled on the visible window and drawn. The picture is a shared viewport: a drag moves it with the finger, a pinch spreads it about the point you touch, and the scales are the same on both axes, so a slope of one is drawn at forty-five degrees.
+
+**Results.** The plot, with the axes, the grid, the optional `f′` overlay, the shaded area, and the view controls.
+
+**Validation.** An expression that cannot be parsed, and a shading range that is not a pair of numbers.
+
+**Limitations.** The graph is a picture of the function, not a proof of anything: the accuracy of the curve is the accuracy of the sampling. The view is bound to the variable `x`.
+
+**Examples.** `sin(x)` with the area from 0 to π shaded.
+
+**Related.** Limits, Derivatives, Inequalities.
+
+---
+
+### Differential Equations (`calculus.differential_equations`)
+
+**Purpose.** Solve a first-order differential equation.
+
+**Inputs.** The **Differential equation**, its **Order**, **How to solve it** (symbolic, initial value, or numerical), the **Condition** and **Second condition**, and for the numerical route the **From x**, **To x**, **Step size** and **Method**.
+
+**Method.** The equation is classified first — separable, linear, or with constant coefficients — and then solved by the method that fits it. The numerical route is Runge–Kutta, and the stability condition is checked before anything is computed.
+
+**Results.** The general or the particular solution, the constants and the values they took, the derivation step by step, and for the numerical route the points of the solution and the method that would have applied.
+
+**Validation.** An equation that cannot be read, a condition for an equation of the wrong order, and a step size that the scheme cannot take are each reported in words.
+
+**Limitations.** The symbolic route covers separable and first-order linear equations, and constant-coefficient equations of higher order; anything else is refused with the reason. The numerical route is an approximation.
+
+**Examples.** `dy/dx = 2y` → `y = C·e^(2x)`. `y' = x - y` with `y(0) = 1` → `y = x - 1 + 2e^(-x)`.
+
+**Related.** Function Graphing, Partial Differential Equations.
+
+---
+
+### Multivariable Calculus (`calculus.multivariable`)
+
+**Purpose.** The calculus of functions of more than one variable.
+
+**Inputs.** `f(x, y) =`, the **Variables**, the **Point** to evaluate at, the **Order** of the derivative, the **Second variable** for a mixed partial, a **Direction vector** for the directional derivative, the **Components** of a vector field, the **Bounds** of a region, and a **parametric curve** `x(t), y(t)` for a line integral.
+
+**Method.** The operations run on the same expression engine as the rest of the calculus, so the partial derivatives are exact; the integrals reuse the adaptive rule. The critical-point search looks at all eight neighbours of a point.
+
+**Results.** The requested quantity, the gradient, the Hessian, the classification of a critical point, the integrals, and a picture: a rotatable surface and a contour map with the gradient vectors, both drawn from the same expression. The level curves are traced with the marching-squares rule, so they follow the true contours, and the arrows have a fixed length on the screen.
+
+**Validation.** A function of the wrong number of variables, a direction vector of the wrong length, bounds that are not in pairs, and a curve whose bounds run backwards are each reported.
+
+**Limitations.** The integrals are numerical, over a rectangle, a box or a parametric curve. The critical points are found by scanning, so a saddle in a narrow region may be missed. The expression parser reads a run of letters as one name, so the multivariable tool puts the multiplication signs in itself, because it knows the variables.
+
+**Examples.** The gradient of `x^2 + 3xy + y^2` is `(2x + 3y, 3x + 2y)`.
+
+**Related.** Derivatives, Fourier Analysis.
+
+---
+
+### Fourier Analysis (`calculus.fourier`)
+
+**Purpose.** The Fourier series of a function, and the discrete transform of a list of samples.
+
+**Inputs.** For the series: `f(x) =`, the **Variable**, the **Period T** and the **Harmonics**. For the transform: the **Sample values**, in order, and the **Length of the record**.
+
+**Method.** The coefficients are found by numerical integration with a fixed rule and enough panels, so a fast oscillation is not missed; the number of panels follows the number of harmonics. The constant term is the mean of the function, even when no harmonics are asked for.
+
+**Results.** The series term by term, the constant term, the difference from the function, and the discrete transform with each bin's frequency. The function and its approximation are drawn together.
+
+**Validation.** A period that is not positive, a negative number of harmonics, and a list of samples that is empty or of the wrong length.
+
+**Limitations.** The coefficients are estimates, not exact values. The two routes are kept apart: the series takes a function, the transform takes a list.
+
+**Examples.** The first sine coefficient of `sin(x)` is one.
+
+**Related.** Multivariable Calculus, Complex Analysis.
+
+---
+
+### Complex Analysis (`calculus.complex`)
+
+**Purpose.** Work with complex numbers and complex functions.
+
+**Inputs.** A complex number as its real and imaginary parts, or a function `f(z) =` with `z` as the variable, a point, a contour `x(t), y(t)` with its bounds, and the **Order of the pole**.
+
+**Method.** The complex arithmetic is exact in the polar and exponential forms; the principal square root and the principal logarithm take the principal branch, and the principal cube root is chosen by argument rather than by its imaginary part. The Cauchy–Riemann check is a local numerical check of the four partial derivatives.
+
+**Results.** The real part, the imaginary part, the modulus, the argument, the polar form, the conjugate, the powers, the roots, the value of `f(z)`, the Cauchy–Riemann residual, a contour integral, and the residue.
+
+**Validation.** A point that is not a pair of numbers, a contour whose bounds run backwards, and a pole of an order the tool does not handle.
+
+**Limitations.** The contour integral and the residue are numerical estimates: the limit is taken along a few directions. The Cauchy–Riemann check is a local numerical check, not a proof of analyticity.
+
+**Examples.** `z^2` at `1 + i` → `2i`.
+
+**Related.** Fourier Analysis, Derivatives.
+
+---
+
+### Partial Differential Equations (`calculus.pde`)
+
+**Purpose.** The heat and wave equations along a rod, and Laplace's and Poisson's equations over a square.
+
+**Inputs.** The **equation** — heat, wave, Laplace or Poisson — the **Initial condition u(x, 0)**, the **Initial velocity u_t(x, 0)**, the two end values, the **Number of points in space**, the **Number of steps in time**, the **Time to reach**, the **Diffusivity α** or the **Speed c**, and for the two-dimensional route the **Size of the side**, the **Boundary values**, the **source f(x, y)**, the **Points on each side** and the **Maximum sweeps**. The coefficients **A**, **B** and **C** classify the equation as elliptic, parabolic or hyperbolic.
+
+**Method.** Finite differences. The stability condition is checked before anything is computed, and the tool refuses a step that would make the numbers grow. The two-dimensional route relaxes the grid until the values stop changing.
+
+**Results.** The solution, the stability number and the limit it must satisfy, the steady state, the number of sweeps used, and a colour map of the field. The colours follow the accent colour you have chosen, and a flat field is explained rather than left looking like a failure.
+
+**Validation.** A step that breaks the stability condition, a grid or sweep count outside the allowed range, an expression that cannot be read, and a side length that is not positive are each reported in words.
+
+**Limitations.** The boundary of the two-dimensional equations is a single expression used on all four sides, so the textbook "hot along the top, cold elsewhere" cannot be written directly. The answers are numerical approximations, and the wave equation is a one-dimensional string.
+
+**Examples.** The heat equation with the initial value `sin(pi*x)` on a rod of length 1 spreads the peak and lowers it.
+
+**Related.** Differential Equations, Function Graphing.
+
+---
+
+## 9. Advanced Mathematics — 3 tools
+
+Three learning environments. Each computes real values for the example in front of it and states what it does not reach.
+
+### Measure Theory (`advanced.measure`)
+
+**Purpose.** Measure, unions, overlaps and the integral.
+
+**Inputs.** What to explore — the measure of a set, the union and the overlap of two sets, a geometric series of intervals, or the Riemann integral of a function — and the sets, the series, or the function itself.
+
+**Method.** The measure of a finite union of intervals is the total length; the union and the overlap are computed from the intervals themselves. Countable additivity is shown through a geometric series. The lower and upper Riemann sums are computed and compared, which is what says whether the integral of a function exists.
+
+**Results.** The measure, the union, the overlap, the sum of the measures and the ratio between them; the partial sums and the total length; the lower and upper sums, the gap between them, and whether the integral exists; and where two functions differ and whether they are equal almost everywhere.
+
+**Validation.** A set that is not a list of intervals, bounds that are the wrong way round, and a function that cannot be read are each reported in words.
+
+**Limitations.** Finite unions of intervals only. The Riemann sums are numerical, and the answer they give about existence is the answer for that function on that interval.
+
+**Examples.** The measure of `[0, 2] ∪ [1, 3]` is three.
+
+**Related.** Topology Explorer, Functional Analysis.
+
+---
+
+### Topology Explorer (`advanced.topology`)
+
+**Purpose.** The open sets, the closed sets and the shapes of a topological space.
+
+**Inputs.** What to explore — a set of real numbers, a finite topological space, a region of the plane, or a homeomorphism — and the intervals, the points, the centre and radius, or the map itself.
+
+**Method.** The intervals carry their open and closed ends, so an open interval and a closed one are different sets. The interior, the closure, the boundary, the isolated points and the limit points are computed from those ends. A finite space is given by its open sets, and the plane regions are compared by the map between them.
+
+**Results.** Whether the set is open, closed, compact and connected; its interior, closure and boundary; its isolated and limit points; the open sets of a finite space; the area of a region; and the homeomorphisms between two spaces.
+
+**Validation.** An interval whose ends are the wrong way round, a point that is not a number, a radius that is not positive, and a set of open sets that is not closed under intersection are each reported.
+
+**Limitations.** Intervals, finite spaces and a few plane regions. The homeomorphisms are the ones that can be checked on those.
+
+**Examples.** `(0, 1)` is open and not closed; `[0, 1]` is closed and compact.
+
+**Related.** Measure Theory, Functional Analysis.
+
+---
+
+### Functional Analysis (`advanced.functional`)
+
+**Purpose.** Vectors, inner products, projections and the operators between them.
+
+**Inputs.** What to do — the inner product, the norms, the distance, the angle, the projection, the Gram–Schmidt process, the least-squares fit, the eigenvalues and eigenvectors of a matrix, or the spectral radius — and the vectors or the matrix.
+
+**Method.** The inner products and the norms are exact in the usual arithmetic; the Gram–Schmidt process and the least-squares fit are checked for shape first, so a fit that does not exist is refused with the reason rather than crashing. The eigenvalues of a symmetric matrix are found with the Jacobi method.
+
+**Results.** The inner product, the norms, the distance, the angle, whether two vectors are orthogonal, the projection and its residual, the orthonormal basis and whether it is orthonormal, the least-squares coefficients and the length of the residual, the eigenvalues, the eigenvectors, whether the matrix is symmetric, its spectral radius, and whether it is a contraction. The infinite-dimensional case is described rather than faked.
+
+**Validation.** Vectors of different lengths, a matrix that is not square, a fit with more rows than columns and a projection onto a zero vector are each reported in words.
+
+**Limitations.** The eigenvalues are found numerically, so they are estimates. The infinite-dimensional spaces are described, not computed in.
+
+**Examples.** The inner product of `(1, 2, 3)` and `(0, 1, 4)` is fourteen.
+
+**Related.** Measure Theory, Topology Explorer.
+
+---
+
 ## Appendix: category index
 
 | Category | Tool | Id |
@@ -732,7 +1083,7 @@ They differ by design: 1 January 23:00 → 2 January 01:00 is a calendar interva
 | | [Combinations](#combinations-algebracombinations) | `algebra.combinations` |
 | | [Prime checker](#prime-checker-algebraprimes) | `algebra.primes` |
 | | [Number generator](#number-generator-algebrarandom) | `algebra.random` |
-| | [Calculus](#calculus-algebracalculus) | `algebra.calculus` |
+| | [Inequalities](#inequalities-algebrainequalities) | `algebra.inequalities` |
 | Geometry | [2D shapes](#2d-shapes-geometryshapes) | `geometry.shapes` |
 | | [3D bodies](#3d-bodies-geometrybodies) | `geometry.bodies` |
 | Converters | [Length](#length-convertlength) | `convert.length` |
@@ -772,14 +1123,31 @@ They differ by design: 1 January 23:00 → 2 January 01:00 is a calendar interva
 | | [Time interval](#time-interval-datetimeinterval) | `datetime.interval` |
 | Other | [Mileage & trips](#mileage--trips-othermileage) | `other.mileage` |
 | | [Ohm's law](#ohms-law-otherohms_law) | `other.ohms_law` |
+| Calculus | [Derivatives](#derivatives-calculusderivatives) | `calculus.derivatives` |
+| | [Integrals](#integrals-calculusintegrals) | `calculus.integrals` |
+| | [Limits](#limits-calculuslimits) | `calculus.limits` |
+| | [Taylor & Maclaurin](#taylor--maclaurin-calculustaylor) | `calculus.taylor` |
+| | [Summations & Products](#summations--products-calculussummations) | `calculus.summations` |
+| | [Infinite Series](#infinite-series-calculusseries) | `calculus.series` |
+| | [Equation Solving & Roots](#equation-solving--roots-calculusroots) | `calculus.roots` |
+| | [Extrema & Optimization](#extrema--optimization-calculusextrema) | `calculus.extrema` |
+| | [Function Graphing](#function-graphing-calculusgraph) | `calculus.graph` |
+| | [Differential Equations](#differential-equations-calculusdifferential_equations) | `calculus.differential_equations` |
+| | [Multivariable Calculus](#multivariable-calculus-calculusmultivariable) | `calculus.multivariable` |
+| | [Fourier Analysis](#fourier-analysis-calculusfourier) | `calculus.fourier` |
+| | [Complex Analysis](#complex-analysis-calculuscomplex) | `calculus.complex` |
+| | [Partial Differential Equations](#partial-differential-equations-calculuspde) | `calculus.pde` |
+| Advanced Mathematics | [Measure Theory](#measure-theory-advancedmeasure) | `advanced.measure` |
+| | [Topology Explorer](#topology-explorer-advancedtopology) | `advanced.topology` |
+| | [Functional Analysis](#functional-analysis-advancedfunctional) | `advanced.functional` |
 
-**Count: 10 + 2 + 23 + 6 + 3 + 3 + 2 = 49.** Every id here appears in `data/ToolRegistry.kt`, and every id there appears here.
+**Count: 10 + 2 + 23 + 6 + 3 + 3 + 2 + 14 + 3 = 66.** Every id here appears in `data/ToolRegistry.kt`, and every id there appears here.
 
 ---
 
 ## Related documentation
 
 - [User guide](USER_GUIDE.md) — navigation, input rules, settings, errors
-- [Calculus guide](CALCULUS_GUIDE.md) — the Calculus tool in depth
+- [Calculus guide](CALCULUS_GUIDE.md) — the calculus tools in depth
 - [Architecture](ARCHITECTURE.md) — how the engines are built
 - [Roadmap](../ROADMAP.md) — verified limitations and outstanding work

@@ -141,16 +141,16 @@ class CalculusParser(private val text: String) {
         }
     }
 
-    private fun parseFactor(): Node? {
-        val base = parseUnary() ?: return null
-        skipSpace()
-        if (match("^") != null) {
-            val exp = parseFactor() ?: return null
-            return Node.Pow(base, exp)
-        }
-        return base
-    }
+    private fun parseFactor(): Node? = parseUnary()
 
+    /**
+     * Reads a signed factor.
+     *
+     * The power is read inside the sign, so that the sign binds looser than
+     * the power: -x^2 is -(x^2), which is what the grammar at the top of
+     * this file says and what the printer's own text assumes. A sign that
+     * comes before another sign is a sign of the whole of what follows.
+     */
     private fun parseUnary(): Node? {
         skipSpace()
         if (match("-", "−") != null) {
@@ -158,7 +158,13 @@ class CalculusParser(private val text: String) {
             return Node.Neg(operand)
         }
         match("+")
-        return parsePostfix()
+        val base = parsePostfix() ?: return null
+        skipSpace()
+        if (match("^") != null) {
+            val exp = parseFactor() ?: return null
+            return Node.Pow(base, exp)
+        }
+        return base
     }
 
     private fun parsePostfix(): Node? {

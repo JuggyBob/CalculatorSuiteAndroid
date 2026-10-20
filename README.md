@@ -2,14 +2,14 @@
 
 # Calculator Suite
 
-**49 calculators in one offline Android app — a fast everyday keypad plus a full calculus workbench.**
+**66 calculators in one Android app — a fast everyday keypad, a full calculus workbench, and an AI that reads a photograph of a problem.**
 
 [![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![Min SDK](https://img.shields.io/badge/min%20SDK-26-green)](https://developer.android.com/about/versions/oreo)
 [![Target SDK](https://img.shields.io/badge/target%20SDK-36-green)](https://developer.android.com/about/versions/16)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-3DDC84?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Tests](https://img.shields.io/badge/tests-910%20passing-success)](docs/BUILDING.md)
+[![Tests](https://img.shields.io/badge/tests-1267%20passing-success)](docs/BUILDING.md)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-79589E)](LICENSE)
 
 </div>
@@ -18,20 +18,20 @@
 
 | Main menu | Scientific calculator | Calculus graph |
 |---|---|---|
-| ![Main menu: the everyday keypad, search, recents and the seven categories](docs/screenshots/01-main-menu.png) | ![Scientific calculator showing sin(30)+2^10 = 1,024.5](docs/screenshots/02-scientific-calculator.png) | ![Calculus tool plotting sin(x) with view controls and shaded-area limits](docs/screenshots/03-calculus-graph.png) |
-| The landing screen: quick arithmetic, search across all 49 tools, and seven categories. | `DEG`/`RAD`/`GRAD`, the full function keypad, memory keys and collapsible reference panels. | Interactive plot with pan, pinch-zoom, an optional `f′` layer and a shaded-area limit. |
+| ![Main menu: the everyday keypad, search, recents and the eight categories](docs/screenshots/01-main-menu.png) | ![Scientific calculator showing sin(30)+2^10 = 1,024.5](docs/screenshots/02-scientific-calculator.png) | ![Calculus tool plotting sin(x) with view controls and shaded-area limits](docs/screenshots/03-calculus-graph.png) |
+| The landing screen: quick arithmetic, search across all 66 tools, and eight categories. | `DEG`/`RAD`/`GRAD`, the full function keypad, memory keys and collapsible reference panels. | Interactive plot with pan, pinch-zoom, an optional `f′` layer and a shaded-area limit. |
 
 ---
 
 ## What it is
 
-Calculator Suite is a single-purpose Android app that bundles **49 registered tools** across **7 categories**, plus an everyday keypad and a full scientific calculator. Everything is written in Kotlin with Jetpack Compose (Material 3).
+Calculator Suite is a single-purpose Android app that bundles **66 registered tools** across **8 categories**, plus an everyday keypad, a full scientific calculator and an **AI problem solver** that reads a photograph of a mathematical problem and works it out with the app's own engines. Everything is written in Kotlin with Jetpack Compose (Material 3).
 
 The design goal was **no dead controls**: every button, field and toggle performs a real computation with exact arithmetic where the mathematics allows it, and shows its working rather than a bare number.
 
 - **Exact where it can be.** Money and general decimals use `BigDecimal` with a 34-significant-digit evaluation context; integer maths (factorials, GCD/LCM, primes, permutations) uses `BigInteger`. Display rounding happens only at the very end, at 3–15 significant digits.
 - **Honest about approximations.** Numerical results are prefixed `≈` and their method is named — adaptive Simpson for definite integrals, RK4 for differential equations, bisection for root scans.
-- **On-device.** The only network call in the whole app is the currency converter fetching reference exchange rates. Everything else works with the device in aeroplane mode.
+- **On-device by default.** Every tool works with the device in aeroplane mode. The only network calls are the currency converter fetching reference exchange rates, and the AI problem solver talking to the provider **you** chose — the picture goes nowhere else, and only when you press the button.
 
 ## Feature highlights
 
@@ -39,7 +39,10 @@ The design goal was **no dead controls**: every button, field and toggle perform
 |---|---|
 | 🧮 **Everyday keypad** | Live preview as you type, four memory keys, optional full-screen expansion. |
 | 🔬 **Scientific calculator** | Trig, logs, powers, factorials, `mod`, memory, DEG/RAD/GRAD, and collapsible reference panels that match the keypad exactly. |
-| ∫ **Calculus workbench** | Symbolic and numerical derivatives (incl. partials), indefinite and definite integration, limits, infinite series and convergence, Taylor/Maclaurin, Σ and Π notation, roots, extrema, differential equations, and an interactive graph. |
+| ∫ **Calculus workbench** | Fourteen focused tools: derivatives, integrals, limits, Taylor/Maclaurin, Σ and Π notation, infinite series, roots, extrema, an interactive function graph, differential equations, multivariable calculus, Fourier analysis, complex analysis and partial differential equations. |
+| 🧠 **AI problem solver** | Photograph a mathematical problem. The AI reads it, picks the right Calculator Suite tool, and the app's own engine does the mathematics. Ten providers, your own key, your own model. |
+| 📐 **Advanced mathematics** | Measure theory, a topology explorer and functional analysis — each computing real values and stating what it does not reach. |
+| 🎨 **Accent colour** | A palette of presets or a custom colour of your own, reaching every button, surface, curve and highlight in the app. |
 | 📐 **23 converters** | Length, area, volume, mass, temperature, pressure, energy, power, force, torque, speed, acceleration, time, angle, data storage, data transfer, flow, fuel economy, numeric bases, Roman numerals, cooking measures, ring sizes, shoe sizes. |
 | 💷 **6 finance tools** | Currency (live reference rates + offline cache), loan amortisation, compound interest with EAR, sales tax, tips with cent allocation, unit price comparison. |
 | 🩺 **3 health tools** | BMI, caloric burn from MET values, US Navy body-fat estimate. |
@@ -57,13 +60,15 @@ Download the signed APK from the
 
 ```bash
 # Verify the download before installing
-sha256sum -c CalculatorSuite-v1.0.0.apk.sha256
+sha256sum -c CalculatorSuite-v2.0.0.apk.sha256
 
 # Install over USB
-adb install CalculatorSuite-v1.0.0.apk
+adb install CalculatorSuite-v2.0.0.apk
 ```
 
 **Requirements:** Android 8.0 (API 26) or newer, arm64-v8a / x86_64. You will need to allow installation from your file manager the first time.
+
+The 2.0.0 APK is signed with the same key as 1.0.0, so it installs straight over the older version with your settings and history intact.
 
 ## Usage
 
@@ -71,7 +76,8 @@ adb install CalculatorSuite-v1.0.0.apk
 2. **Find a tool** — tap the search field and type what you want ("tip", "hex", "mortgage"), or browse a category card.
 3. **Enter data** — most tools recompute live; the rest have an explicit **Calculate** button. Every tool has a **Reset** action in its top bar that restores that tool's defaults.
 4. **Copy or save** — every result card can copy a full-precision value or push the calculation into history.
-5. **Adjust behaviour** — open **Settings** for theme, angle unit, result precision, thousands separator, haptics and wallpaper colours.
+5. **Adjust behaviour** — open **Settings** for theme, accent colour, angle unit, result precision, thousands separator, haptics and wallpaper colours.
+6. **Let the AI read a problem** — tap the brain button, photograph a mathematical problem or pick a picture of one, and the app works it out. You choose the provider, the model and your own key in the AI settings; see the [User Guide](docs/USER_GUIDE.md).
 
 Number entry accepts `1 234,56` and `1,234.56` interchangeably; the decimal mark always follows your device's region. See the [User Guide](docs/USER_GUIDE.md) for input rules, error messages and common workflows.
 
@@ -83,7 +89,7 @@ You need **JDK 17 or newer** (JDK 21 is what CI uses) and an **Android SDK with 
 git clone https://github.com/JuggyBob/CalculatorSuiteAndroid.git
 cd CalculatorSuiteAndroid
 
-./gradlew :app:testDebugUnitTest   # 910 JVM unit tests
+./gradlew :app:testDebugUnitTest   # 1267 JVM unit tests
 ./gradlew :app:lintDebug           # Android Lint
 ./gradlew :app:assembleDebug       # app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -101,9 +107,9 @@ Full instructions, build variants and troubleshooting are in [docs/BUILDING.md](
 | Persistence | DataStore Preferences 1.1.7 |
 | Numerics | `java.math.BigDecimal` / `BigInteger` (34-digit `MathContext`), `Double` for numerical calculus |
 | Dates | `java.time` |
-| Networking | `HttpURLConnection` + `org.json` (currency rates only) |
+| Networking | `HttpURLConnection` + `org.json` (currency rates, and the AI provider you choose) |
 | Build | Gradle 8.13, Android Gradle Plugin 8.13.2, Kotlin Compose plugin |
-| Tests | JUnit 4 on the JVM — 910 tests, no instrumentation required |
+| Tests | JUnit 4 on the JVM — 1267 tests, no instrumentation required |
 | Min / target SDK | 26 / 36 |
 
 See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for the full list with licences, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the code is organised.
@@ -112,7 +118,7 @@ See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for the full list with licences
 
 | | |
 |---|---|
-| [Features & tools](docs/FEATURES_AND_TOOLS.md) | Every one of the 49 tools, with inputs, formulas, limits and worked examples |
+| [Features & tools](docs/FEATURES_AND_TOOLS.md) | Every one of the 66 tools, with inputs, formulas, limits and worked examples |
 | [User guide](docs/USER_GUIDE.md) | Navigation, input rules, settings, history, error messages |
 | [Calculus guide](docs/CALCULUS_GUIDE.md) | Expression syntax, each operation, graphing, and the honest limits of the symbolic engine |
 | [Architecture](docs/ARCHITECTURE.md) | Package layout, engines, navigation, state, testing strategy |
@@ -127,7 +133,12 @@ See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for the full list with licences
 
 Calculator Suite is offline-first and does not collect, transmit or sell any personal data. There is **no analytics, no advertising, no tracking SDK and no account**. All history, favourites and settings stay in the app's private local storage.
 
-The one exception is the **Currency converter**, which makes a single HTTPS request to `open.er-api.com` (a free, key-less public rate service) to fetch reference exchange rates. Nothing about you is sent beyond the currency you select as the base. Rates are cached locally so the tool keeps working offline, and the app shows a warning when the cache is more than 24 hours old.
+There are two features that talk to the internet, and both are opt-in and visible:
+
+- The **Currency converter** makes a single HTTPS request to `open.er-api.com` (a free, key-less public rate service) to fetch reference exchange rates. Nothing about you is sent beyond the currency you select as the base. Rates are cached locally so the tool keeps working offline, and the app shows a warning when the cache is more than 24 hours old.
+- The **AI problem solver** sends the picture and the question to the **AI provider you chose in the settings** — OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, Groq, Mistral AI, xAI, Together AI or Fireworks AI. Your API key is kept by the phone's own keystore, encrypted, and never written in plain text or included in an error message. The picture is only ever sent to the provider you selected, and only when you press the button. If you never configure the AI feature, nothing about you is ever sent anywhere.
+
+That is the whole list. There is no third-party SDK that collects anything, and the app has no account system.
 
 Full details — including the complete permission list and exactly what is stored on disk — are in [PRIVACY.md](PRIVACY.md).
 

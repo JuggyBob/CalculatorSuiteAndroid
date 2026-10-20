@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -87,8 +88,13 @@ fun SearchScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
+                    // A little shorter than the default, which keeps the touch
+                    // target comfortable and the list of results in view.
+                    .heightIn(min = 48.dp, max = 52.dp)
                     .focusRequester(focusRequester),
-                placeholder = { Text("Search 48 tools by name or synonym") },
+                // The count comes from the registry, so it is always the number
+                // of tools the user can actually find.
+                placeholder = { Text("Search ${ToolRegistry.all.size} tools") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {

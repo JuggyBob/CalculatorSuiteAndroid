@@ -12,9 +12,10 @@ How Calculator Suite is put together, what to type, what the messages mean, and 
 6. [Using a tool](#6-using-a-tool)
 7. [Settings](#7-settings)
 8. [History and favourites](#8-history-and-favourites)
-9. [Error messages](#9-error-messages)
-10. [Common workflows](#10-common-workflows)
-11. [Things to know](#11-things-to-know)
+9. [The AI problem solver](#9-the-ai-problem-solver)
+10. [Error messages](#10-error-messages)
+11. [Common workflows](#11-common-workflows)
+12. [Things to know](#12-things-to-know)
 
 ---
 
@@ -23,7 +24,7 @@ How Calculator Suite is put together, what to type, what the messages mean, and 
 The first time you open the app you get four welcome pages:
 
 1. **Welcome** — what the app is
-2. **Organised** — the seven categories and how many tools each holds
+2. **Organised** — the eight categories and how many tools each holds
 3. **Mathematics** — the calculus workbench
 4. **Make it yours** — the settings
 
@@ -39,6 +40,7 @@ From top to bottom:
 |---|---|
 | **Calc Suite** | Title, and a count of the available tools |
 | **History icon** | Your saved calculations |
+| **Brain icon** | The AI problem solver — read a mathematical problem from a picture |
 | **Gear icon** | Settings |
 | **Fullscreen icon** | Expand the keypad to fill the screen; tap again to restore |
 | **Search field** | Tap and type keywords |
@@ -48,7 +50,7 @@ From top to bottom:
 | **MC MR M+ M−** | Memory: clear, recall, add, subtract |
 | **Keypad** | Digits, operators, `%`, `±`, `C`, backspace, `=` |
 | **Recently used** | The last tools you opened, if any |
-| **Categories** | The seven category cards |
+| **Categories** | The eight category cards |
 
 The result previews live as you type. Press `=` to commit it to history.
 
@@ -177,6 +179,12 @@ Open with the gear icon on the main screen.
 
 ### Appearance
 
+The **Accent colour** row is where the colour of the app comes from. There are seven preset swatches — green, blue, teal, purple, rose, orange and slate — and a **custom colour** button that opens a picker with a colour square, a hue slider, a hexadecimal field and a preview. **Back to the default green** puts the original colour back.
+
+The accent reaches the buttons, the selection, the icons, the surfaces and the curves in the graphs, so a blue accent gives a blue app rather than blue buttons on green cards. Every colour keeps the lightness the app already had, so the contrast between the text and the background is the same whatever you choose. The green is the app's original colour exactly, so if you never touch this row nothing changes.
+
+The choice is kept between restarts.
+
 | Setting | Options |
 |---|---|
 | Theme | System, Light, Dark |
@@ -222,7 +230,58 @@ Tap an entry to reopen its tool.
 
 All three are local. Nothing is uploaded.
 
-## 9. Error messages
+## 9. The AI problem solver
+
+The **brain icon** on the main screen opens a feature that reads a mathematical problem from a picture and works it out.
+
+### What it actually does
+
+1. You take a photograph of the problem, or pick a picture of one.
+2. The picture is shown to you, so you can check it is the right one before anything is sent.
+3. The app sends the picture to **the AI provider you chose**, together with the list of the mathematical tools that may be used and the arguments each one takes.
+4. The model reads the problem, names the tool it wants, and fills in that tool's arguments.
+5. The app **checks the choice** against the registry and the arguments against that tool's own list, and then **runs the engine that tool already uses**.
+
+The mathematics is done by Calculator Suite, not by the model. If the model picks a tool, the answer is that tool's answer, with that tool's working — and a number that was worked out numerically is marked `≈` and says how it was found.
+
+### Setting it up
+
+The feature is off until you turn it on. Open the brain icon, then the **gear icon** beside it.
+
+| Field | What to put |
+|---|---|
+| **Who answers** | The provider: OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, Groq, Mistral AI, xAI, Together AI or Fireworks AI |
+| **Model name** | The model you want to use, typed exactly as the provider names it |
+| **API key** | Your key from that provider. It is hidden by default; tap the eye to show it |
+| **Save the key** | Stores it, encrypted, in the phone's keystore |
+| **Remove the key** | Deletes it |
+| **Test the connection** | Sends one short message and tells you whether the key and the model work |
+
+The **model name** is used exactly as you type it, so a model released today can be used today without waiting for an app update.
+
+> **The model must be one that reads pictures.** If the model you chose cannot read images, the request is refused and the app says so. It never moves you to a different model on its own, and it never makes a request you did not ask for.
+
+### Using it
+
+1. Tap **Take a photo**, or **Pick a picture**.
+2. Check the preview. **Choose another** throws it away.
+3. Tap **Read the problem**.
+4. The app shows **what the model read** — the problem in words and the tool it chose — and then the answer, with the working.
+
+If the model was not sure, it says so instead of guessing: the reading is marked **ambiguous** and the question that has to be answered is put to you. If no tool can work the problem out, that is said too.
+
+### When the reading is wrong
+
+Tap **Correct the inputs**. The arguments the model produced are shown in a dialog, one field each, and the tool runs again with what you write. The answer updates, and the expression shown is the one that was actually used.
+
+### Your key and your privacy
+
+- The key is kept by the phone's **keystore**, encrypted. It is never written in plain text, never logged, and never shown inside an error message.
+- The picture goes to **the provider you chose** and to nobody else, and only when you press **Read the problem**. It is not stored in your history.
+- The request is billed by that provider using your key. **Test the connection** sends one very short message.
+- The full disclosure is in [Privacy](../PRIVACY.md).
+
+## 10. Error messages
 
 Errors appear next to the offending field or in the result card, in plain language. There are no error codes.
 
@@ -244,7 +303,7 @@ Errors appear next to the offending field or in the result card, in plain langua
 
 **`≈` means approximate.** A result prefixed with `≈` was computed numerically rather than symbolically, and the panel names the method (adaptive Simpson, RK4, bisection, one-sided evaluation). An exact result has no prefix.
 
-## 10. Common workflows
+## 11. Common workflows
 
 ### "What is 15% of 2,000?"
 
@@ -278,7 +337,7 @@ Open **Percentage** from Algebra, keep the **Percent of** mode, enter `15` and `
 
 **Combinations**, nCr mode, `n = 52`, `r = 5`. Large results are shown in full — the exact integer is available to copy, not rounded.
 
-## 11. Things to know
+## 12. Things to know
 
 - **The app is portrait-only.** It will not rotate. This is deliberate, so no screen or dialog can be caught mid-rotation.
 - **System bars are hidden.** Swipe from the screen edge to bring them back temporarily.

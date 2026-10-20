@@ -4,9 +4,9 @@ import androidx.compose.runtime.Composable
 import com.calcsuite.ui.tools.ToolArgs
 
 /**
- * Algebra batch dispatcher: the nine tools Percentage, Average, Proportion,
- * Ratio, Equations, GCF & LCM, Combinations, Prime checker and Number
- * generator. Returns false for ids that belong to another batch so the host
+ * Algebra batch dispatcher: Percentage, Average, Proportion, Ratio, Equations,
+ * GCF & LCM, Combinations, Prime checker, Number generator, Calculus and
+ * Inequalities. Returns false for ids that belong to another batch so the host
  * can continue its own dispatch chain.
  */
 @Composable
@@ -21,7 +21,7 @@ fun AlgebraTools(args: ToolArgs): Boolean {
         "algebra.combinations" -> CombinatoricsToolScreen(args)
         "algebra.primes" -> PrimeToolScreen(args)
         "algebra.random" -> RandomToolScreen(args)
-        "algebra.calculus" -> CalculusToolScreen(args)
+        "algebra.inequalities" -> InequalityToolScreen(args)
         else -> return false
     }
     return true

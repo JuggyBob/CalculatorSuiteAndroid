@@ -1,8 +1,9 @@
-﻿package com.calcsuite.ui.tools.algebra
+﻿package com.calcsuite.ui.tools.calculus
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +44,7 @@ import com.calcsuite.engine.calculus.OdeResult
 import com.calcsuite.engine.calculus.RootResult
 import com.calcsuite.engine.calculus.SeriesResult
 import com.calcsuite.ui.components.ErrorNotice
+import com.calcsuite.ui.components.clickableRow
 import com.calcsuite.ui.components.ExpandablePanel
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
@@ -68,12 +70,14 @@ import kotlin.math.abs
  * with the numbers above it.
  */
 @Composable
-fun CalculusToolScreen(args: ToolArgs) {
+fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    var operationName by rememberSaveable { mutableStateOf(CalcOperation.DERIVATIVE.name) }
-    val operation = CalcOperation.valueOf(operationName)
+    // Each tool is a tool of its own, so the operation is the tool's and is
+    // not something the user chooses here: the other operations are separate
+    // tools in the Calculus category.
+    val operation = tool.operation
 
-    var expression by rememberSaveable { mutableStateOf("x^2 + 3x") }
+    var expression by rememberSaveable { mutableStateOf(tool.defaultExpression) }
     var variable by rememberSaveable { mutableStateOf("x") }
     var atPoint by rememberSaveable { mutableStateOf("1") }
     var lowerLimit by rememberSaveable { mutableStateOf("0") }
@@ -84,10 +88,6 @@ fun CalculusToolScreen(args: ToolArgs) {
     var centre by rememberSaveable { mutableStateOf("0") }
     var order by rememberSaveable { mutableStateOf("6") }
     var side by rememberSaveable { mutableStateOf(BothSides) }
-    var odeInitialX by rememberSaveable { mutableStateOf("0") }
-    var odeInitialY by rememberSaveable { mutableStateOf("1") }
-    var odeSteps by rememberSaveable { mutableStateOf("100") }
-    var odeStep by rememberSaveable { mutableStateOf("0.05") }
     var view by remember { mutableStateOf(GraphView.Default) }
 
     val parsed = remember(expression) { CalculusParser.parse(expression) }
@@ -105,8 +105,8 @@ fun CalculusToolScreen(args: ToolArgs) {
     }
 
     ToolScaffold(
-        title = "Calculus",
-        subtitle = if (expanded) null else "Derivatives, integrals, limits, series and graphs",
+        title = tool.title,
+        subtitle = if (expanded) null else tool.description,
         onBack = args.onBack,
         favorite = args.favorite,
         onToggleFavorite = args.onToggleFavorite,
@@ -133,13 +133,6 @@ fun CalculusToolScreen(args: ToolArgs) {
         if (parseError != null && expression.isNotBlank()) {
             ErrorNotice(parseError)
         }
-
-        SegmentedChoice(
-            options = CalcOperation.entries.map { it.label to it.shortLabel },
-            selected = operation.label,
-            onSelect = { label -> operationName = CalcOperation.entries.first { it.label == label }.name },
-            label = "Operation",
-        )
 
         when (operation) {
             CalcOperation.DERIVATIVE -> DerivativePanel(
@@ -222,18 +215,18 @@ fun CalculusToolScreen(args: ToolArgs) {
                 onRecord = args.onRecord,
             )
 
-            CalcOperation.ODE -> OdePanel(
-                expression = expression,
-                variable = v,
-                initialX = odeInitialX,
-                initialY = odeInitialY,
-                steps = odeSteps,
-                step = odeStep,
-                onInitialX = { odeInitialX = it },
-                onInitialY = { odeInitialY = it },
-                onSteps = { odeSteps = it },
-                onStep = { odeStep = it },
-                onRecord = args.onRecord,
+            // The differential equations have a screen of their own, with the
+            // equation editor, the conditions, the numerical settings, the
+            // slope field and the full explanation.
+            CalcOperation.ODE -> OdeToolContent(args = args)
+
+            // These four have a workspace of their own in the Calculus
+            // category, so they are never reached from this screen.
+            CalcOperation.GRADIENT,
+            CalcOperation.FOURIER,
+            CalcOperation.COMPLEX,
+            CalcOperation.PDE -> InfoNote(
+                "This operation has a tool of its own in the Calculus category.",
             )
 
             CalcOperation.GRAPH -> GraphPanel(
@@ -258,6 +251,7 @@ fun CalculusToolScreen(args: ToolArgs) {
             ExpandablePanel(title = "Conventions & Help") {
                 CalculusHelp()
             }
+
         }
     }
 }
@@ -732,62 +726,6 @@ private fun ExtremaPanel(
 
 // ----------------------------------------------------------------------- ODE
 
-@Composable
-private fun OdePanel(
-    expression: String,
-    variable: String,
-    initialX: String,
-    initialY: String,
-    steps: String,
-    step: String,
-    onInitialX: (String) -> Unit,
-    onInitialY: (String) -> Unit,
-    onSteps: (String) -> Unit,
-    onStep: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
-) {
-    FormulaCard(
-        formula = "dy/dx = f(x, y),   y(x₀) = y₀   solved by Runge–Kutta 4",
-        explanation = "Enter the right-hand side only, using x as the independent variable " +
-            "and y for the dependent one. For y′ = y with y(0) = 1 the exact solution is " +
-            "y = e^x.",
-    )
-
-    NumberField(label = "x₀", value = initialX, onValueChange = onInitialX)
-    NumberField(label = "y₀", value = initialY, onValueChange = onInitialY)
-    NumberField(label = "Step size h", value = step, onValueChange = onStep)
-    NumberField(label = "Steps", value = steps, onValueChange = onSteps, integerOnly = true)
-
-    val ode = remember(expression, variable, initialX, initialY, steps, step) {
-        EquationEngine.solveODE(expression, variable, initialX, initialY, steps, step)
-    }
-    val result: OdeResult? = (ode as? CalcResult.Ok)?.value
-    val finalX = result?.points?.lastOrNull()?.first
-    ResultCard(
-        label = result?.equation ?: "dy/dx = $expression",
-        value = result?.let { NodePrinter.format(it.finalY) },
-        approx = true,
-        error = (ode as? CalcResult.Err)?.error?.message,
-        caption = result?.let { "y at x = ${finalX?.let(NodePrinter::format) ?: "?"} after $steps steps" },
-        onCopy = { onRecord("ODE ${result?.equation ?: expression}", it) },
-    )
-    result?.let {
-        StepsCard(steps = it.steps, title = "Method")
-        SectionCard(title = "Solution") {
-            it.points.take(6).forEach { (x, y, index) ->
-                ResultRow(
-                    "step $index",
-                    "x = ${NodePrinter.format(x)}    y = ${NodePrinter.format(y)}",
-                )
-            }
-            ResultRow(
-                "final",
-                "x = ${finalX?.let(NodePrinter::format) ?: "—"}    y = ${NodePrinter.format(it.finalY)}",
-                emphasis = true,
-            )
-        }
-    }
-}
 
 // ---------------------------------------------------------------------- graph
 
@@ -1021,15 +959,3 @@ private fun CalculusHelp() {
 }
 
 /** Operations offered by the tool, in the order they appear in the selector. */
-private enum class CalcOperation(val label: String, val shortLabel: String) {
-    DERIVATIVE("Derivative", "d/dx"),
-    INTEGRAL("Integral", "∫"),
-    LIMIT("Limit", "lim"),
-    SERIES("Series", "Σ∞"),
-    TAYLOR("Taylor", "T"),
-    SUM("Sum and product", "Σ Π"),
-    EQUATION("Roots", "= 0"),
-    EXTREMA("Extrema", "f′=0"),
-    ODE("Differential equation", "y′"),
-    GRAPH("Graph", "plot"),
-}

@@ -1,40 +1,54 @@
 package com.calcsuite.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ToolRegistryTest {
 
-    /** The exact 49 tool ids the app must ship. */
+    /**
+     * The exact tool ids the app must ship.
+     *
+     * The counts are derived from this list rather than written down, so adding
+     * a tool only means adding its id here.
+     */
     private val expectedIds = setOf(
-        // Algebra (10)
+        // Algebra
         "algebra.percentage", "algebra.average", "algebra.proportion", "algebra.ratio",
         "algebra.equations", "algebra.gcf_lcm", "algebra.combinations", "algebra.primes",
-        "algebra.random", "algebra.calculus",
-        // Geometry (2)
+        "algebra.random", "algebra.inequalities",
+        // Geometry
         "geometry.shapes", "geometry.bodies",
-        // Converters (23)
+        // Converters
         "convert.acceleration", "convert.angle", "convert.area", "convert.cooking",
         "convert.data_storage", "convert.data_transfer", "convert.energy", "convert.force",
         "convert.fuel", "convert.length", "convert.numeric_base", "convert.power",
         "convert.pressure", "convert.ring_size", "convert.roman", "convert.shoe_size",
         "convert.speed", "convert.temperature", "convert.time", "convert.torque",
         "convert.volume", "convert.flow", "convert.weight",
-        // Finance (6)
+        // Finance
         "finance.currency", "finance.unit_price", "finance.tax", "finance.tip",
         "finance.loan", "finance.interest",
-        // Health (3)
+        // Health
         "health.bmi", "health.calories", "health.body_fat",
-        // Date & time (3)
+        // Date & time
         "datetime.age", "datetime.add_subtract", "datetime.interval",
-        // Other (2)
+        // Calculus (14)
+        "calculus.derivatives", "calculus.integrals", "calculus.limits",
+        "calculus.taylor", "calculus.summations", "calculus.series",
+        "calculus.roots", "calculus.extrema", "calculus.graph",
+        "calculus.differential_equations", "calculus.multivariable",
+        "calculus.fourier", "calculus.complex", "calculus.pde",
+        // Advanced mathematics (3)
+        "advanced.measure", "advanced.topology", "advanced.functional",
+        // Other
         "other.mileage", "other.ohms_law",
     )
 
-    @Test fun registryContainsExactlyTheFortyNineTools() {
-        assertEquals(49, ToolRegistry.all.size)
+    @Test fun registryContainsExactlyTheExpectedTools() {
+        assertEquals(expectedIds.size, ToolRegistry.all.size)
         assertEquals(expectedIds, ToolRegistry.all.map { it.id }.toSet())
     }
 
@@ -49,14 +63,25 @@ class ToolRegistryTest {
     }
 
     @Test fun categoryCounts() {
-        assertEquals(10, ToolRegistry.inCategory(ToolCategory.ALGEBRA).size)
-        assertEquals(2, ToolRegistry.inCategory(ToolCategory.GEOMETRY).size)
-        assertEquals(23, ToolRegistry.inCategory(ToolCategory.CONVERT).size)
-        assertEquals(6, ToolRegistry.inCategory(ToolCategory.FINANCE).size)
-        assertEquals(3, ToolRegistry.inCategory(ToolCategory.HEALTH).size)
-        assertEquals(3, ToolRegistry.inCategory(ToolCategory.DATETIME).size)
-        assertEquals(2, ToolRegistry.inCategory(ToolCategory.OTHER).size)
-        assertEquals(49, ToolCategory.entries.sumOf { ToolRegistry.inCategory(it).size })
+        // Each tool belongs to the category its id names, and every category
+        // holds what the catalogue says it holds.
+        for (tool in ToolRegistry.all) {
+            val expected = ToolCategory.entries.first { it.id == tool.id.substringBefore('.') }
+            assertEquals(
+                "${tool.id} is in the wrong category",
+                expected,
+                tool.category,
+            )
+            assertTrue(
+                "${tool.id} is not listed under its category",
+                ToolRegistry.inCategory(expected).any { it.id == tool.id },
+            )
+        }
+        // Every tool is counted exactly once.
+        assertEquals(
+            expectedIds.size,
+            ToolCategory.entries.sumOf { ToolRegistry.inCategory(it).size },
+        )
     }
 
     @Test fun byIdResolvesEveryToolAndRejectsUnknown() {
@@ -67,7 +92,55 @@ class ToolRegistryTest {
         assertNull(ToolRegistry.byId(""))
     }
 
+    @Test fun theOldCalculusIdStillResolves() {
+        // Favourites, the recently-used list and the history keep the id of the
+        // tool they were created from, so the pre-category id has to map to
+        // something rather than disappear.
+        val legacy = ToolRegistry.byId("algebra.calculus")
+        assertNotNull("the legacy id must still resolve", legacy)
+        assertEquals("calculus.derivatives", legacy?.id)
+        // It must not be listed twice: the alias is a lookup, not an entry.
+        assertEquals(1, ToolRegistry.all.count { it.id == "calculus.derivatives" })
+        assertTrue(ToolRegistry.all.none { it.id == "algebra.calculus" })
+    }
+
+    @Test fun theCalculusCategoryHoldsTheCalculusTools() {
+        val calculus = ToolRegistry.inCategory(ToolCategory.CALCULUS)
+        assertEquals(14, calculus.size)
+        assertTrue(calculus.any { it.id == "calculus.differential_equations" })
+        assertTrue(calculus.any { it.id == "calculus.multivariable" })
+        assertTrue(calculus.any { it.id == "calculus.fourier" })
+        assertTrue(calculus.any { it.id == "calculus.complex" })
+        assertTrue(calculus.any { it.id == "calculus.pde" })
+        // Every tool sits in the category its id names.
+        for (tool in ToolRegistry.all) {
+            val expected = ToolCategory.entries.first { it.id == tool.id.substringBefore('.') }
+            assertEquals("${tool.id} is in the wrong category", expected, tool.category)
+        }
+    }
+
     // ------------------------------------------------------------------ search
+
+    @Test fun theAdvancedMathematicsCategoryHoldsItsTools() {
+        val advanced = ToolRegistry.inCategory(ToolCategory.ADVANCED)
+        assertEquals(3, advanced.size)
+        assertTrue(advanced.any { it.id == "advanced.measure" })
+        assertTrue(advanced.any { it.id == "advanced.topology" })
+        assertTrue(advanced.any { it.id == "advanced.functional" })
+        for (tool in advanced) {
+            assertTrue("${tool.id} should have synonyms", tool.synonyms.isNotEmpty())
+        }
+    }
+
+    @Test fun theNewToolsAreFoundBySearch() {
+        assertTrue(ToolRegistry.search("fourier").any { it.id == "calculus.fourier" })
+        assertTrue(ToolRegistry.search("residue").any { it.id == "calculus.complex" })
+        assertTrue(ToolRegistry.search("heat equation").any { it.id == "calculus.pde" })
+        assertTrue(ToolRegistry.search("homeomorphism").any { it.id == "advanced.topology" })
+        assertTrue(ToolRegistry.search("eigenvalue").any { it.id == "advanced.functional" })
+        assertTrue(ToolRegistry.search("countably additive").any { it.id == "advanced.measure" })
+        assertTrue(ToolRegistry.search("gradient").any { it.id == "calculus.multivariable" })
+    }
 
     @Test fun shortcutQueriesFindTheRightTool() {
         // The master prompt calls these synonyms out explicitly.

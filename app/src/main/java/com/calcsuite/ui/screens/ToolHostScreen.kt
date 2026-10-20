@@ -16,7 +16,9 @@ import androidx.compose.ui.unit.dp
 import com.calcsuite.data.ToolDef
 import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.tools.ToolArgs
+import com.calcsuite.ui.tools.advanced.AdvancedTools
 import com.calcsuite.ui.tools.algebra.AlgebraTools
+import com.calcsuite.ui.tools.calculus.CalculusTools
 import com.calcsuite.ui.tools.convert.ConvertTools
 import com.calcsuite.ui.tools.datetime.DateTimeTools
 import com.calcsuite.ui.tools.finance.FinanceTools
@@ -54,12 +56,14 @@ fun ToolHostScreen(
 /**
  * Each batch dispatcher handles the ids of its own domain and returns false
  * for every other id, so the chain resolves exactly one screen per tool.
- * Together the seven branches cover all 48 registered tools.
+ * Together the nine branches cover every registered tool.
  */
 @Composable
 private fun ToolScreenDispatch(args: ToolArgs) {
     when {
         AlgebraTools(args) -> Unit
+        CalculusTools(args) -> Unit
+        AdvancedTools(args) -> Unit
         GeometryTools(args) -> Unit
         ConvertTools(args) -> Unit
         FinanceTools(args) -> Unit

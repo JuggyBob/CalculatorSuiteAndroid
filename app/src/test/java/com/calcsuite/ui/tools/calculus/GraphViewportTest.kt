@@ -1,4 +1,4 @@
-package com.calcsuite.ui.tools.algebra
+package com.calcsuite.ui.tools.calculus
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -63,9 +63,36 @@ class GraphViewportTest {
 
     @Test fun panDownMovesTheWindowUpInWorldCoordinates() {
         val after = pan(GraphView.Default, 0.0, 60.0)
-        // Dragging down reveals lower y, so the maximum decreases.
-        assertEquals(8.0, after.yMax, 1e-9)
-        assertEquals(-12.0, after.yMin, 1e-9)
+        // Dragging down moves the picture down the screen, which means the
+        // window shows higher y: the maximum increases.
+        assertEquals(12.0, after.yMax, 1e-9)
+        assertEquals(-8.0, after.yMin, 1e-9)
+    }
+
+    @Test fun thePictureFollowsTheFingerInBothDirections() {
+        // The graph is drawn with x increasing to the right and y increasing
+        // upwards, so a drag to the right must move a fixed world point to
+        // the right on the screen, and a drag downwards must move it down.
+        val before = GraphView.Default
+        val right = pan(before, 200.0, 0.0)
+        val down = pan(before, 0.0, 200.0)
+
+        // Where the point x = 0, y = 0 lands on the screen.
+        fun screenX(view: GraphView) = (0.0 - view.xMin) / (view.xMax - view.xMin) * width
+        fun screenY(view: GraphView) = (view.yMax - 0.0) / (view.yMax - view.yMin) * height
+
+        assertEquals(
+            "the picture should move to the right with the finger",
+            200.0,
+            screenX(right) - screenX(before),
+            1e-9,
+        )
+        assertEquals(
+            "the picture should move down with the finger",
+            200.0,
+            screenY(down) - screenY(before),
+            1e-9,
+        )
     }
 
     @Test fun spanIsClampedSoTheViewCannotCollapse() {

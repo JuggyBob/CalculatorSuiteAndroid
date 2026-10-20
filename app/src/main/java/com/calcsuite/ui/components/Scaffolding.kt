@@ -122,7 +122,7 @@ fun ToolScaffold(
                 columnModifier
             }
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(ScreenGap),
         ) {
             content()
             Spacer(Modifier.height(28.dp))
@@ -145,7 +145,7 @@ fun SectionCard(
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(PanelGap),
         ) {
             if (title != null) {
                 Text(
@@ -158,6 +158,23 @@ fun SectionCard(
         }
     }
 }
+
+/**
+ * The vertical gap between the parts of a card or a panel.
+ *
+ * It is the one rule for the spacing inside a card, so that a group of parts
+ * looks the same wherever it appears.
+ */
+val PanelGap = 8.dp
+
+/**
+ * The vertical gap between the blocks of a screen.
+ *
+ * The expandable sections of the newer tools are separated by this gap, which
+ * is the same one the older tools get from the screen they sit in, so a group
+ * of them looks the same in every tool.
+ */
+val ScreenGap = 12.dp
 
 /** Collapsible advanced panel: keeps the default screen simple. */
 @Composable
@@ -196,7 +213,7 @@ fun ExpandablePanel(
             AnimatedVisibility(visible = expanded) {
                 Column(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(PanelGap),
                 ) {
                     content()
                 }

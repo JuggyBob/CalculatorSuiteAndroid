@@ -109,6 +109,9 @@ class CalculusEngineTest {
             "tan(x)", "sin(x^2)", "cos(x)/x", "ln(x)", "e^x", "asin(x)",
             "acos(x)", "atan(x)", "1/(x^2 + 1)", "(x + 1)/(x - 2)", "-x^3 + 2",
             "sqrt(x^2 + 1)", "(x + 1)^3", "1 - 1/x", "x/(x^2 + 1)^2",
+            // A negative factor in a product has to be bracketed, or the
+            // printed form would be read as a difference.
+            "x*-2", "-3*x^2", "(-x)^3", "2*(-x)*(-1)", "-x^2", "-x^2 + 2",
         )) {
             val node = val_(CalculusParser.parse(src))
             val printed = NodePrinter.print(node)

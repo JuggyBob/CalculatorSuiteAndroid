@@ -1,4 +1,4 @@
-package com.calcsuite.ui.tools.algebra
+package com.calcsuite.ui.tools.calculus
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -148,8 +148,11 @@ object GraphViewport {
         val ratioX = if (spanX == 0.0) 0.5 else (focusWorldX - view.xMin) / spanX
         val ratioY = if (spanY == 0.0) 0.5 else (focusWorldY - view.yMin) / spanY
 
+        // The picture moves with the finger in both directions. The sign is
+        // different on the two axes only because the y axis points up while
+        // the screen's does not.
         val newMinX = focusWorldX - ratioX * newSpanX - panX * unitsPerPxX
-        val newMaxY = focusWorldY + (1 - ratioY) * newSpanY - panY * unitsPerPxY
+        val newMaxY = focusWorldY + (1 - ratioY) * newSpanY + panY * unitsPerPxY
         return view.copy(
             xMin = newMinX,
             xMax = newMinX + newSpanX,

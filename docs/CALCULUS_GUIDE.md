@@ -1,8 +1,8 @@
 # Calculus Guide
 
-The Calculus tool takes **one expression** and runs ten different operations on it, showing its working for each.
+The calculus tools take **one expression** and run a piece of mathematics on it, showing the working for each. There are fourteen of them — derivatives, integrals, limits, Taylor and Maclaurin, summations and products, infinite series, roots, extrema, the function graph, differential equations, multivariable calculus, Fourier analysis, complex analysis and partial differential equations — and they all share the expression language described below.
 
-> **This guide is deliberately specific about limits.** Some of the symbolic engine's boundaries produce surprising results, and a document that glossed over them would be worse than useless. Everything in [Limitations](#8-limitations--read-this) is verified against the code.
+> **This guide is deliberately specific about limits.** Some of the symbolic engine's boundaries produce surprising results, and a document that glossed over them would be worse than useless. Everything in [Limitations](#9-limitations--read-this) is verified against the code.
 
 ---
 
@@ -15,7 +15,7 @@ The Calculus tool has **its own parser**, separate from the scientific calculato
 ```
 expression := term (('+' | '−') term)*
 term       := factor (('*' | '×' | '·' | '/' | '÷') factor)*
-factor     := unary ('^' factor)?          // right-associative
+factor     := ('−' | '+')? postfix ('^' factor)?   // right-associative
 unary      := ('−' | '+')? postfix
 postfix    := primary ('!')*
 primary    := number | constant | name '(' args ')' | name | '(' expression ')'
@@ -52,7 +52,7 @@ primary    := number | constant | name '(' args ')' | name | '(' expression ')'
 
 **The tool always works in radians.** There is no degree mode here — convert explicitly with `deg(x)` and `rad(x)` if you need to.
 
-### One field, ten operations
+### One field, fourteen tools
 
 Type an expression into `f(x) =`, then pick the operation:
 
@@ -252,7 +252,43 @@ Implementation notes that explain its behaviour:
 
 ---
 
-## 8. Limitations — read this
+## 8. The four tools added in 2.0.0
+
+### Multivariable Calculus
+
+The multivariable tool runs on the same expression engine, but knows which variables it is looking at, so it can put the multiplication signs in itself: `3xy` is read as `3*x*y` rather than as one long name.
+
+It offers the partial derivative of any order, the mixed partial, the gradient, the directional derivative with an optional normalisation, the Jacobian, the Hessian, the divergence, the curl, the Laplacian, the critical points with the second-derivative test, and the double, triple and line integrals.
+
+The picture is two views of the same function: a rotatable surface, and a contour map with the gradient vectors drawn on it. The level curves are traced with the marching-squares rule, so they follow the true contours, and the arrows have a fixed length on the screen.
+
+The integrals are numerical, over a rectangle, a box or a parametric curve. The critical points are found by scanning, so a saddle in a narrow region may be missed.
+
+### Fourier Analysis
+
+Two routes, kept apart: the **Fourier series** of a function, and the **discrete transform** of a list of samples.
+
+The series takes `f(x) =`, a variable, a period and a number of harmonics. The coefficients are found by numerical integration with a fixed rule and enough panels, so a fast oscillation is not missed, and the number of panels follows the number of harmonics. The constant term is the mean of the function, even when no harmonics are asked for. The function and its approximation are drawn together.
+
+The transform takes a list of samples and gives each bin's frequency.
+
+The coefficients are estimates, not exact values.
+
+### Complex Analysis
+
+Complex arithmetic in the polar and exponential forms, the evaluation of complex functions, a numerical Cauchy’Riemann check, contour integrals and residues, with an interactive complex plane.
+
+The principal square root and the principal logarithm take the principal branch, and the principal cube root is chosen by argument rather than by its imaginary part. The contour integral and the residue are numerical estimates — the limit is taken along a few directions — and the Cauchy’Riemann check is a local numerical check, not a proof of analyticity.
+
+### Partial Differential Equations
+
+The heat and wave equations along a rod, and Laplace’s and Poisson’s equations over a square, all by finite differences.
+
+The stability condition is checked **before** anything is computed, and the tool refuses a step that would make the numbers grow. The two-dimensional route relaxes the grid until the values stop changing, and the field is drawn as a colour map whose colours follow the accent colour you have chosen.
+
+The boundary of the two-dimensional equations is a single expression used on all four sides, so the textbook "hot along the top, cold elsewhere" cannot be written directly.
+
+## 9. Limitations — read this
 
 The symbolic engine is a **pattern matcher with exact rules**, not a computer algebra system. Its boundaries are real:
 
@@ -286,29 +322,31 @@ All three evaluate against a hard-coded `x`. If you change **Differentiate with 
 
 ### Not implemented
 
-Higher-order differential equations; series arithmetic beyond the geometric closed form; complex analysis; symbolic root-finding for cubics or quartics; implicit-equation solving; indefinite integrals of anything not in the pattern list.
+Symbolic root-finding for cubics or quartics; implicit-equation solving; indefinite integrals of anything not in the pattern list; series arithmetic beyond the geometric closed form. Complex analysis, the Fourier engine, the differential equation solver and the finite-difference PDE solver are separate engines with their own limits.
 
 ---
 
-## 9. Conventions & Help
+## 10. Conventions & Help
 
 The tool's own **Conventions & Help** panel contains the symbol table, the full syntax, a per-operation explanation and worked examples. It sits at the bottom of the screen and is hidden while the tool is expanded to fullscreen, so the plot gets the whole screen.
 
 ---
 
-## 10. Related tools
+## 11. Related tools
 
 | Tool | When to use it instead |
 |---|---|
 | [Scientific calculator](USER_GUIDE.md#5-the-scientific-calculator) | Plain arithmetic and trig with degree support and memory keys |
 | [Equations](FEATURES_AND_TOOLS.md#equations-algebraequations) | Linear, quadratic and 2×2 systems solved **exactly** with fractions, not scanned numerically |
 | [Average](FEATURES_AND_TOOLS.md#average-algebraaverage) | Series arithmetic is not attempted; compute finite sums here |
+| [Inequalities](FEATURES_AND_TOOLS.md#inequalities-algebrainequalities) | Solving an inequality, or a system of them, with the solution set and the region |
+| [Advanced mathematics](FEATURES_AND_TOOLS.md#9-advanced-mathematics--3-tools) | Measure theory, topology and functional analysis, where the calculus tools stop |
 
 ---
 
 ## Related documentation
 
-- [Features and tools](FEATURES_AND_TOOLS.md) — all 49 tools
+- [Features and tools](FEATURES_AND_TOOLS.md) — all 66 tools
 - [User guide](USER_GUIDE.md) — navigation, settings, errors
 - [Roadmap](../ROADMAP.md) — the limitations above are tracked as outstanding work
 - [Architecture](ARCHITECTURE.md) — how the engine is built

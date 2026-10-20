@@ -63,3 +63,97 @@ val CalculusIcon: ImageVector by lazy {
         )
     }.build()
 }
+
+/**
+ * The Inequalities glyph: a number line with a shaded solution segment that
+ * ends in an open circle.
+ *
+ * The open circle is the point of the picture — it is what separates an
+ * inequality from an equation, and it is the same convention the tool's number
+ * line uses.
+ *
+ * As with [CalculusIcon] the stroke colour is never seen, because render sites
+ * apply the theme's accent tint over both strokes and fills.
+ */
+val InequalityIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "Inequality",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        // The axis.
+        addPath(
+            pathData = PathData {
+                moveTo(2f, 12.5f)
+                lineTo(21.4f, 12.5f)
+            },
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.5f,
+            strokeLineCap = StrokeCap.Round,
+        )
+        // The solution segment, drawn thick so it reads as shaded.
+        addPath(
+            pathData = PathData {
+                moveTo(3.2f, 12.5f)
+                lineTo(11f, 12.5f)
+            },
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 3.4f,
+            strokeLineCap = StrokeCap.Round,
+        )
+        // The open circle: the endpoint is excluded.
+        addPath(
+            pathData = PathData {
+                moveTo(8.8f, 12.5f)
+                arcToRelative(2.2f, 2.2f, 0f, true, true, 4.4f, 0f)
+                arcToRelative(2.2f, 2.2f, 0f, true, true, -4.4f, 0f)
+                close()
+            },
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.5f,
+        )
+        // A tick on the axis, so the line reads as a number line.
+        addPath(
+            pathData = PathData {
+                moveTo(17.2f, 10.4f)
+                lineTo(17.2f, 14.6f)
+            },
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.4f,
+            strokeLineCap = StrokeCap.Round,
+        )
+    }.build()
+}
+
+/**
+ * The Integrals glyph: a plain integral sign.
+ *
+ * It is drawn in the same way as the other hand-made glyphs here — a stroked
+ * centreline rather than a filled outline — so that it sits with them in size,
+ * weight and colour. The sign alone is enough to say "integral"; there is no
+ * second character to compete with it.
+ */
+val IntegralIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "Integral",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        // The integral sign: the top hook opens to the right and the bottom
+        // hook to the left, which is what makes it read as ∫ rather than as a J.
+        addPath(
+            pathData = PathData {
+                moveTo(14.2f, 3.2f)
+                curveTo(9.0f, 3.2f, 9.0f, 7.8f, 10.6f, 12.0f)
+                curveTo(12.2f, 16.2f, 12.2f, 20.8f, 7.0f, 20.8f)
+            },
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 2f,
+            strokeLineCap = StrokeCap.Round,
+        )
+    }.build()
+}

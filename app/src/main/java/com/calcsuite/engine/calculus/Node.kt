@@ -71,10 +71,23 @@ object NodePrinter {
         is Node.Neg -> "−" + operand(n.a, 5)
         is Node.Add -> operand(n.a, 1) + " + " + operand(n.b, 1)
         is Node.Sub -> operand(n.a, 2) + " − " + operand(n.b, 2)
-        is Node.Mul -> joinFactors(operand(n.a, 3), operand(n.b, 3))
+        is Node.Mul -> joinFactors(productFactor(n.a), productFactor(n.b))
         is Node.Div -> operand(n.a, 3) + " ÷ " + operand(n.b, 3)
         is Node.Pow -> operand(n.a, 6) + "^" + operand(n.b, 5)
         is Node.Fun -> n.name + "(" + n.args.joinToString(", ") { print(it) } + ")"
+    }
+
+    /**
+     * A factor of a product.
+     *
+     * A negative factor is bracketed, because "x-2" would be read as a
+     * difference rather than as a product, so the printed form would not
+     * mean what the tree means.
+     */
+    private fun productFactor(n: Node): String {
+        val text = operand(n, 3)
+        val negative = text.startsWith("-") || text.startsWith("\u2212")
+        return if (negative) "($text)" else text
     }
 
     /**
@@ -91,7 +104,15 @@ object NodePrinter {
         val digitRun = l.isDigit() && (r.isDigit() || r == '.')
         val identifierRun = (l.isLetter() && r.isLetterOrDigit()) ||
             (l == ')' && r.isLetterOrDigit())
-        return if (digitRun || identifierRun) "$left·$right" else "$left$right"
+        // A factor in brackets after a name or a number would be read as a
+        // call, and the parser does not read a product that way, so the sign
+        // is written out.
+        val bracketRun = r == '('
+        return if (digitRun || identifierRun || bracketRun) {
+            "$left·$right"
+        } else {
+            "$left$right"
+        }
     }
 
     /**

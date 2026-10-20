@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's own cache, where the camera writes the photograph. -->
+<paths>
+    <cache-path
+        name="ai"
+        path="ai/" />
+</paths>

@@ -2,6 +2,21 @@ package com.calcsuite.data
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.Balance
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.AutoGraph
+import androidx.compose.material.icons.filled.BubbleChart
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.HorizontalRule
+import androidx.compose.material.icons.filled.MultilineChart
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Abc
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Architecture
@@ -58,6 +73,8 @@ enum class ToolCategory(val id: String, val label: String, val icon: ImageVector
     FINANCE("finance", "Finance", Icons.Filled.AccountBalance),
     HEALTH("health", "Health", Icons.Filled.MonitorHeart),
     DATETIME("datetime", "Date & Time", Icons.Filled.CalendarMonth),
+    CALCULUS("calculus", "Calculus", Icons.Filled.Calculate),
+    ADVANCED("advanced", "Advanced Mathematics", Icons.Filled.AccountTree),
     OTHER("other", "Other", Icons.Filled.MoreHoriz),
 }
 
@@ -131,15 +148,16 @@ object ToolRegistry {
             Icons.Filled.Shuffle,
         ),
         ToolDef(
-            "algebra.calculus", "Calculus", ToolCategory.ALGEBRA,
-            "Derivatives, integrals, limits, series, equations and graphs",
+            "algebra.inequalities", "Inequalities", ToolCategory.ALGEBRA,
+            "Solve inequalities and systems, with a sign chart and a number line",
             listOf(
-                "derivative", "differential", "integral", "integrate", "antiderivative",
-                "limit", "series", "taylor", "maclaurin", "summation", "sigma",
-                "product notation", "roots", "extrema", "stationary point",
-                "differential equation", "ode", "graph", "plot", "function plot",
+                "inequality", "inequalities", "solve for x", "greater than", "less than",
+                "at least", "at most", "compound inequality", "system of inequalities",
+                "sign chart", "solution set", "interval notation", "number line",
+                "half plane", "feasible region", "polynomial inequality",
+                "rational inequality", "absolute value inequality",
             ),
-            CalculusIcon,
+            InequalityIcon,
         ),
 
         // ----------------------------------------------------------- Geometry
@@ -375,6 +393,173 @@ object ToolRegistry {
         ),
 
         // ------------------------------------------------------------- Other
+        // ---------------------------------------------------------- Calculus
+        ToolDef(
+            "calculus.derivatives", "Derivatives", ToolCategory.CALCULUS,
+            "Symbolic and numerical derivatives, higher orders and partials",
+            listOf(
+                "derivative", "differentiate", "d/dx", "partial derivative",
+                "gradient", "tangent", "rate of change", "higher order derivative",
+            ),
+            Icons.Filled.TrendingUp,
+        ),
+        ToolDef(
+            "calculus.integrals", "Integrals", ToolCategory.CALCULUS,
+            "Indefinite and definite integration, exact where it exists",
+            listOf(
+                "integral", "integrate", "antiderivative", "area under a curve",
+                "definite integral", "indefinite integral", "accumulated area",
+            ),
+            IntegralIcon,
+        ),
+        ToolDef(
+            "calculus.limits", "Limits", ToolCategory.CALCULUS,
+            "Finite, one-sided and infinite limits",
+            listOf(
+                "limit", "as x approaches", "indeterminate form", "lhopital",
+                "left hand limit", "right hand limit", "infinity",
+            ),
+            Icons.Filled.HorizontalRule,
+        ),
+        ToolDef(
+            "calculus.taylor", "Taylor & Maclaurin", ToolCategory.CALCULUS,
+            "Expansions around a centre, with every coefficient",
+            listOf(
+                "taylor series", "maclaurin series", "series expansion",
+                "power series", "coefficients", "approximation by polynomial",
+            ),
+            Icons.Filled.AutoGraph,
+        ),
+        ToolDef(
+            "calculus.summations", "Summations & Products", ToolCategory.CALCULUS,
+            "Finite sums and products in sigma and pi notation",
+            listOf(
+                "sum", "summation", "sigma", "product", "pi notation", "factorial sum",
+                "add up a series", "multiply a series",
+            ),
+            Icons.Filled.FormatListNumbered,
+        ),
+        ToolDef(
+            "calculus.series", "Infinite Series", ToolCategory.CALCULUS,
+            "Convergence of an infinite series and its closed form",
+            listOf(
+                "infinite series", "convergence", "diverges", "geometric series",
+                "ratio test", "sum to infinity",
+            ),
+            Icons.Filled.Timeline,
+        ),
+        ToolDef(
+            "calculus.roots", "Equation Solving & Roots", ToolCategory.CALCULUS,
+            "Find the real roots of an equation",
+            listOf(
+                "roots", "solve for x", "zeros", "root finder", "equation",
+                "where is it zero", "intersections",
+            ),
+            Icons.Filled.Functions,
+        ),
+        ToolDef(
+            "calculus.extrema", "Extrema & Optimization", ToolCategory.CALCULUS,
+            "Stationary points, local extrema and critical points",
+            listOf(
+                "extrema", "maximum", "minimum", "stationary point", "critical point",
+                "inflection", "optimise", "optimization", "turning point",
+            ),
+            Icons.Filled.BubbleChart,
+        ),
+        ToolDef(
+            "calculus.graph", "Function Graphing", ToolCategory.CALCULUS,
+            "Plot a function, its derivative and an area under the curve",
+            listOf(
+                "graph", "plot", "sketch", "curve", "zoom", "pan", "graph a function",
+                "area under the graph",
+            ),
+            Icons.Filled.ShowChart,
+        ),
+        ToolDef(
+            "calculus.differential_equations", "Differential Equations", ToolCategory.CALCULUS,
+            "Solve ODEs symbolically or numerically, and graph the solution",
+            listOf(
+                "differential equation", "ode", "dy/dx", "initial value problem",
+                "ivp", "separable", "first order linear", "euler method",
+                "runge kutta", "slope field", "direction field", "ivp solver",
+            ),
+            Icons.Filled.Timeline,
+        ),
+
+        ToolDef(
+            "calculus.multivariable", "Multivariable Calculus", ToolCategory.CALCULUS,
+            "Partial derivatives, gradients, Hessians and multiple integrals",
+            listOf(
+                "multivariable", "partial derivative", "gradient", "directional derivative",
+                "jacobian", "hessian", "divergence", "curl", "laplacian",
+                "critical point", "double integral", "triple integral", "line integral",
+                "optimization in two variables", "surface", "3d graph",
+            ),
+            Icons.Filled.ViewInAr,
+        ),
+        ToolDef(
+            "calculus.fourier", "Fourier Analysis", ToolCategory.CALCULUS,
+            "Fourier series, harmonics and the discrete transform",
+            listOf(
+                "fourier", "fourier series", "harmonics", "coefficient",
+                "discrete fourier transform", "dft", "fft", "frequency", "spectrum",
+                "signal", "sine series", "cosine series", "gibbs",
+            ),
+            Icons.Filled.GraphicEq,
+        ),
+        ToolDef(
+            "calculus.complex", "Complex Analysis", ToolCategory.CALCULUS,
+            "Complex numbers, functions, contours and residues",
+            listOf(
+                "complex number", "imaginary", "modulus", "argument", "polar form",
+                "conjugate", "euler", "contour integral", "residue", "cauchy riemann",
+                "holomorphic", "branch cut", "complex plane",
+            ),
+            Icons.Filled.AllInclusive,
+        ),
+        ToolDef(
+            "calculus.pde", "Partial Differential Equations", ToolCategory.CALCULUS,
+            "Heat, wave, Laplace and Poisson equations, solved numerically",
+            listOf(
+                "partial differential equation", "pde", "heat equation", "diffusion",
+                "wave equation", "laplace equation", "poisson equation",
+                "boundary condition", "finite difference", "elliptic", "parabolic", "hyperbolic",
+            ),
+            Icons.Filled.Waves,
+        ),
+
+        ToolDef(
+            "advanced.measure", "Measure Theory", ToolCategory.ADVANCED,
+            "Sets, measures, countable additivity and the two integrals",
+            listOf(
+                "measure theory", "measure", "countably additive", "null set",
+                "almost everywhere", "measurable", "lebesgue", "riemann integral",
+                "interval measure", "sigma algebra",
+            ),
+            Icons.Filled.Balance,
+        ),
+        ToolDef(
+            "advanced.topology", "Topology Explorer", ToolCategory.ADVANCED,
+            "Open sets, closures, connectedness and homeomorphisms",
+            listOf(
+                "topology", "open set", "closed set", "interior", "closure", "boundary",
+                "limit point", "isolated point", "connected", "path connected",
+                "compact", "homeomorphism", "metric space", "open ball", "neighbourhood",
+            ),
+            Icons.Filled.Hub,
+        ),
+        ToolDef(
+            "advanced.functional", "Functional Analysis", ToolCategory.ADVANCED,
+            "Norms, inner products, operators and projections",
+            listOf(
+                "functional analysis", "vector space", "norm", "inner product",
+                "orthogonality", "banach", "hilbert", "operator", "eigenvalue",
+                "eigenvector", "projection", "least squares", "gram schmidt",
+                "orthonormal basis",
+            ),
+            Icons.Filled.Functions,
+        ),
+
         ToolDef(
             "other.mileage", "Mileage & trips", ToolCategory.OTHER,
             "Trip distance, fuel economy and trip cost",
@@ -391,7 +576,30 @@ object ToolRegistry {
 
     val all: List<ToolDef> get() = tools
 
-    fun byId(id: String): ToolDef? = tools.firstOrNull { it.id == id }
+    /**
+     * Tool ids that were stored before the Calculus category existed.
+     *
+     * Favourites, the recently-used list and the history all keep the id of the
+     * tool they were created from, so an old id has to keep resolving. The old
+     * single "Calculus" screen now lives in the category, and the Derivatives
+     * tool is the closest match for it.
+     */
+    private val LEGACY_IDS = mapOf(
+        "algebra.calculus" to "calculus.derivatives",
+    )
+
+    fun byId(id: String): ToolDef? =
+        tools.firstOrNull { it.id == id } ?: LEGACY_IDS[id]?.let { legacy -> tools.firstOrNull { it.id == legacy } }
+
+    /**
+     * The current id for a tool id that may be an old one.
+     *
+     * Favourites, the recently-used list and the history all keep the id of
+     * the tool they were created from, so an id that has since changed is
+     * mapped to the one that is in force now. Without this a renamed tool
+     * would appear twice in the recently-used list, under two ids.
+     */
+    fun canonicalId(id: String): String = LEGACY_IDS[id] ?: id
 
     fun inCategory(category: ToolCategory): List<ToolDef> = tools.filter { it.category == category }
 

@@ -20,7 +20,10 @@ Source root: `app/src/main/java/com/calcsuite/`
 |---|---|---|
 | `core` | `CalcResult`/`CalcError`/`ErrorKind`, and `Num` — parsing, formatting, precision | No |
 | `expr` | The scientific calculator's expression language: lexer, parser, evaluator, `Functions` catalogue | No |
-| `engine.calculus` | The calculus tool: `Node`, printer, parser, evaluator, differentiation, integration, calculus and equation engines | No |
+| `engine.calculus` | The calculus engines: `Node`, printer, parser, evaluator, differentiation, integration, calculus and equation engines | No |
+| `engine.calculus.ode` | The differential equation engine: the parser, the classifier, the separable, linear and constant-coefficient solvers, and the numerical one | No |
+| `engine.calculus.multivariable` | The multivariable operations, built on the same expression engine | No |
+| `engine.algebra.inequality` | The inequality engine: the parser, the solver, the solution set and the numerical scan | No |
 | `engine.algebra` | Percentage, average, proportion, ratio, equations, GCF/LCM, combinatorics, primes, random | No |
 | `engine.convert` | `UnitFamily` machinery plus one file per unit family, and the bespoke cooking/fuel/base/roman/ring/shoe/transfer engines | No |
 | `engine.finance` | Currency catalog and engine, loan, interest, tax, tip, unit price | No (HTTP via `HttpURLConnection`) |
@@ -28,13 +31,18 @@ Source root: `app/src/main/java/com/calcsuite/`
 | `engine.health` | BMI, calories, body fat | No |
 | `engine.datetime` | Age, date maths, intervals | No (`java.time`) |
 | `engine.other` | Mileage, Ohm's law | No |
+| `engine.advanced` | The advanced mathematics: complex numbers and analysis, matrices and linear algebra, the Fourier engine, the finite-difference PDE engine, the measure and topology models, and the shared `Explanation` model | No |
 | `data` | `ToolRegistry` (the catalogue), `SettingsRepository`, `HistoryRepository`, `CurrencyRepository`, icon definitions | Yes |
+| `ai` | The AI feature: the ten providers, the HTTP client, the credential store, the image loader, the tool registry and the pipeline | Yes (keystore, HTTP) |
 | `ui.components` | Shared Compose widgets: scaffolding, forms, result cards, inputs, formatting | Yes |
 | `ui.screens` | Main menu, categories, search, history, settings, scientific, onboarding, the calculator panel | Yes |
 | `ui.theme` | Colour, typography, shape, `CalcSuiteTheme` | Yes |
 | `ui.tools` | One screen per tool, grouped by category, plus per-domain dispatchers | Yes |
+| `ui.ai` | The AI problem solver: its screen, its settings screen and its view model | Yes |
 
 **The rule:** `core`, `expr` and every `engine.*` package must compile and run without the Android framework. `java.math`, `java.time` and the rest of the JDK are fine; `android.*` is not.
+
+The `ai` package is the one part that needs the framework, because it holds the keystore and the HTTP client. Its mathematics — the tool registry, the argument checking and the execution — is kept apart from the transport, so that it can be tested without a network.
 
 ## The result type
 
@@ -78,7 +86,7 @@ The string stored in history is the **formatted** display string, while the copy
 
 ## The tool registry
 
-`data/ToolRegistry.kt` is the single source of truth for all 49 tools:
+`data/ToolRegistry.kt` is the single source of truth for all 66 tools:
 
 ```kotlin
 ToolDef(
@@ -224,7 +232,13 @@ History is a JSON array rather than a database because it is a bounded, flat lis
 
 ## Networking
 
-One screen, one call. `CurrencyRepository.refresh()` issues a single HTTPS `GET` to `open.er-api.com` on `Dispatchers.IO`, with 15-second timeouts, two fixed headers and no analytics parameters. The response is parsed into a `RatesSnapshot`, cached, and re-used offline with a staleness warning past 24 hours. There is no other network code in the project.
+Two places, and no more.
+
+**The currency converter.** `CurrencyRepository.refresh()` issues a single HTTPS `GET` to `open.er-api.com` on `Dispatchers.IO`, with 15-second timeouts, two fixed headers and no analytics parameters. The response is parsed into a `RatesSnapshot`, cached, and re-used offline with a staleness warning past 24 hours.
+
+**The AI problem solver.** `ai/AiClient` sends one HTTPS `POST` to the provider the user chose, on `Dispatchers.IO`, with the picture as base64 in that provider's own image format, the question, the list of eligible tools and the user's API key in the provider's own authentication header. The transport is behind the `AiTransport` interface, so the whole path can be exercised with a fake transport and no network at all. The credential is held by `ai/AiConfigRepository`, which encrypts it with AES/GCM under a key in the Android keystore and never writes it in plain text.
+
+There is no other network code in the project: no telemetry, no crash reporting, no update check and no font or icon download.
 
 ## Theme
 
@@ -236,7 +250,7 @@ Locked to portrait twice over: `android:screenOrientation="portrait"` in the man
 
 ## Testing
 
-910 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
+1267 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
 
 ```
 app/src/test/java/com/calcsuite/engine/

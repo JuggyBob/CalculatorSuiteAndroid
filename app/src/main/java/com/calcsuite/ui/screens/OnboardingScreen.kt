@@ -357,7 +357,7 @@ private fun rememberWelcomePages(): List<WelcomePage> {
         ),
         WelcomePage(
             eyebrow = "Organised",
-            title = "Seven categories",
+            title = "${ToolCategory.entries.size} categories",
             body = "Everything sits in a category, and search finds it by what you " +
                 "remember — \"mortgage\", \"kcal\", \"octal\", \"tip\".",
             illustration = Icons.Filled.GridView,

@@ -12,14 +12,32 @@ android {
         applicationId = "com.calcsuite"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
+    }
+
+    // The release key is held outside the repository. Its location and its
+    // two passwords are read from the Gradle environment, or from
+    // ~/.gradle/gradle.properties, and the build falls back to an unsigned
+    // APK when they are not there, so the continuous build is unaffected
+    // and no secret is ever committed.
+    val releaseStoreFile = providers.gradleProperty("RELEASE_STORE_FILE")
+    signingConfigs {
+        if (releaseStoreFile.isPresent) {
+            create("release") {
+                storeFile = file(releaseStoreFile.get())
+                storePassword = providers.gradleProperty("RELEASE_STORE_PASSWORD").get()
+                keyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").get()
+                keyPassword = providers.gradleProperty("RELEASE_KEY_PASSWORD").get()
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
