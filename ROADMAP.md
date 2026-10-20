@@ -126,7 +126,7 @@ Not commitments. Ordered roughly by how much they would improve the app.
 
 ### Engineering
 
-- Instrumentation (Espresso/Compose UI) tests for a handful of critical flows, to complement the 910 JVM tests.
+- Instrumentation (Espresso/Compose UI) tests for a handful of critical flows, to complement the 1267 JVM tests.
 - A screenshot-testing baseline, so UI regressions are caught automatically.
 - Reproducibility of the release build — currently signed with a locally held key.
 
