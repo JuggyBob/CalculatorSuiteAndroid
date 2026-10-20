@@ -32,6 +32,7 @@ The design goal was **no dead controls**: every button, field and toggle perform
 - **Exact where it can be.** Money and general decimals use `BigDecimal` with a 34-significant-digit evaluation context; integer maths (factorials, GCD/LCM, primes, permutations) uses `BigInteger`. Display rounding happens only at the very end, at 3–15 significant digits.
 - **Honest about approximations.** Numerical results are prefixed `≈` and their method is named — adaptive Simpson for definite integrals, RK4 for differential equations, bisection for root scans.
 - **On-device by default.** Every tool works with the device in aeroplane mode. The only network calls are the currency converter fetching reference exchange rates, and the AI problem solver talking to the provider **you** chose — the picture goes nowhere else, and only when you press the button.
+- **Nothing to sign up for.** There is no account, no advert, no tracker, no crash reporter and no telemetry. The app asks for no permission beyond the network, the AI feature is off until you turn it on, and the one thing it stores is on your own device.
 
 ## Feature highlights
 
@@ -41,6 +42,7 @@ The design goal was **no dead controls**: every button, field and toggle perform
 | 🔬 **Scientific calculator** | Trig, logs, powers, factorials, `mod`, memory, DEG/RAD/GRAD, and collapsible reference panels that match the keypad exactly. |
 | ∫ **Calculus workbench** | Fourteen focused tools: derivatives, integrals, limits, Taylor/Maclaurin, Σ and Π notation, infinite series, roots, extrema, an interactive function graph, differential equations, multivariable calculus, Fourier analysis, complex analysis and partial differential equations. |
 | 🧠 **AI problem solver** | Photograph a mathematical problem. The AI reads it, picks the right Calculator Suite tool, and the app's own engine does the mathematics. Ten providers, your own key, your own model. |
+| 🚫 **No sign-up, no adverts, no tracking** | Nothing to create an account for, nothing sold, and every tool works with the network off. |
 | 📐 **Advanced mathematics** | Measure theory, a topology explorer and functional analysis — each computing real values and stating what it does not reach. |
 | 🎨 **Accent colour** | A palette of presets or a custom colour of your own, reaching every button, surface, curve and highlight in the app. |
 | 📐 **23 converters** | Length, area, volume, mass, temperature, pressure, energy, power, force, torque, speed, acceleration, time, angle, data storage, data transfer, flow, fuel economy, numeric bases, Roman numerals, cooking measures, ring sizes, shoe sizes. |
@@ -66,7 +68,7 @@ sha256sum -c CalculatorSuite-v2.0.0.apk.sha256
 adb install CalculatorSuite-v2.0.0.apk
 ```
 
-**Requirements:** Android 8.0 (API 26) or newer, arm64-v8a / x86_64. You will need to allow installation from your file manager the first time.
+**Requirements:** any phone or tablet running Android 8.0 (API 26) or newer, arm64-v8a or x86_64. It is a single APK, about 14 MB, with nothing to sign up for. You will need to allow installation from your file manager the first time.
 
 The 2.0.0 APK is signed with the same key as 1.0.0, so it installs straight over the older version with your settings and history intact.
 
