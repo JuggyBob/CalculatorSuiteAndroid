@@ -6,6 +6,27 @@ This project uses a plain, human-written changelog. **Version 1.0.0 was the firs
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for the version number.
 
+## [3.0.1] — 2026-10-21
+
+A small release that fixes the circuit builder: **a part can now be dragged where you want it**, and **the name of a part sits over the part it names**. `versionName = 3.0.1`, `versionCode = 5`, `minSdk 26`, `targetSdk 36`.
+
+This release upgrades over 3.0.0 in place: the signing key is unchanged, so the app installs straight over the old one.
+
+### Fixed
+
+- **A part can be dragged on the canvas.** Dragging did nothing at all, and three things were at fault: the gesture was thrown away and started again every time the circuit changed, so a drag never got going; the place on the canvas was worked out from the picture's old centre, so a touch landed in the wrong place as soon as the picture had been panned; and each step of the drag was put back on the grid, so a part held to the finger could not move far enough to leave the square it was in. A part now follows the finger exactly and is put on the grid when it is let go, and the drag can be undone.
+- **The name of a part is centred on the part.** The names of the parts that stand on end, and the name of the ground, were written beside them instead of over them, and the name of a part was written at a fixed distance from its centre, so a name lay on top of its symbol as soon as the picture was zoomed in. Every name is now centred on its part and written clear of it, at a distance that grows with the zoom.
+- **The list of example circuits is a list.** The names are on the left with dots filling the space beside them, and the sentence under each name is left-aligned with it, so the list reads like a table of contents rather than a centred column.
+
+### Verification
+
+- 1410 JVM unit tests, 0 failures.
+- Android Lint: 0 errors, and no new warnings.
+- `assembleDebug` and the signed release build both succeed.
+- On-device checks covering the three fixes: a part dragged across the canvas and let go on the grid, a tap on a part still opening its editor, a drag on the empty paper still moving the picture, and the list of examples.
+
+---
+
 ## [3.0.0] — 2026-10-21
 
 A major release. **Electrical Circuits** — a circuit you can draw, wire and work out — joins **eleven electrical calculators**, and the AI problem solver now works on exactly the problem it shows you. `versionName = 3.0.0`, `versionCode = 4`, `minSdk 26`, `targetSdk 36`.
@@ -327,6 +348,7 @@ Documented in full in [ROADMAP.md](ROADMAP.md) and [docs/CALCULUS_GUIDE.md](docs
 - `assembleDebug` and the signed release build both succeed.
 - On-device checks covering onboarding (first launch, navigation, skip, finish, restart persistence), the separator setting (all five styles, live update, persistence), portrait lock across 13 destinations, light and dark themes, and 14 assertions on the two calculus fixes.
 
+[3.0.1]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.1
 [3.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.0
 [2.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/2.0.0-release
 [1.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v1.0.0

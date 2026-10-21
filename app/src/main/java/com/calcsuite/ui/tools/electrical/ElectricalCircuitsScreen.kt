@@ -31,6 +31,13 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.calcsuite.engine.electrical.ComponentKind
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.calcsuite.engine.electrical.Circuit
@@ -381,30 +388,50 @@ private fun CircuitBuilder(args: ToolArgs) {
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     for (example in CircuitExamples.all) {
-                        TextButton(
-                            onClick = {
-                                state = state.copy(
-                                    circuit = example.circuit,
-                                    selected = null,
-                                    action = EditorAction.Idle,
-                                    undo = state.undo + state.circuit,
-                                    redo = emptyList(),
-                                )
-                                showExamples = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
+                        // The name of the example is on the left, with dots
+                        // filling the space to its right, so that the list
+                        // reads like a table of contents.
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    state = state.copy(
+                                        circuit = example.circuit,
+                                        selected = null,
+                                        action = EditorAction.Idle,
+                                        undo = state.undo + state.circuit,
+                                        redo = emptyList(),
+                                    )
+                                    showExamples = false
+                                }
+                                .padding(vertical = 6.dp),
                         ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    example.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                DotLeader(
+                                    Modifier
+                                        .weight(1f)
+                                        .padding(start = 8.dp, end = 2.dp)
+                                        .height(12.dp),
+                                )
+                            }
                             Text(
-                                example.title,
-                                style = MaterialTheme.typography.bodyMedium,
+                                example.teaching,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Start,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 2.dp),
                             )
                         }
-                        Text(
-                            example.teaching,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
-                        )
                     }
                 }
             },
@@ -493,5 +520,28 @@ private fun ElectricalCalculatorsPanel(args: ToolArgs) {
         "capacitor" -> CapacitorPanel()
         "timeconstant" -> TimeConstantPanel()
         "ac" -> AcPanel()
+    }
+}
+
+/**
+ * The line of dots that fills the space beside a name.
+ *
+ * It is drawn as a dashed line, so the dots are the same whatever the
+ * width of the space is, and they follow the text's own colour.
+ */
+@Composable
+private fun DotLeader(modifier: Modifier = Modifier) {
+    val colour = MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(modifier) {
+        val middle = size.height / 2f
+        drawLine(
+            color = colour,
+            start = Offset(0f, middle),
+            end = Offset(size.width, middle),
+            strokeWidth = 2f,
+            pathEffect = PathEffect.dashPathEffect(
+                floatArrayOf(2f, 3.5f),
+            ),
+        )
     }
 }

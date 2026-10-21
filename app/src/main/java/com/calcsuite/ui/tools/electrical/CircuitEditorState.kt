@@ -104,16 +104,27 @@ object CircuitEditor {
         )
     }
 
-    /** Moves a part. */
+    /**
+     * Moves a part.
+     *
+     * @param snap true to put the part on the grid, false while it is being
+     *   dragged. A part that is being dragged follows the finger exactly, and
+     *   is put on the grid when it is let go.
+     */
     fun moveComponent(
         state: CircuitEditorState,
         id: String,
         x: Double,
         y: Double,
         record: Boolean,
+        snap: Boolean = true,
     ): CircuitEditorState {
         val component = state.circuit.component(id) ?: return state
-        val moved = component.copy(x = CircuitGeometry.snap(x), y = CircuitGeometry.snap(y))
+        val moved = if (snap) {
+            component.copy(x = CircuitGeometry.snap(x), y = CircuitGeometry.snap(y))
+        } else {
+            component.copy(x = x, y = y)
+        }
         return state.copy(
             circuit = state.circuit.copy(
                 components = state.circuit.components.map { if (it.id == id) moved else it },

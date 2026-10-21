@@ -2,8 +2,8 @@ package com.calcsuite.ui.tools.electrical
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -116,10 +117,18 @@ fun CircuitCanvas(
     val surface = MaterialTheme.colorScheme.surfaceContainerLow
     val density = LocalDensity.current
 
-    fun transform(): CanvasTransform = CanvasTransform(
-        centreX = state.viewCentreX,
-        centreY = state.viewCentreY,
-        zoom = state.zoom,
+    /**
+     * The world transform, worked out from the state as it is now.
+     *
+     * The gesture handlers are not restarted every time the picture is
+     * moved, so the state they hold is not the current one. Reading the
+     * centre of the view from the captured state would put a touch in the
+     * wrong place as soon as the picture had been panned.
+     */
+    fun transformFor(s: CircuitEditorState): CanvasTransform = CanvasTransform(
+        centreX = s.viewCentreX,
+        centreY = s.viewCentreY,
+        zoom = s.zoom,
         width = canvasSize.width.toFloat().coerceAtLeast(1f),
         height = canvasSize.height.toFloat().coerceAtLeast(1f),
     )
@@ -130,85 +139,202 @@ fun CircuitCanvas(
             .background(surface)
             .semantics { contentDescription = "The circuit" }
             .onSizeChanged { canvasSize = it }
-            .pointerInput(state.circuit, state.zoom, canvasSize) {
-                detectTapGestures { tap ->
-                    val now = current
-                    val world = transform().world(tap)
-                    val wiring = now.action as? EditorAction.Wiring
-                    if (wiring != null) {
-                        val target = CircuitGeometry.terminalAt(
-                            now.circuit,
-                            world.first,
-                            world.second,
-                            26.0 * now.zoom,
-                        )
-                        send(
-                            if (target != null && target != wiring.from) {
-                                CircuitEditor.addWire(now, wiring.from, target)
-                                    .copy(action = EditorAction.Idle)
-                            } else {
-                                now.copy(action = EditorAction.Idle)
-                            },
-                        )
-                        return@detectTapGestures
-                    }
-                    val placing = now.action as? EditorAction.Placing
-                    if (placing != null) {
-                        val placed = CircuitEditor.addComponent(
-                            now,
-                            placing.kind,
-                            world.first,
-                            world.second,
-                        ).copy(action = EditorAction.Idle)
-                        send(placed)
-                        // The part that has just been put down is opened, so
-                        // that its value can be given straight away.
-                        select(placed.selected)
-                        return@detectTapGestures
-                    }
-                    val terminal = CircuitGeometry.terminalAt(
-                        now.circuit,
-                        world.first,
-                        world.second,
-                        26.0 * now.zoom,
-                    )
-                    if (terminal != null) {
-                        send(
-                            now.copy(
-                                action = EditorAction.Wiring(terminal, world.first, world.second),
-                            ),
-                        )
-                        return@detectTapGestures
-                    }
-                    val component = CircuitGeometry.componentAt(now.circuit, world.first, world.second)
-                    send(now.copy(selected = component?.id))
-                    select(component?.id)
-                }
-            }
-            .pointerInput(state.circuit, state.zoom, canvasSize) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    val now = current
-                    val world = transform().world(centroid)
-                    val grabbed = CircuitGeometry.componentAt(now.circuit, world.first, world.second)
-                    val pinching = abs(zoom - 1f) > 1e-4f
-                    if (grabbed != null && !pinching) {
-                        send(
-                            CircuitEditor.moveComponent(
-                                now,
-                                grabbed.id,
-                                grabbed.x + pan.x * now.zoom,
-                                grabbed.y - pan.y * now.zoom,
-                                record = false,
-                            ),
-                        )
+            .pointerInput(canvasSize) {
+                // The gesture is not restarted when the circuit changes: a
+                // drag changes the circuit on every step, and restarting the
+                // gesture would throw the drag away halfway through. The
+                // state is read as it is, through `current`.
+                // One gesture watches the touch from the start to the end, so
+                // that a tap and a drag cannot fight over it. It drags the
+                // part under the finger, or the paper when the finger is on
+                // the paper, or zooms when there are two fingers down. A
+                // touch that never moved is a tap.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val start = transformFor(current).world(down.position)
+                    // What was under the finger when it went down. A terminal
+                    // is not a handle for dragging, so that a wire can still
+                    // be started from one.
+                    val onTerminal = CircuitGeometry.terminalAt(
+                        current.circuit,
+                        start.first,
+                        start.second,
+                        26.0 * current.zoom,
+                    ) != null
+                    val grabbed = if (onTerminal) {
+                        null
                     } else {
-                        send(
-                            now.copy(
-                                viewCentreX = now.viewCentreX - pan.x * now.zoom,
-                                viewCentreY = now.viewCentreY + pan.y * now.zoom,
-                                zoom = (now.zoom * zoom).coerceIn(0.1, 4.0),
-                            ),
-                        )
+                        CircuitGeometry.componentAt(current.circuit, start.first, start.second)
+                    }
+
+                    var moved = false
+                    var pinched = false
+                    var last = down.position
+                    var lastSpread = 0f
+                    // Where the part is being dragged to, in world units, so
+                    // that it follows the finger exactly.
+                    var dragTarget: Pair<Double, Double>? = null
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.isEmpty()) break
+
+                        if (pressed.size >= 2) {
+                            // Two fingers: the picture is zoomed about the
+                            // point between them.
+                            pinched = true
+                            moved = true
+                            val first = pressed[0].position
+                            val second = pressed[1].position
+                            val middle = (first + second) / 2f
+                            val spread = (first - second).getDistance()
+                            val now = current
+                            val factor = if (lastSpread > 0f) spread / lastSpread else 1f
+                            val zoom = (now.zoom * factor).coerceIn(0.1, 4.0)
+                            val world = transformFor(now).world(middle)
+                            send(
+                                now.copy(
+                                    viewCentreX = world.first -
+                                        (middle.x - size.width / 2f) * zoom,
+                                    viewCentreY = world.second +
+                                        (middle.y - size.height / 2f) * zoom,
+                                    zoom = zoom,
+                                ),
+                            )
+                            last = middle
+                            lastSpread = spread
+                            event.changes.forEach { it.consume() }
+                            continue
+                        }
+
+                        val change = pressed.first()
+                        if (!change.positionChanged()) continue
+                        val distance = (change.position - down.position).getDistance()
+                        if (!moved && distance > viewConfiguration.touchSlop) {
+                            moved = true
+                            last = change.position
+                        }
+                        if (!moved) continue
+
+                        val now = current
+                        val pan = change.position - last
+                        if (grabbed != null && !pinched) {
+                            // The part follows the finger exactly: its place
+                            // is kept as the drag goes on, and it is put on
+                            // the grid when it is let go.
+                            val part = now.circuit.component(grabbed.id)
+                            if (part != null) {
+                                val target = dragTarget ?: (part.x to part.y)
+                                val next = (target.first + pan.x * now.zoom) to
+                                    (target.second - pan.y * now.zoom)
+                                dragTarget = next
+                                send(
+                                    CircuitEditor.moveComponent(
+                                        now,
+                                        part.id,
+                                        next.first,
+                                        next.second,
+                                        record = false,
+                                        snap = false,
+                                    ),
+                                )
+                            }
+                        } else if (!pinched) {
+                            // The paper follows the finger.
+                            send(
+                                now.copy(
+                                    viewCentreX = now.viewCentreX - pan.x * now.zoom,
+                                    viewCentreY = now.viewCentreY + pan.y * now.zoom,
+                                ),
+                            )
+                        }
+                        last = change.position
+                        change.consume()
+                    }
+
+                    // A part that was dragged is put on the grid, and the
+                    // drag can be undone.
+                    val target = dragTarget
+                    dragTarget = null
+                    if (target != null && grabbed != null) {
+                        val now = current
+                        val part = now.circuit.component(grabbed.id)
+                        if (part != null) {
+                            send(
+                                CircuitEditor.moveComponent(
+                                    now,
+                                    part.id,
+                                    part.x,
+                                    part.y,
+                                    record = true,
+                                ),
+                            )
+                        }
+                    }
+
+                    if (!moved) {
+                        // A tap.
+                        val now = current
+                        val world = transformFor(now).world(down.position)
+                        val wiring = now.action as? EditorAction.Wiring
+                        if (wiring != null) {
+                            val target = CircuitGeometry.terminalAt(
+                                now.circuit,
+                                world.first,
+                                world.second,
+                                26.0 * now.zoom,
+                            )
+                            send(
+                                if (target != null && target != wiring.from) {
+                                    CircuitEditor.addWire(now, wiring.from, target)
+                                        .copy(action = EditorAction.Idle)
+                                } else {
+                                    now.copy(action = EditorAction.Idle)
+                                },
+                            )
+                        } else {
+                            val placing = now.action as? EditorAction.Placing
+                            if (placing != null) {
+                                val placed = CircuitEditor.addComponent(
+                                    now,
+                                    placing.kind,
+                                    world.first,
+                                    world.second,
+                                ).copy(action = EditorAction.Idle)
+                                send(placed)
+                                // The part that has just been put down is
+                                // opened, so that its value can be given
+                                // straight away.
+                                select(placed.selected)
+                            } else {
+                                val terminal = CircuitGeometry.terminalAt(
+                                    now.circuit,
+                                    world.first,
+                                    world.second,
+                                    26.0 * now.zoom,
+                                )
+                                if (terminal != null) {
+                                    send(
+                                        now.copy(
+                                            action = EditorAction.Wiring(
+                                                terminal,
+                                                world.first,
+                                                world.second,
+                                            ),
+                                        ),
+                                    )
+                                } else {
+                                    val component = CircuitGeometry.componentAt(
+                                        now.circuit,
+                                        world.first,
+                                        world.second,
+                                    )
+                                    send(now.copy(selected = component?.id))
+                                    select(component?.id)
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -424,27 +550,41 @@ private fun DrawScope.drawComponent(
     } else {
         null
     }
+    // The name is centred on the part and written above it, clear of the
+    // symbol. The distances are scaled with the zoom, so the name never
+    // lies on top of the part it names.
+    val unit = (1.0 / view.zoom).toFloat()
+    val halfAcross = 10f * unit
+    val halfAlong = 22f * unit
+    val standsUp = abs(acrossX) > 0.5f
+    val gap = 5f
+
     val nameX: Float
     val nameY: Float
     val valueX: Float
     val valueY: Float
     if (component.kind == ComponentKind.GROUND) {
-        nameX = middle.x - nameLayout.size.width - 30f
-        nameY = middle.y - nameLayout.size.height / 2
-        valueX = middle.x - (valueLayout?.size?.width ?: 0) / 2
-        valueY = middle.y + 26f
-    } else if (abs(acrossX) > 0.5f) {
-        // The part stands on end, so its name is written beside it.
-        nameX = middle.x - nameLayout.size.width - 34f
-        nameY = middle.y - nameLayout.size.height / 2
-        valueX = middle.x + 34f
-        valueY = middle.y - (valueLayout?.size?.height ?: 0) / 2
-    } else {
-        // The part lies down, so its name is written above it.
+        // The ground symbol hangs below its point, so the name is written
+        // above the point and the value below the symbol.
         nameX = middle.x - nameLayout.size.width / 2
-        nameY = middle.y - nameLayout.size.height - 26f
+        nameY = middle.y - nameLayout.size.height - 8f
         valueX = middle.x - (valueLayout?.size?.width ?: 0) / 2
-        valueY = middle.y + 26f
+        valueY = middle.y + 12f * unit
+    } else {
+        val top = if (standsUp) {
+            middle.y - (halfAlong + halfAcross)
+        } else {
+            middle.y - halfAcross
+        }
+        val bottom = if (standsUp) {
+            middle.y + (halfAlong + halfAcross)
+        } else {
+            middle.y + halfAcross
+        }
+        nameX = middle.x - nameLayout.size.width / 2
+        nameY = top - gap - nameLayout.size.height
+        valueX = middle.x - (valueLayout?.size?.width ?: 0) / 2
+        valueY = bottom + gap
     }
     drawText(textLayoutResult = nameLayout, topLeft = Offset(nameX, nameY))
     if (valueLayout != null) {

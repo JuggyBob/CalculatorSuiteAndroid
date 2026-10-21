@@ -14,7 +14,7 @@ Please do not disclose the issue publicly until it has been addressed.
 
 ### What to include
 
-- Affected version (the app version from **Settings → Calc Suite 3.0.0**, or the commit SHA)
+- Affected version (the app version from **Settings → Calc Suite 3.0.1**, or the commit SHA)
 - Device model, Android version
 - Steps to reproduce, ideally with the exact input that triggers it
 - What you observed and what you expected
@@ -42,9 +42,10 @@ Calculator Suite has a very small attack surface: it has no accounts, no server 
 
 | Version | Supported |
 |---|---|
-| 3.0.0 | ✔ |
-| 2.0.0 | ✔ (upgrade to 3.0.0) |
-| 1.0.0 | ✔ (upgrade to 3.0.0) |
+| 3.0.1 | ✔ |
+| 3.0.0 | ✔ (upgrade to 3.0.1) |
+| 2.0.0 | ✔ (upgrade to 3.0.1) |
+| 1.0.0 | ✔ (upgrade to 3.0.1) |
 
 As the project is new, only the latest release receives fixes. When a new version is published, the table above is updated.
 
