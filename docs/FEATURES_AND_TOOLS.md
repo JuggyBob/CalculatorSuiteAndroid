@@ -14,7 +14,7 @@ Every one of the **66 registered tools** across **8 categories**, with its input
 | [Calculus](#8-calculus--14-tools) | 14 |
 | [Advanced Mathematics](#9-advanced-mathematics--3-tools) | 3 |
 
-**Not a tool, but a feature.** The **AI problem solver** (the brain button beside the history button on the main screen) reads a photograph of a mathematical problem, has a chosen AI provider pick the right tool below, and lets that tool's own engine do the mathematics. It is described in the [User Guide](USER_GUIDE.md#the-ai-problem-solver).
+**Not a tool, but a feature.** The **AI problem solver** (the brain button beside the history button on the main screen) reads a photograph of a mathematical problem, has a chosen AI provider pick the right tool below, and lets that tool's own engine do the mathematics. It is described in the [User Guide](USER_GUIDE.md#9-the-ai-problem-solver).
 
 **Notation used throughout.** *Exact* means the result is computed with arbitrary-precision arithmetic (`BigDecimal` at 34 significant digits, or `BigInteger`) and is not rounded until display. *Numerical* means a numeric method was used, the result is prefixed `≈`, and the panel names the method.
 
@@ -704,21 +704,38 @@ They differ by design: 1 January 23:00 → 2 January 01:00 is a calendar interva
 
 ---
 
-### Ohm's law (`other.ohms_law`)
+### Electrical Circuits (`other.electrical_circuits`)
 
-**Purpose.** Solve for voltage, current, resistance or power.
+**Purpose.** Draw a circuit, wire it up, and work out what happens in it — and, alongside it, the ordinary electrical calculations that do not need a circuit drawn.
 
-**Inputs.** Any three of `V = I × R`, `I = V / R`, `R = V / I`, and `P = V × I = I²R = V²/R`. The tool infers the missing quantity from the three you supply.
+**Inputs.** The tool has two halves.
 
-**Method.** Exact decimal — these are algebraic identities, not approximations.
+*The circuit builder.* Parts are put down on a canvas and wired together:
 
-**Results.** The solved value plus the derived quantities and the formula used.
+- **The parts.** A resistor, a voltage source, a current source, a switch and a ground. A part can be put down by tapping the canvas after choosing it, or dragged straight out of the palette.
+- **The drawing.** A grid, a pan and a pinch-zoom. The parts are drawn as the standard symbols — the box of a resistor, the circle with the plus and the minus of a voltage source, the circle with the arrow of a current source, the hinged arm of a switch and the three lines of the earth symbol of a ground. Wires are drawn by tapping a terminal and then the terminal it goes to; a dot marks every point where three or more terminals meet.
+- **Each part's own values.** Tap a part to open it: its name, its value with an SI prefix, its power rating, and — for a switch — whether it is open or closed.
+- **The circuit itself.** A resistance must be greater than zero, a source needs its voltage or current, and a circuit needs a ground.
 
-**Validation.** A resistance of zero, which would make `I = V/R` undefined — reported rather than producing an infinity.
+*The eleven calculators.* Ohm's law and power; resistors in series; resistors in parallel; a series part and a parallel part; a voltage divider; a current divider; writing a value in another prefix; the resistor colour code; a capacitor; the time constant of an RC or an RL circuit; and an alternating circuit.
 
-**Limitations.** DC only; no AC, impedance, phase or power factor. No parallel/series network solving. A skin-depth-aware or non-ohmic component is out of scope.
+**Method.** The builder solves the circuit by **modified nodal analysis**: the app writes the equations for the circuit as you have drawn it — one current balance at every point that is not the ground, together with the voltage of each source — and solves them with Gaussian elimination and partial pivoting, reporting a singular system rather than dividing by a number that is nearly zero.
 
-**Example.** 12 V across 4 Ω → I = **3 A**, P = **36 W**.
+The connectivity is read from the terminals and the wires alone, never from the picture, so two wires that merely cross on the screen join nothing, and a closed switch joins its two ends exactly as a wire would while an open one does not.
+
+Where the resistor network can be reduced by the series and parallel rules, the reduction is shown step by step with the real names and the real values of the parts. Where it cannot — because reducing it would change the way the branches share the current — the nodal method that was used instead is named and explained.
+
+The calculators work in exact decimal arithmetic where the mathematics allows it: the algebraic identities of Ohm's law, the sums and reciprocals of a resistor network, and the charge and the energy of a capacitor.
+
+**Results.** The voltage across, the current through and the power in every part; the resistance the source sees; the power the source delivers; and the whole circuit's answer in six sections — the result and what it means, the formula and its symbols, the working, why the formula applies, and an independent check.
+
+**Validation.** Four states are told apart, because each needs something different from you: the canvas is empty; the circuit is not finished (a part is not joined, a value is missing, there is no ground); the circuit cannot be worked out as it stands (a resistance of zero, a short-circuited source, a part that hangs); or it has been solved. The message names the part that is at fault. A part whose value is missing, zero or negative is reported rather than quietly treated as zero.
+
+**Limitations.** The builder is for **steady direct current with ideal parts**: there is no transient analysis, no frequency sweep and no non-ohmic component, and the switch is ideal — a conductor when closed, a break when open. The circuit needs one ground, and the voltages are measured against it. The alternating-current calculator is a separate calculation at one frequency, not a simulation of a circuit over time. The power rating of a resistor is kept, but the app does not yet warn when a part is being worked harder than its rating.
+
+**Examples.** Two resistors in series, 100 Ω and 200 Ω across 12 V → **300 Ω** seen by the source, **0.04 A** delivered, 4 V across the first and 8 V across the second. Two resistors in parallel, 100 Ω and 200 Ω across 12 V → **66.667 Ω**, **0.18 A** in total, 0.12 A and 0.06 A in the branches.
+
+**Related.** The calculators are the same ones the earlier Ohm's law tool offered, and the first of them is Ohm's law itself, unchanged.
 
 ---
 
@@ -1122,7 +1139,7 @@ Three learning environments. Each computes real values for the example in front 
 | | [Add & subtract time](#add--subtract-time-datetimeadd_subtract) | `datetime.add_subtract` |
 | | [Time interval](#time-interval-datetimeinterval) | `datetime.interval` |
 | Other | [Mileage & trips](#mileage--trips-othermileage) | `other.mileage` |
-| | [Ohm's law](#ohms-law-otherohms_law) | `other.ohms_law` |
+| | [Electrical Circuits](#electrical-circuits-otherelectrical_circuits) | `other.electrical_circuits` |
 | Calculus | [Derivatives](#derivatives-calculusderivatives) | `calculus.derivatives` |
 | | [Integrals](#integrals-calculusintegrals) | `calculus.integrals` |
 | | [Limits](#limits-calculuslimits) | `calculus.limits` |

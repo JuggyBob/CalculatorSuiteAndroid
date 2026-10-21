@@ -33,6 +33,7 @@ import com.calcsuite.ui.components.SegmentedChoice
 import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.tools.ToolArgs
 import kotlin.math.abs
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Measure Theory tool.
@@ -90,7 +91,7 @@ fun MeasureTheoryContent(args: ToolArgs) {
     )
 
     when (section) {
-        "Sets and measures" -> SetsSection()
+        "Sets and measures" -> SetsSection(args)
         "Countable additivity" -> AdditivitySection()
         "The two integrals" -> IntegralsSection()
         else -> NullSetsSection()
@@ -101,9 +102,13 @@ fun MeasureTheoryContent(args: ToolArgs) {
  * The measures of two sets and of their union.
  */
 @Composable
-private fun SetsSection() {
-    var first by rememberSaveable { mutableStateOf("0, 2") }
-    var second by rememberSaveable { mutableStateOf("1, 3") }
+private fun SetsSection(args: ToolArgs) {
+    var first by rememberSaveable {
+        mutableStateOf(args.prefill("first", "firstSet") ?: "0, 2")
+    }
+    var second by rememberSaveable {
+        mutableStateOf(args.prefill("second", "secondSet") ?: "1, 3")
+    }
 
     SectionCard(title = "Two sets") {
         PlainField(

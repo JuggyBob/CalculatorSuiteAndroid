@@ -37,6 +37,7 @@ import com.calcsuite.ui.theme.NumberTextStyle
 import com.calcsuite.ui.tools.ToolArgs
 import java.math.BigDecimal
 import java.math.BigInteger
+import com.calcsuite.ui.tools.prefill
 
 private enum class ComboMode { Combination, Permutation, Probability }
 
@@ -47,8 +48,8 @@ fun CombinatoricsToolScreen(args: ToolArgs) {
 
     var modeName by rememberSaveable { mutableStateOf(ComboMode.Combination.name) }
     val mode = ComboMode.valueOf(modeName)
-    var nText by rememberSaveable { mutableStateOf("5") }
-    var rText by rememberSaveable { mutableStateOf("2") }
+    var nText by rememberSaveable { mutableStateOf(args.prefill("nText", "n") ?: "5") }
+    var rText by rememberSaveable { mutableStateOf(args.prefill("rText", "r") ?: "2") }
     var populationText by rememberSaveable { mutableStateOf("49") }
     var specialText by rememberSaveable { mutableStateOf("6") }
     var drawsText by rememberSaveable { mutableStateOf("6") }

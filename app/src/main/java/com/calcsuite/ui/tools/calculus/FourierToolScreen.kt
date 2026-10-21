@@ -45,6 +45,7 @@ import com.calcsuite.ui.tools.ToolArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Fourier Analysis tool.
@@ -70,10 +71,12 @@ fun FourierToolScreen(args: ToolArgs) {
 @Composable
 fun FourierToolContent(args: ToolArgs) {
     var modeName by rememberSaveable { mutableStateOf("Series") }
-    var functionText by rememberSaveable { mutableStateOf("sin(x)") }
-    var variable by rememberSaveable { mutableStateOf("x") }
+    var functionText by rememberSaveable {
+        mutableStateOf(args.prefill("functionText", "expression") ?: "sin(x)")
+    }
+    var variable by rememberSaveable { mutableStateOf(args.prefill("variable") ?: "x") }
     var period by rememberSaveable { mutableStateOf("6.283185307179586") }
-    var harmonics by rememberSaveable { mutableStateOf("3") }
+    var harmonics by rememberSaveable { mutableStateOf(args.prefill("harmonics") ?: "3") }
     var samplesText by rememberSaveable { mutableStateOf("0, 1, 0, -1, 0, 1, 0, -1") }
     var interval by rememberSaveable { mutableStateOf("1") }
 
@@ -207,7 +210,18 @@ fun FourierToolContent(args: ToolArgs) {
             caption = "N = ${series.series.harmonics} harmonics, T = " +
                 formatReal(series.series.period),
             approx = true,
-            onCopy = { args.onRecord("Fourier series of $functionText", it) },
+            onCopy = {
+                    args.onRecord.record(
+                        "Fourier series of \$functionText",
+                        it,
+                        mapOf(
+                            "functionText" to functionText,
+                            "variable" to variable,
+                            "interval" to interval,
+                            "harmonics" to harmonics,
+                        ),
+                    )
+                },
             copyValue = series.series.render(variable.trim().ifBlank { "x" }),
         )
         ResultRow(label = "Constant term a₀/2", value = formatReal(series.series.a0 / 2))

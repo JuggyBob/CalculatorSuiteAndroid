@@ -44,7 +44,7 @@ class ToolRegistryTest {
         // Advanced mathematics (3)
         "advanced.measure", "advanced.topology", "advanced.functional",
         // Other
-        "other.mileage", "other.ohms_law",
+        "other.mileage", "other.electrical_circuits",
     )
 
     @Test fun registryContainsExactlyTheExpectedTools() {
@@ -104,6 +104,29 @@ class ToolRegistryTest {
         assertTrue(ToolRegistry.all.none { it.id == "algebra.calculus" })
     }
 
+    @Test fun theOldOhmsLawIdStillResolves() {
+        // The tool was called Ohm's law before it became Electrical Circuits.
+        // The history entries made with it have to open the tool that is
+        // there now, and the tool must not be listed twice.
+        val legacy = ToolRegistry.byId("other.ohms_law")
+        assertNotNull("the old id must still resolve", legacy)
+        assertEquals("other.electrical_circuits", legacy?.id)
+        assertEquals("other.electrical_circuits", ToolRegistry.canonicalId("other.ohms_law"))
+        assertEquals(1, ToolRegistry.all.count { it.id == "other.electrical_circuits" })
+        assertTrue(ToolRegistry.all.none { it.id == "other.ohms_law" })
+    }
+
+    @Test fun theElectricalToolIsInTheOtherCategory() {
+        val tool = ToolRegistry.byId("other.electrical_circuits")
+        assertNotNull("the tool is there", tool)
+        assertEquals("it is in Other", ToolCategory.OTHER, tool?.category)
+        assertEquals("it is called Electrical Circuits", "Electrical Circuits", tool?.title)
+        assertTrue(
+            "it is found under the old name",
+            ToolRegistry.search("ohm's law").any { it.id == "other.electrical_circuits" },
+        )
+    }
+
     @Test fun theCalculusCategoryHoldsTheCalculusTools() {
         val calculus = ToolRegistry.inCategory(ToolCategory.CALCULUS)
         assertEquals(14, calculus.size)
@@ -150,7 +173,9 @@ class ToolRegistryTest {
         assertEquals("health.bmi", ToolRegistry.search("bmi").first().id)
         assertEquals("algebra.combinations", ToolRegistry.search("ncr").first().id)
         assertEquals("convert.roman", ToolRegistry.search("mcmxciv").first().id)
-        assertEquals("other.ohms_law", ToolRegistry.search("ohms law").first().id)
+        assertEquals("other.electrical_circuits", ToolRegistry.search("ohms law").first().id)
+        assertEquals("other.electrical_circuits", ToolRegistry.search("ohm law").first().id)
+        assertEquals("other.electrical_circuits", ToolRegistry.search("circuit").first().id)
     }
 
     @Test fun titleMatchesRankAboveSynonymMatches() {

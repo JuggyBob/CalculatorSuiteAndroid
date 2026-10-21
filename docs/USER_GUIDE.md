@@ -173,6 +173,31 @@ Two interaction patterns:
 
 Results can be **copied** at full precision or **saved** to history from the result card.
 
+### The circuit builder
+
+**Electrical Circuits** (in *Other*) has two halves, and the builder is the one that is new.
+
+**Putting a circuit together.**
+
+- **Choose a part** from the *Parts* panel and tap the canvas to put it down, or **drag the part straight out of the panel** onto the canvas. The part opens as soon as it is down, so you can give it its value straight away.
+- **Move a part** by dragging it. **Turn it** with the *Turn* action in its editor, which turns the symbol a quarter at a time.
+- **Wire two terminals together** by tapping one and then the other. A wire follows your finger while you are choosing where it goes, and a dot marks every point where three or more terminals meet.
+- **Pan and zoom** the picture by dragging the empty canvas and by pinching. The picture is cut off at the edge of the canvas, so nothing spills over the rest of the screen.
+- **Undo and redo** with the two arrows above the canvas.
+- **Examples** opens seven ready-made circuits; **Clear** empties the canvas.
+
+**Working it out.** Press **Calculate the circuit**. The app solves the circuit and shows:
+
+- the voltage across, the current through and the power in **every part**;
+- the resistance the source sees and the power it delivers;
+- the working, in the same expandable sections as the rest of the app — the result and what it means, the formula and its symbols, the step-by-step calculation, why the formula applies, and a check.
+
+If the circuit cannot be worked out, the message says why and names the part at fault: a part that is not joined, a value that is missing, a resistance of zero, a short-circuited source, or no ground.
+
+**Your circuit is kept.** It is still on the canvas when you come back to the tool, and a circuit you calculate is saved in the history — tap that entry and the tool opens with that circuit on the canvas.
+
+The **Calculators** tab beside the builder holds eleven calculations that need no drawing: Ohm's law, resistors in series and in parallel, a series part with a parallel part, the voltage and current dividers, writing a value in another prefix, the resistor colour code, a capacitor, the time constant of an RC or an RL circuit, and an alternating circuit.
+
 ## 7. Settings
 
 Open with the gear icon on the main screen.
@@ -328,6 +353,10 @@ Open **Percentage** from Algebra, keep the **Percent of** mode, enter `15` and `
 ### "What's the derivative of x²+3x?"
 
 **Calculus**, leave the default expression, and the `d/dx` operation is already selected. It reports `2x + 3` and cross-checks it numerically at a point you choose. See the [Calculus guide](CALCULUS_GUIDE.md).
+
+### "What is the current through this resistor?"
+
+Open **Electrical Circuits**, choose *Examples* and pick **Two resistors in series** to see the shape of it, or build your own: put a source and a resistor on the canvas, wire them together, add a ground, and press **Calculate the circuit**. The current, the drop across each part and the power each part turns into heat are all shown, with the working.
 
 ### "Convert 100 USD to EUR"
 

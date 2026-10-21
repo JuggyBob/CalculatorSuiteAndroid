@@ -59,7 +59,7 @@ The APK is signed with a release key, so Android will show a warning the first t
 - Verify the download first:
 
   ```bash
-  sha256sum CalculatorSuite-v2.0.0.apk
+  sha256sum CalculatorSuite-v3.0.0.apk
   # compare with the .sha256 file published alongside it
   ```
 

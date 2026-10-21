@@ -12,11 +12,11 @@ android {
         applicationId = "com.calcsuite"
         minSdk = 26
         targetSdk = 36
-        // The 2.0.0 release was republished with a higher version code, so
-        // that it installs over the first 2.0.0 build (version code 2) and
-        // over 1.0.0 (version code 1) alike. The version name is unchanged.
-        versionCode = 3
-        versionName = "2.0.0"
+        // The version code is raised for every published build, so that the
+        // new one installs over the old one: 3.0.0 carries 4, above the 3
+        // of the republished 2.0.0 and the 2 of the first 2.0.0.
+        versionCode = 4
+        versionName = "3.0.0"
     }
 
     // The release key is held outside the repository. Its location and its

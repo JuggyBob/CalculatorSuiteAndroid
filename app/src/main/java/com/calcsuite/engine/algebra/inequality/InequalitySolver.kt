@@ -11,7 +11,7 @@ import kotlin.math.abs
 enum class InequalityMode(val label: String, val hint: String) {
     SINGLE("Single", "One inequality in one variable, for example 2x + 3 < 11"),
     COMPOUND("Compound", "One chain, for example -2 < 3x + 1 <= 10"),
-    SYSTEM("System", "Several inequalities, one per line, all of which must hold"),
+    SYSTEM("System", "Several inequalities, one in each field, all of which must hold"),
     // The four mode chips share the row width equally, so a label has to fit in
     // a quarter of it. "Two variables" does not, and was clipped to "Two"; the
     // full description is in the hint line underneath.
@@ -113,7 +113,7 @@ object InequalitySolver {
                 } else null
             InequalityMode.SYSTEM ->
                 if (parsed.chainCount < 2) {
-                    "This mode expects several inequalities, one per line, all of which must hold."
+                    "This mode expects several inequalities, one in each field, all of which must hold."
                 } else null
             InequalityMode.TWO_VARIABLE -> null
         }
@@ -342,6 +342,31 @@ object InequalitySolver {
         }
     }
 
+    /**
+     * A quadratic written the way a person would write it.
+     *
+     * The coefficient of one is left out and the signs are written as a
+     * minus, so the expression reads `x^2 - 4` rather than `1x^2 + -4`.
+     */
+    private fun quadraticText(variable: String, a: Rat, b: Rat, c: Rat): String {
+        val leading = when {
+            a.isOne() -> "$variable^2"
+            a.toDouble() == -1.0 -> "\u2212$variable^2"
+            else -> "${a.display()}$variable^2"
+        }
+        val middle = when {
+            b.isZero() -> ""
+            b.toDouble() > 0.0 -> " + ${b.display()}$variable"
+            else -> " \u2212 ${(-b).display()}$variable"
+        }
+        val last = when {
+            c.isZero() -> ""
+            c.toDouble() > 0.0 -> " + ${c.display()}"
+            else -> " \u2212 ${(-c).display()}"
+        }
+        return leading + middle + last
+    }
+
     private fun solveRational(
         relation: Rel.Simple,
         difference: IExpr,
@@ -364,6 +389,60 @@ object InequalitySolver {
             )
         } else {
             steps.add("The inequality is already of the form f($variable) ${relation.op.symbol} 0.")
+        }
+
+        // A quadratic is worked out with its discriminant, so that the
+        // student can see why there are two roots, one or none.
+        val numerator = rational.num
+        if (numerator.degree == 2 && rational.den.degree == 0) {
+            val a = numerator.coefficient(2)
+            val b = numerator.coefficient(1)
+            val c = numerator.coefficient(0)
+            steps.add(
+                "f($variable) is the quadratic ${quadraticText(variable, a, b, c)}, " +
+                    "so a = ${a.display()}, b = ${b.display()} and c = ${c.display()}.",
+            )
+            val delta = b * b - Rat.of(4) * a * c
+            steps.add(
+                "Its discriminant is Δ = b² − 4ac = (${b.display()})² − 4·(${a.display()})·(${c.display()}) " +
+                    "= ${delta.display()}.",
+            )
+            when {
+                delta.isZero() -> {
+                    steps.add(
+                        "Δ = 0, so the quadratic touches the axis at one point: it has one " +
+                            "repeated root, x = −b ÷ 2a = ${b.display()} ÷ ${a.display()}.",
+                    )
+                    steps.add(
+                        "The sign does not change at a repeated root: the quadratic keeps the " +
+                            "sign of its leading coefficient on both sides of it.",
+                    )
+                }
+                delta.toDouble() > 0.0 -> {
+                    steps.add(
+                        "Δ > 0, so the quadratic crosses the axis twice: it has two distinct " +
+                            "real roots, x = (−b ± √Δ) ÷ 2a.",
+                    )
+                    steps.add(
+                        "The sign changes at each of them, and because the leading coefficient " +
+                            "is ${a.display()}, the quadratic is " +
+                            (if (a.toDouble() > 0.0) "positive" else "negative") +
+                            " outside the two roots and " +
+                            (if (a.toDouble() > 0.0) "negative" else "positive") +
+                            " between them.",
+                    )
+                }
+                else -> {
+                    steps.add(
+                        "Δ < 0, so the quadratic never crosses the axis: it has no real roots.",
+                    )
+                    steps.add(
+                        "The sign is the sign of the leading coefficient everywhere, so the " +
+                            "quadratic is ${if (a.toDouble() > 0.0) "positive" else "negative"} " +
+                            "for every value of $variable.",
+                    )
+                }
+            }
         }
 
         val poles = denominatorRoots.map { it.value }.toSet()

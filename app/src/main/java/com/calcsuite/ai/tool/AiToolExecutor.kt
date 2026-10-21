@@ -47,10 +47,15 @@ import java.math.BigInteger
  *
  * @param headline the answer itself, ready to show.
  * @param steps the working, when the engine produced any.
- * @param expression the expression the tool worked on, for the record.
+ * @param expression the engine's own rendering of the problem, when it has
+ *   one. It is the engine's working, not the user's input, so it is shown
+ *   apart from the problem that was asked.
  * @param approximate true when the number is a rounded or numerical answer
  *   rather than an exact one, so that it is shown as an approximation.
  * @param method how the engine found the answer, in the engine's own words.
+ * @param input the exact input the engine was given, with the tool's own
+ *   defaults filled in. This is what was worked out, and it is what the
+ *   screen shows as the problem.
  */
 data class AiToolOutcome(
     val headline: String,
@@ -58,6 +63,7 @@ data class AiToolOutcome(
     val expression: String = "",
     val approximate: Boolean = false,
     val method: String = "",
+    val input: AiToolInput? = null,
 )
 
 /**
@@ -84,20 +90,35 @@ object AiToolExecutor {
     fun run(toolId: String, arguments: Map<String, String>): CalcResult<AiToolOutcome> {
         val spec = AiToolRegistry.byId(toolId)
             ?: return err(ErrorKind.InvalidInput, "There is no mathematical tool called \"$toolId\".")
+        // The arguments are checked and the tool's own defaults are filled
+        // in once, here, so that the engine and the screen are working with
+        // exactly the same input.
+        val prepared = when (val result = prepare(spec, arguments)) {
+            is CalcResult.Err -> return result
+            is CalcResult.Ok -> result.value
+        }
         return try {
-            execute(spec, arguments)
+            when (val result = execute(spec, prepared)) {
+                is CalcResult.Err -> result
+                is CalcResult.Ok -> ok(result.value.copy(input = AiToolInput(toolId, prepared)))
+            }
         } catch (e: Exception) {
             err(ErrorKind.InvalidInput, e.message ?: "The tool could not be run.")
         }
     }
 
-    private fun execute(
+    /**
+     * Checks the arguments against the tool's own list and fills in the
+     * defaults.
+     *
+     * The result is the one set of arguments the engine will be given, and
+     * the one the screen will show, so that the problem that is shown and
+     * the problem that is worked out cannot drift apart.
+     */
+    fun prepare(
         spec: AiToolSpec,
         raw: Map<String, String>,
-    ): CalcResult<AiToolOutcome> {
-        // The arguments are read and checked against the tool's own list, so a
-        // missing or misspelt argument is caught here and not deep inside an
-        // engine.
+    ): CalcResult<Map<String, String>> {
         val values = mutableMapOf<String, String>()
         for (argument in spec.arguments) {
             val given = raw[argument.name]?.trim().orEmpty()
@@ -116,7 +137,13 @@ object AiToolExecutor {
             }
             values[argument.name] = given
         }
+        return ok(values)
+    }
 
+    private fun execute(
+        spec: AiToolSpec,
+        values: Map<String, String>,
+    ): CalcResult<AiToolOutcome> {
         return when (spec.id) {
             "calculus.derivative" -> derivative(values)
             "calculus.integral" -> integral(values)

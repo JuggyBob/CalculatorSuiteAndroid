@@ -16,6 +16,7 @@ import com.calcsuite.ai.tool.AiInterpreter
 import com.calcsuite.ai.tool.AiInterpretation
 import com.calcsuite.ai.tool.AiInterpretationStatus
 import com.calcsuite.ai.tool.AiToolExecutor
+import com.calcsuite.ai.tool.AiToolInput
 import com.calcsuite.ai.tool.AiToolOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +45,16 @@ data class AiUiState(
     val imageUri: Uri? = null,
     /** The problem the model read. */
     val interpretation: AiInterpretation? = null,
+    /**
+     * The input that was, or is to be, worked out: the tool and the
+     * arguments with the tool's own defaults filled in.
+     *
+     * This is the one description of the problem. The engine is given
+     * exactly these arguments, and the screen shows exactly these
+     * arguments, so the problem that is shown and the problem that is
+     * worked out cannot drift apart.
+     */
+    val confirmed: AiToolInput? = null,
     /** The answer the engine gave. */
     val outcome: AiToolOutcome? = null,
     /** The tool that was run. */
@@ -99,8 +110,18 @@ class AiViewModel(application: Application) : AndroidViewModel(application) {
      * Takes the picture the user chose or photographed.
      */
     fun setImage(uri: Uri) {
+        // A new picture starts a new problem, so nothing that belonged to
+        // the old one is left behind.
         _state.update {
-            it.copy(imageUri = uri, image = null, error = null, outcome = null, interpretation = null)
+            it.copy(
+                imageUri = uri,
+                image = null,
+                error = null,
+                outcome = null,
+                interpretation = null,
+                confirmed = null,
+                toolId = null,
+            )
         }
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) { AiImageLoader.load(getApplication(), uri) }
@@ -130,7 +151,20 @@ class AiViewModel(application: Application) : AndroidViewModel(application) {
     fun analyse() {
         val picture = _state.value.image ?: return
         request?.cancel()
-        _state.update { it.copy(working = true, stage = AiStage.ANALYSING, error = null) }
+        // The reading of the last problem is taken away while the new one is
+        // being made, so that the answer on the screen always belongs to the
+        // problem that is shown above it.
+        _state.update {
+            it.copy(
+                working = true,
+                stage = AiStage.ANALYSING,
+                error = null,
+                outcome = null,
+                interpretation = null,
+                confirmed = null,
+                toolId = null,
+            )
+        }
         request = viewModelScope.launch {
             val outcome = withContext(Dispatchers.IO) {
                 val provider = currentSettings.provider
@@ -167,6 +201,8 @@ class AiViewModel(application: Application) : AndroidViewModel(application) {
                                     working = false,
                                     error = answer.error.message,
                                     interpretation = interpretation,
+                                    confirmed = null,
+                                    toolId = interpretation.toolId,
                                     stage = AiStage.DONE,
                                 )
                             }
@@ -174,6 +210,10 @@ class AiViewModel(application: Application) : AndroidViewModel(application) {
                                 it.copy(
                                     working = false,
                                     interpretation = interpretation,
+                                    // The input the engine was actually
+                                    // given, which is the one that is
+                                    // shown from now on.
+                                    confirmed = answer.value.input,
                                     outcome = answer.value,
                                     toolId = interpretation.toolId,
                                     stage = AiStage.DONE,
@@ -208,14 +248,23 @@ class AiViewModel(application: Application) : AndroidViewModel(application) {
             }
             when (outcome) {
                 is com.calcsuite.core.CalcResult.Err -> _state.update {
+                    // A run that fails leaves the last good answer alone, and
+                    // says what went wrong; it never falls back to the
+                    // expression the model first gave.
                     it.copy(working = false, error = outcome.error.message)
                 }
                 is com.calcsuite.core.CalcResult.Ok -> _state.update {
+                    val used = outcome.value.input
                     it.copy(
                         working = false,
                         outcome = outcome.value,
                         toolId = toolId,
-                        interpretation = it.interpretation?.copy(arguments = arguments),
+                        // The corrected arguments become the ones that are
+                        // shown and the ones that were worked out.
+                        confirmed = used,
+                        interpretation = it.interpretation?.copy(
+                            arguments = used?.arguments ?: arguments,
+                        ),
                     )
                 }
             }

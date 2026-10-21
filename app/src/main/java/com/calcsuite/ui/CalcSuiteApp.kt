@@ -6,6 +6,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,6 +28,7 @@ import com.calcsuite.ui.screens.OnboardingScreen
 import com.calcsuite.ui.screens.SearchScreen
 import com.calcsuite.ui.screens.SettingsScreen
 import com.calcsuite.ui.screens.ScientificScreen
+import com.calcsuite.ui.screens.MissingToolRoute
 import com.calcsuite.ui.screens.ToolHostScreen
 import com.calcsuite.ui.ai.AiSettingsScreen
 import com.calcsuite.ui.ai.AiSolveScreen
@@ -72,7 +74,14 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
     val scope = rememberCoroutineScope()
     val nav = rememberNavController()
 
-    fun record(toolId: String, toolTitle: String, category: String, input: String, result: String) {
+    fun record(
+        toolId: String,
+        toolTitle: String,
+        category: String,
+        input: String,
+        result: String,
+        values: Map<String, String> = emptyMap(),
+    ) {
         scope.launch {
             container.history.add(
                 HistoryEntry(
@@ -83,6 +92,7 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                     input = input,
                     result = result,
                     timestamp = System.currentTimeMillis(),
+                    values = values,
                 ),
             )
         }
@@ -166,7 +176,12 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                     HistoryScreen(
                         history = history,
                         onBack = { nav.popBackStack() },
-                        onOpenTool = ::openTool,
+                        onOpenTool = { toolId, values ->
+                            // The saved problem is handed over, so that the
+                            // tool opens with it already in its fields.
+                            container.handoff.handOver(toolId, values)
+                            openTool(toolId)
+                        },
                         onDelete = { id -> scope.launch { container.history.remove(id) } },
                         onClearAll = { scope.launch { container.history.clear() } },
                     )
@@ -198,6 +213,12 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                         viewModel = viewModel,
                         configured = aiSettings.isConfigured,
                         onOpenSettings = { nav.navigate(Routes.AI_SETTINGS) },
+                        onOpenTool = { toolId, values ->
+                            // The problem is handed over, and the tool opens
+                            // with it already in its fields.
+                            container.handoff.handOver(toolId, values)
+                            openTool(toolId)
+                        },
                         onBack = { nav.popBackStack() },
                         onCopy = { text ->
                             scope.launch { container.history.addCopy(text) }
@@ -255,8 +276,20 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                     val toolId = entry.arguments?.getString("toolId").orEmpty()
                     val tool = ToolRegistry.byId(toolId)
                     if (tool == null) {
-                        nav.popBackStack()
+                        // A tool that is not in this build — a history entry
+                        // from an older version, say — must not leave an
+                        // empty screen behind. The user is told what is
+                        // missing and can go back.
+                        MissingToolRoute(
+                            toolId = toolId,
+                            onBack = { nav.popBackStack() },
+                        )
                     } else {
+                        // The values of a problem handed over from another
+                        // screen, such as the AI problem solver. They are
+                        // taken once, so that a later visit to the same
+                        // tool opens with its own values.
+                        val prefill = remember(toolId) { container.handoff.take(toolId) }
                         ToolHostScreen(
                             tool = tool,
                             favorite = toolId in favorites,
@@ -264,10 +297,19 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                             onToggleFavorite = {
                                 scope.launch { container.settings.toggleFavorite(toolId) }
                             },
-                            onRecord = { input, result ->
-                                record(tool.id, tool.title, tool.category.label, input, result)
+                            onRecord = com.calcsuite.ui.tools.HistoryRecorder {
+                                    input, result, values ->
+                                record(
+                                    tool.id,
+                                    tool.title,
+                                    tool.category.label,
+                                    input,
+                                    result,
+                                    values,
+                                )
                             },
                             onOpenTool = ::openTool,
+                            prefill = prefill,
                         )
                     }
                 }

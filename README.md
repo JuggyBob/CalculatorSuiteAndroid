@@ -2,14 +2,14 @@
 
 # Calculator Suite
 
-**66 calculators in one Android app — a fast everyday keypad, a full calculus workbench, and an AI that reads a photograph of a problem.**
+**66 calculators in one Android app — a fast everyday keypad, a full calculus workbench, an electrical circuit editor, and an AI that reads a photograph of a problem.**
 
 [![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![Min SDK](https://img.shields.io/badge/min%20SDK-26-green)](https://developer.android.com/about/versions/oreo)
 [![Target SDK](https://img.shields.io/badge/target%20SDK-36-green)](https://developer.android.com/about/versions/16)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-3DDC84?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Tests](https://img.shields.io/badge/tests-1267%20passing-success)](docs/BUILDING.md)
+[![Tests](https://img.shields.io/badge/tests-1410%20passing-success)](docs/BUILDING.md)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-79589E)](LICENSE)
 
 </div>
@@ -25,7 +25,7 @@
 
 ## What it is
 
-Calculator Suite is a single-purpose Android app that bundles **66 registered tools** across **8 categories**, plus an everyday keypad, a full scientific calculator and an **AI problem solver** that reads a photograph of a mathematical problem and works it out with the app's own engines. Everything is written in Kotlin with Jetpack Compose (Material 3).
+Calculator Suite is a single-purpose Android app that bundles **66 registered tools** across **8 categories**, plus an everyday keypad, a full scientific calculator, an **electrical circuit editor** that works out the circuits you draw, and an **AI problem solver** that reads a photograph of a mathematical problem and works it out with the app's own engines. Everything is written in Kotlin with Jetpack Compose (Material 3).
 
 The design goal was **no dead controls**: every button, field and toggle performs a real computation with exact arithmetic where the mathematics allows it, and shows its working rather than a bare number.
 
@@ -41,6 +41,7 @@ The design goal was **no dead controls**: every button, field and toggle perform
 | 🧮 **Everyday keypad** | Live preview as you type, four memory keys, optional full-screen expansion. |
 | 🔬 **Scientific calculator** | Trig, logs, powers, factorials, `mod`, memory, DEG/RAD/GRAD, and collapsible reference panels that match the keypad exactly. |
 | ∫ **Calculus workbench** | Fourteen focused tools: derivatives, integrals, limits, Taylor/Maclaurin, Σ and Π notation, infinite series, roots, extrema, an interactive function graph, differential equations, multivariable calculus, Fourier analysis, complex analysis and partial differential equations. |
+| ⚡ **Electrical Circuits** | Draw a circuit on a canvas — resistors, sources, switches and a ground — wire it up, and the app solves it by nodal analysis and shows the voltage, current and power of every part, with the working. Eleven electrical calculators come with it. |
 | 🧠 **AI problem solver** | Photograph a mathematical problem. The AI reads it, picks the right Calculator Suite tool, and the app's own engine does the mathematics. Ten providers, your own key, your own model. |
 | 🚫 **No sign-up, no adverts, no tracking** | Nothing to create an account for, nothing sold, and every tool works with the network off. |
 | 📐 **Advanced mathematics** | Measure theory, a topology explorer and functional analysis — each computing real values and stating what it does not reach. |
@@ -62,15 +63,15 @@ Download the signed APK from the
 
 ```bash
 # Verify the download before installing
-sha256sum -c CalculatorSuite-v2.0.0.apk.sha256
+sha256sum -c CalculatorSuite-v3.0.0.apk.sha256
 
 # Install over USB
-adb install CalculatorSuite-v2.0.0.apk
+adb install CalculatorSuite-v3.0.0.apk
 ```
 
 **Requirements:** any phone or tablet running Android 8.0 (API 26) or newer, arm64-v8a or x86_64. It is a single APK, about 14 MB, with nothing to sign up for. You will need to allow installation from your file manager the first time.
 
-The 2.0.0 APK is signed with the same key as 1.0.0, so it installs straight over the older version with your settings and history intact.
+The 3.0.0 APK is signed with the same key as 2.0.0 and 1.0.0, so it installs straight over the older version with your settings and history intact.
 
 ## Usage
 
@@ -79,7 +80,8 @@ The 2.0.0 APK is signed with the same key as 1.0.0, so it installs straight over
 3. **Enter data** — most tools recompute live; the rest have an explicit **Calculate** button. Every tool has a **Reset** action in its top bar that restores that tool's defaults.
 4. **Copy or save** — every result card can copy a full-precision value or push the calculation into history.
 5. **Adjust behaviour** — open **Settings** for theme, accent colour, angle unit, result precision, thousands separator, haptics and wallpaper colours.
-6. **Let the AI read a problem** — tap the brain button, photograph a mathematical problem or pick a picture of one, and the app works it out. You choose the provider, the model and your own key in the AI settings; see the [User Guide](docs/USER_GUIDE.md).
+6. **Build a circuit** — open *Electrical Circuits*, put parts on the canvas, wire them together and press *Calculate the circuit*; the app solves the circuit from its own equations and explains how it got there.
+7. **Let the AI read a problem** — tap the brain button, photograph a mathematical problem or pick a picture of one, and the app works it out. You choose the provider, the model and your own key in the AI settings; see the [User Guide](docs/USER_GUIDE.md).
 
 Number entry accepts `1 234,56` and `1,234.56` interchangeably; the decimal mark always follows your device's region. See the [User Guide](docs/USER_GUIDE.md) for input rules, error messages and common workflows.
 
@@ -91,7 +93,7 @@ You need **JDK 17 or newer** (JDK 21 is what CI uses) and an **Android SDK with 
 git clone https://github.com/JuggyBob/CalculatorSuiteAndroid.git
 cd CalculatorSuiteAndroid
 
-./gradlew :app:testDebugUnitTest   # 1267 JVM unit tests
+./gradlew :app:testDebugUnitTest   # 1410 JVM unit tests
 ./gradlew :app:lintDebug           # Android Lint
 ./gradlew :app:assembleDebug       # app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -111,7 +113,7 @@ Full instructions, build variants and troubleshooting are in [docs/BUILDING.md](
 | Dates | `java.time` |
 | Networking | `HttpURLConnection` + `org.json` (currency rates, and the AI provider you choose) |
 | Build | Gradle 8.13, Android Gradle Plugin 8.13.2, Kotlin Compose plugin |
-| Tests | JUnit 4 on the JVM — 1267 tests, no instrumentation required |
+| Tests | JUnit 4 on the JVM — 1410 tests, no instrumentation required |
 | Min / target SDK | 26 / 36 |
 
 See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for the full list with licences, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the code is organised.

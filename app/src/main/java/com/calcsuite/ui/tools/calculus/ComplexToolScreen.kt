@@ -40,6 +40,7 @@ import com.calcsuite.ui.tools.ToolArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Complex Analysis tool.
@@ -254,9 +255,15 @@ private fun CalculatorSection(args: ToolArgs) {
  */
 @Composable
 private fun FunctionSection(args: ToolArgs) {
-    var functionText by rememberSaveable { mutableStateOf("z^2") }
-    var pointReal by rememberSaveable { mutableStateOf("1") }
-    var pointImag by rememberSaveable { mutableStateOf("1") }
+    var functionText by rememberSaveable {
+        mutableStateOf(args.prefill("functionText", "expression") ?: "z^2")
+    }
+    var pointReal by rememberSaveable {
+        mutableStateOf(args.prefill("pointReal") ?: "1")
+    }
+    var pointImag by rememberSaveable {
+        mutableStateOf(args.prefill("pointImag") ?: "1")
+    }
     var view by remember { mutableStateOf(PlotViewport(span = 8.0)) }
 
     val parsed = remember(functionText) {

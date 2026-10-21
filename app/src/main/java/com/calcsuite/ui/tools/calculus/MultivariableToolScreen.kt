@@ -52,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.hypot
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Multivariable Calculus tool.
@@ -76,11 +77,17 @@ fun MultivariableToolScreen(args: ToolArgs) {
 /** The content of the tool, without the scaffold. */
 @Composable
 fun MultivariableToolContent(args: ToolArgs) {
-    var functionText by rememberSaveable { mutableStateOf("x^2 + 3xy + y^2") }
-    var variablesText by rememberSaveable { mutableStateOf("x, y") }
-    var pointText by rememberSaveable { mutableStateOf("1, 2") }
+    var functionText by rememberSaveable {
+        mutableStateOf(args.prefill("functionText", "expression") ?: "x^2 + 3xy + y^2")
+    }
+    var variablesText by rememberSaveable {
+        mutableStateOf(args.prefill("variablesText", "variables") ?: "x, y")
+    }
+    var pointText by rememberSaveable {
+        mutableStateOf(args.prefill("pointText", "point") ?: "1, 2")
+    }
     var operationName by rememberSaveable { mutableStateOf(MultiOperation.GRADIENT.name) }
-    var orderText by rememberSaveable { mutableStateOf("1") }
+    var orderText by rememberSaveable { mutableStateOf(args.prefill("orderText", "order") ?: "1") }
     var secondVariable by rememberSaveable { mutableStateOf("") }
     var directionText by rememberSaveable { mutableStateOf("1, 0") }
     var normalise by rememberSaveable { mutableStateOf(true) }
@@ -376,7 +383,18 @@ fun MultivariableToolContent(args: ToolArgs) {
                 label = answer.operation.label,
                 value = answer.values.firstOrNull(),
                 caption = answer.values.drop(1).takeIf { it.isNotEmpty() }?.joinToString("   "),
-                onCopy = { args.onRecord(answer.operation.label, it) },
+                onCopy = {
+                    args.onRecord.record(
+                        answer.operation.label,
+                        it,
+                        mapOf(
+                            "functionText" to functionText,
+                            "variablesText" to variablesText,
+                            "pointText" to pointText,
+                            "orderText" to orderText,
+                        ),
+                    )
+                },
                 copyValue = answer.values.firstOrNull(),
             )
             for (extra in answer.values.drop(1)) {

@@ -29,6 +29,7 @@ import com.calcsuite.ui.components.SegmentedChoice
 import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.tools.ToolArgs
 import kotlin.math.abs
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Functional Analysis tool.
@@ -86,7 +87,7 @@ fun FunctionalAnalysisContent(args: ToolArgs) {
     )
 
     when (section) {
-        "Norms and inner products" -> NormsSection()
+        "Norms and inner products" -> NormsSection(args)
         "Projections and least squares" -> ProjectionSection()
         "Operators and eigenvalues" -> OperatorSection()
         else -> ConceptsSection()
@@ -97,9 +98,13 @@ fun FunctionalAnalysisContent(args: ToolArgs) {
  * The norms, the inner products and the angles.
  */
 @Composable
-private fun NormsSection() {
-    var first by rememberSaveable { mutableStateOf("1, 2, 3") }
-    var second by rememberSaveable { mutableStateOf("0, 1, 4") }
+private fun NormsSection(args: ToolArgs) {
+    var first by rememberSaveable {
+        mutableStateOf(args.prefill("first", "firstVector") ?: "1, 2, 3")
+    }
+    var second by rememberSaveable {
+        mutableStateOf(args.prefill("second", "secondVector") ?: "0, 1, 4")
+    }
 
     val u = parseVector(first)
     val v = parseVector(second)

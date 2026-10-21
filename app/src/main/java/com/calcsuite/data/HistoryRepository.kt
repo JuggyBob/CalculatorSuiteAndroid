@@ -18,6 +18,15 @@ data class HistoryEntry(
     val input: String,
     val result: String,
     val timestamp: Long,
+    /**
+     * The values the calculation was made from, by the name the tool's own
+     * fields use.
+     *
+     * They are what lets a saved calculation open its tool with the problem
+     * already in it. An entry saved before this was kept has none, and opens
+     * the tool with that tool's own defaults.
+     */
+    val values: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -80,10 +89,37 @@ class HistoryRepository(context: Context) {
                         put("input", e.input)
                         put("result", e.result)
                         put("timestamp", e.timestamp)
+                        // The values, so that the calculation can be opened
+                        // again with the problem in it. An entry saved
+                        // before this was kept has none.
+                        put(
+                            "values",
+                            JSONObject().apply {
+                                e.values.forEach { (name, value) -> put(name, value) }
+                            },
+                        )
                     },
                 )
             }
             return array.toString()
+        }
+
+        /**
+         * The values of an entry, read back.
+         *
+         * An entry that was saved before the values were kept has none, and
+         * opens its tool with that tool's own defaults.
+         */
+        private fun readValues(obj: JSONObject?): Map<String, String> {
+            if (obj == null) return emptyMap()
+            val out = mutableMapOf<String, String>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val name = keys.next()
+                val value = obj.opt(name)
+                if (value is String && value.isNotBlank()) out[name] = value
+            }
+            return out
         }
 
         fun decode(json: String): List<HistoryEntry> {
@@ -100,6 +136,7 @@ class HistoryRepository(context: Context) {
                         input = obj.optString("input"),
                         result = obj.optString("result"),
                         timestamp = obj.optLong("timestamp"),
+                        values = readValues(obj.optJSONObject("values")),
                     )
                 }
             } catch (_: Exception) {

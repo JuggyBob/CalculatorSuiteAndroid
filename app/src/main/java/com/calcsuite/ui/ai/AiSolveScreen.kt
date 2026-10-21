@@ -12,22 +12,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.calcsuite.ai.AiImage
 import com.calcsuite.ai.tool.AiInterpretationStatus
+import com.calcsuite.ai.tool.AiToolInput
 import com.calcsuite.ai.tool.AiToolRegistry
+import com.calcsuite.ui.components.ActionButton
+import com.calcsuite.ui.components.ActionRow
 import com.calcsuite.ui.components.ErrorNotice
 import com.calcsuite.ui.components.FormulaText
 import com.calcsuite.ui.components.InfoNote
@@ -55,15 +54,17 @@ import com.calcsuite.ui.components.ToolScaffold
  * The screen where a photograph of a mathematical problem becomes an answer.
  *
  * The picture is shown before anything is sent, so the user can be sure the
- * right picture is being read, and the problem the model saw is shown with
- * the answer, so a wrong reading is caught before it is trusted. The
- * mathematics is done by Calculator Suite itself, never by the model.
+ * right picture is being read. The answer is presented as a piece of
+ * mathematics — the problem that was submitted, the method, the working and
+ * then the answer — so that the result can be checked against the work
+ * that produced it.
  */
 @Composable
 fun AiSolveScreen(
     viewModel: AiViewModel,
     configured: Boolean,
     onOpenSettings: () -> Unit,
+    onOpenTool: (String, Map<String, String>) -> Unit,
     onBack: () -> Unit,
     onCopy: (String) -> Unit,
 ) {
@@ -106,12 +107,12 @@ fun AiSolveScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(
+                ActionButton(
+                    text = "Set up the AI feature",
                     onClick = onOpenSettings,
+                    emphasised = true,
                     modifier = Modifier.padding(top = 4.dp),
-                ) {
-                    Text("Set up the AI feature")
-                }
+                )
             }
             return@ToolScaffold
         }
@@ -124,35 +125,33 @@ fun AiSolveScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(
-                Modifier
+            // The two actions are one above the other, so that each label
+            // has the whole width of the card and neither has to wrap.
+            ActionButton(
+                text = "Take a photo",
+                onClick = {
+                    val uri = AiCameraUri.create(context)
+                    pendingCameraUri = uri
+                    camera.launch(uri)
+                },
+                icon = Icons.Filled.PhotoCamera,
+                emphasised = true,
+                modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = {
-                        val uri = AiCameraUri.create(context)
-                        pendingCameraUri = uri
-                        camera.launch(uri)
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Filled.PhotoCamera, contentDescription = null)
-                    Text("Take a photo", Modifier.padding(start = 6.dp))
-                }
-                OutlinedButton(
-                    onClick = {
-                        gallery.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Filled.PhotoLibrary, contentDescription = null)
-                    Text("Pick a picture", Modifier.padding(start = 6.dp))
-                }
-            }
+                    .padding(top = 8.dp),
+            )
+            ActionButton(
+                text = "Pick a picture",
+                onClick = {
+                    gallery.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                icon = Icons.Filled.PhotoLibrary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+            )
         }
 
         state.error?.let { ErrorNotice(it) }
@@ -160,25 +159,23 @@ fun AiSolveScreen(
         state.image?.let { image ->
             SectionCard(title = "The picture") {
                 PicturePreview(image)
-                Row(
+                ActionRow(
                     Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedButton(
+                    ActionButton(
+                        text = "Choose another",
                         onClick = { viewModel.clearImage() },
                         modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Choose another")
-                    }
-                    Button(
+                    )
+                    ActionButton(
+                        text = "Read the problem",
                         onClick = { viewModel.analyse() },
                         enabled = !state.working,
+                        emphasised = true,
                         modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Read the problem")
-                    }
+                    )
                 }
             }
         }
@@ -220,12 +217,78 @@ fun AiSolveScreen(
                 if (interpretation.status == AiInterpretationStatus.READY &&
                     interpretation.toolId != null
                 ) {
-                    OutlinedButton(
+                    ActionButton(
+                        text = "Correct the inputs",
                         onClick = { correcting = interpretation },
                         modifier = Modifier.padding(top = 4.dp),
-                    ) {
-                        Text("Correct the inputs")
+                    )
+                }
+            }
+        }
+
+        // The answer, presented as a piece of mathematics: the problem that
+        // was submitted, the method, the working, and then the answer.
+        state.confirmed?.let { confirmed ->
+            ConfirmedProblem(confirmed)
+        }
+
+        state.outcome?.let { outcome ->
+            SectionCard(title = "The solution") {
+                if (outcome.steps.isNotEmpty()) {
+                    StepsCard(
+                        steps = outcome.steps,
+                        title = "Step by step",
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+                ResultCard(
+                    label = "The answer",
+                    value = outcome.headline,
+                    approx = outcome.approximate,
+                    caption = outcome.method.ifBlank { null },
+                    onCopy = { onCopy(outcome.headline) },
+                )
+                if (outcome.expression.isNotBlank() &&
+                    outcome.expression != state.confirmed?.arguments?.values?.firstOrNull()
+                ) {
+                    Column {
+                        Text(
+                            "The engine's own form",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FormulaText(outcome.expression)
                     }
+                }
+                ActionRow(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                ) {
+                    ActionButton(
+                        text = "Copy the answer",
+                        onClick = { onCopy(outcome.headline) },
+                        icon = Icons.Filled.ContentCopy,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ActionButton(
+                        text = "Solve again",
+                        onClick = { viewModel.analyse() },
+                        icon = Icons.Filled.Refresh,
+                        enabled = !state.working,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                val confirmed = state.confirmed
+                if (confirmed != null) {
+                    ActionButton(
+                        text = "Open in the calculator",
+                        onClick = { onOpenTool(confirmed.toolId, confirmed.arguments) },
+                        icon = Icons.Filled.OpenInNew,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    )
                 }
             }
         }
@@ -241,109 +304,28 @@ fun AiSolveScreen(
                 },
             )
         }
-
-        state.outcome?.let { outcome ->
-            SectionCard(title = "The answer") {
-                ResultCard(
-                    label = "The result",
-                    value = outcome.headline,
-                    approx = outcome.approximate,
-                    caption = outcome.method.ifBlank { null },
-                    onCopy = { onCopy(outcome.headline) },
-                )
-                if (outcome.expression.isNotBlank()) {
-                    Column {
-                        Text(
-                            "The expression",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        FormulaText(outcome.expression)
-                    }
-                }
-                if (outcome.steps.isNotEmpty()) {
-                    StepsCard(steps = outcome.steps, title = "How this was worked out")
-                }
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(
-                        onClick = { onCopy(outcome.headline) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Copy the answer")
-                    }
-                    OutlinedButton(
-                        onClick = { viewModel.analyse() },
-                        enabled = !state.working,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("Solve again")
-                    }
-                }
-            }
-        }
     }
 }
 
 /**
- * The dialog that lets the user correct what the model read.
+ * The problem that was submitted, shown as the tool received it.
  *
- * The arguments of the chosen tool are shown as they are, one field each,
- * so that a wrong reading can be put right before the tool runs again.
+ * This is the same set of arguments the engine was given, so what is shown
+ * here is exactly what was worked out.
  */
 @Composable
-private fun CorrectInputsDialog(
-    toolId: String,
-    arguments: Map<String, String>,
-    onDismiss: () -> Unit,
-    onRun: (Map<String, String>) -> Unit,
-) {
-    val spec = AiToolRegistry.byId(toolId)
-    val names = spec?.arguments?.map { it.name } ?: arguments.keys.toList()
-    var values by remember(toolId, arguments) {
-        mutableStateOf(names.associateWith { arguments[it].orEmpty() })
+private fun ConfirmedProblem(confirmed: AiToolInput) {
+    val spec = AiToolRegistry.byId(confirmed.toolId)
+    val rows = spec?.let { confirmed.meaningfulArguments(it) } ?: emptyList()
+    if (rows.isEmpty() && spec == null) return
+    SectionCard(title = "The problem submitted") {
+        spec?.let {
+            ResultRow(label = "The tool", value = it.title)
+        }
+        for ((name, value) in rows) {
+            ResultRow(label = name, value = value)
+        }
     }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(spec?.title ?: "The inputs") },
-        text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    "Check what was read from the picture. The tool runs again with " +
-                        "what is written here.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                for (argument in spec?.arguments.orEmpty()) {
-                    OutlinedTextField(
-                        value = values[argument.name].orEmpty(),
-                        onValueChange = { values = values + (argument.name to it) },
-                        label = { Text(argument.name) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onRun(values) }) {
-                Text("Run it")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-    )
 }
 
 /**

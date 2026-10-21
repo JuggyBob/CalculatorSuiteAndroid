@@ -44,7 +44,7 @@ Pinned through the Compose BOM, currently **2026.05.01**.
 
 | Dependency | Version | Licence | Purpose |
 |---|---|---|---|
-| `junit:junit` | 4.13.2 | EPL-1.0 | The test framework — all 1267 tests are JVM unit tests |
+| `junit:junit` | 4.13.2 | EPL-1.0 | The test framework — all 1410 tests are JVM unit tests |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-test` | 1.7.3 | Apache-2.0 | Coroutine test dispatchers |
 | `org.json:json` | 20250107 | Public Domain | A real `org.json` implementation, because the `android.jar` stub throws at runtime in JVM unit tests. Used to test currency-rate JSON parsing. |
 

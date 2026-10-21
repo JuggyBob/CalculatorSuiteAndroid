@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
@@ -23,8 +24,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,6 +49,7 @@ import com.calcsuite.ui.components.SegmentedChoice
 import com.calcsuite.ui.components.StepsCard
 import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.tools.ToolArgs
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Inequalities tool.
@@ -55,7 +60,16 @@ import com.calcsuite.ui.tools.ToolArgs
  */
 @Composable
 fun InequalityToolScreen(args: ToolArgs) {
-    var expression by rememberSaveable { mutableStateOf("2x + 3 < 11") }
+    // The expressions are held one by one, so that a system of them can be
+    // written without needing a new line in the keyboard.
+    val expressions = rememberSaveable(
+        saver = listSaver<SnapshotStateList<String>, String>(
+            save = { ArrayList(it) },
+            restore = { mutableStateListOf<String>().also { list -> list.addAll(it) } },
+        ),
+    ) {
+        mutableStateListOf(args.prefill("expression", "inequality") ?: "2x + 3 < 11")
+    }
     var modeName by rememberSaveable { mutableStateOf(InequalityMode.SINGLE.name) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var probeX by rememberSaveable { mutableStateOf("") }
@@ -65,6 +79,9 @@ fun InequalityToolScreen(args: ToolArgs) {
     val accent = MaterialTheme.colorScheme.primary
     val poleColor = MaterialTheme.colorScheme.error
 
+    // The solver reads one expression per line, so the fields are joined
+    // with a new line.
+    val expression = expressions.joinToString("\n")
     val result = remember(expression, modeName) {
         if (expression.isBlank()) null else InequalitySolver.solve(expression, mode)
     }
@@ -87,14 +104,31 @@ fun InequalityToolScreen(args: ToolArgs) {
     ) {
         if (!expanded) {
             SectionCard(title = "Inequality") {
-                PlainField(
-                    label = "Expression",
-                    value = expression,
-                    onValueChange = { expression = it },
-                    placeholder = "2x + 3 < 11",
-                    monospace = true,
-                    imeAction = androidx.compose.ui.text.input.ImeAction.Done,
-                )
+                // A system is written as one expression per field, so the
+                // keyboard never has to produce a new line.
+                val shown = if (mode == InequalityMode.SYSTEM) {
+                    expressions.size.coerceAtLeast(2)
+                } else {
+                    1
+                }
+                for (index in 0 until shown) {
+                    if (index >= expressions.size) expressions.add("")
+                    PlainField(
+                        label = if (shown == 1) "Expression" else "Expression ${index + 1}",
+                        value = expressions.getOrElse(index) { "" },
+                        onValueChange = { expressions[index] = it },
+                        placeholder = if (index == 0) "2x + 3 < 11" else "x - 4 > 0",
+                        monospace = true,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                    )
+                }
+                if (mode == InequalityMode.SYSTEM) {
+                    TextButton(onClick = { expressions.add("") }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add expression")
+                    }
+                }
                 SegmentedChoice(
                     label = "Mode",
                     options = InequalityMode.entries.map { it to it.label },
@@ -108,14 +142,18 @@ fun InequalityToolScreen(args: ToolArgs) {
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = {
-                        expression = EXAMPLES[mode] ?: "2x + 3 < 11"
+                        val example = EXAMPLES[mode] ?: "2x + 3 < 11"
+                        val lines = example.split("\n").filter { it.isNotBlank() }
+                        expressions.clear()
+                        expressions.addAll(if (lines.isEmpty()) listOf(example) else lines)
                     }) {
                         Icon(Icons.Filled.Lightbulb, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Example")
                     }
                     TextButton(onClick = {
-                        expression = ""
+                        expressions.clear()
+                        expressions.add("")
                         probeX = ""
                         probeY = ""
                     }) {

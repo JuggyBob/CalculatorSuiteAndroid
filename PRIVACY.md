@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last reviewed: 20 October 2026 · Applies to Calculator Suite 2.0.0**
+**Last reviewed: 21 October 2026 — Applies to Calculator Suite 3.0.0**
 
 The short version: Calculator Suite does not collect, transmit, sell or share personal data. It has no accounts, no analytics, no advertising and no tracking. Everything you do in the app stays on your device, with one narrow, documented exception for currency exchange rates.
 

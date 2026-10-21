@@ -20,6 +20,7 @@ import com.calcsuite.engine.algebra.EquationEngine
 import com.calcsuite.engine.algebra.EquationKind
 import com.calcsuite.engine.algebra.QuadraticRoute
 import com.calcsuite.engine.algebra.SystemKind
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.ExpandablePanel
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
@@ -34,8 +35,108 @@ import com.calcsuite.ui.components.rememberCopyAction
 import com.calcsuite.ui.components.rememberFmt
 import com.calcsuite.ui.tools.ToolArgs
 import java.math.BigDecimal
+import com.calcsuite.ui.tools.prefill
 
 private enum class EquationMode { Linear, Quadratic, System }
+
+/**
+ * The definition of what the tool does, for the mode that is in use.
+ */
+private fun equationDefinition(mode: EquationMode): String = when (mode) {
+    EquationMode.Linear ->
+        "Solving an equation means finding the value of the unknown that makes " +
+            "the two sides equal. A linear equation has the unknown to the first " +
+            "power only, so one value solves it - or none does."
+    EquationMode.Quadratic ->
+        "A quadratic equation has the unknown to the second power. It is brought " +
+            "to the standard form ax² + bx + c = 0, and the answer is found from " +
+            "its discriminant."
+    EquationMode.System ->
+        "A system of two equations in two unknowns is solved together. The two " +
+            "equations are lines in the plane, and the answer is the point where " +
+            "they meet."
+}
+
+/** The symbols of the formula, and what they stand for. */
+private fun equationSymbols(mode: EquationMode): List<Pair<String, String>> = when (mode) {
+    EquationMode.Linear -> listOf(
+        "a" to "the coefficient of the unknown",
+        "b" to "the constant on the left",
+        "c" to "the constant on the right",
+    )
+    EquationMode.Quadratic -> listOf(
+        "a" to "the coefficient of the square of the unknown",
+        "b" to "the coefficient of the unknown",
+        "c" to "the constant",
+        "\u0394" to "the discriminant, b² \u2212 4ac, which says how many roots there are",
+    )
+    EquationMode.System -> listOf(
+        "a\u2081, b\u2081, c\u2081" to "the coefficients of the first equation",
+        "a\u2082, b\u2082, c\u2082" to "the coefficients of the second equation",
+        "D" to "the determinant a\u2081b\u2082 \u2212 a\u2082b\u2081, which must not be zero",
+    )
+}
+
+/** The conditions the method needs. */
+private fun equationConditions(mode: EquationMode): List<String> = when (mode) {
+    EquationMode.Linear -> listOf(
+        "The coefficient of the unknown must not be zero. If it is, the equation " +
+            "is not linear and the tool says so rather than dividing by zero.",
+    )
+    EquationMode.Quadratic -> listOf(
+        "The coefficient of the square must not be zero; otherwise the equation " +
+            "is linear and is solved as one.",
+        "The discriminant decides how many roots there are: two, one repeated " +
+            "root, or none.",
+    )
+    EquationMode.System -> listOf(
+        "The determinant must not be zero. If it is, the two lines are parallel " +
+            "or the same, and the tool reports that rather than a point.",
+    )
+}
+
+/** How the engine works the answer out. */
+private fun equationMethod(mode: EquationMode): String = when (mode) {
+    EquationMode.Linear ->
+        "Both sides are brought to the standard form ax + b = c, and the unknown " +
+            "is then isolated with exact fractions."
+    EquationMode.Quadratic ->
+        "The equation is brought to the standard form ax² + bx + c = 0, the " +
+            "discriminant is worked out, and the roots are found from it. When " +
+            "the discriminant is negative the roots are given as complex numbers."
+    EquationMode.System ->
+        "The two equations are solved together by Cramer's rule, with exact " +
+            "fractions throughout."
+}
+
+/** What the answer means. */
+private fun equationInterpretation(
+    mode: EquationMode,
+    outcome: EquationOutcome,
+): String = when (mode) {
+    EquationMode.Linear ->
+        "The value is the one that makes the two sides equal, and the check " +
+            "puts it back into the equation to show that it does."
+    EquationMode.Quadratic ->
+        "The roots are the points where the parabola crosses the axis. A " +
+            "negative discriminant means it never does."
+    EquationMode.System ->
+        "The point is where the two lines meet, and the check puts it back " +
+            "into both equations."
+}
+
+/** What the tool does not reach. */
+private fun equationLimitations(mode: EquationMode): String = when (mode) {
+    EquationMode.Linear ->
+        "One equation in one unknown, and the unknown to the first power. An " +
+            "equation with the unknown in a product, or on both sides, is not read."
+    EquationMode.Quadratic ->
+        "One equation in one unknown, and the unknown to the second power. " +
+            "Equations of a higher degree, and systems of them, are not read."
+    EquationMode.System ->
+        "Two equations in two unknowns, both linear. Three equations, or a " +
+            "quadratic system, are not read."
+}
 
 private data class EquationOutcome(
     val label: String,
@@ -45,6 +146,8 @@ private data class EquationOutcome(
     val error: String? = null,
     val rows: List<Pair<String, String>> = emptyList(),
     val steps: List<String> = emptyList(),
+    /** The engine's own check of the answer. */
+    val verification: String? = null,
     val notes: List<String> = emptyList(),
     val formula: String,
     val explanation: String,
@@ -55,17 +158,31 @@ fun EquationsToolScreen(args: ToolArgs) {
     val fmt = rememberFmt()
     val copy = rememberCopyAction()
 
-    var modeName by rememberSaveable { mutableStateOf(EquationMode.Linear.name) }
+    // The tool the problem came from decides the mode, so that a
+    // problem handed over opens in the right form.
+    var modeName by rememberSaveable {
+        mutableStateOf(
+            when (args.tool.id) {
+                "algebra.quadratic" -> EquationMode.Quadratic.name
+                "algebra.system" -> EquationMode.System.name
+                else -> args.prefill("mode") ?: EquationMode.Linear.name
+            },
+        )
+    }
     val mode = EquationMode.valueOf(modeName)
-    var equation by rememberSaveable { mutableStateOf("2x + 4 = 10") }
-    var quadraticEquation by rememberSaveable { mutableStateOf("x^2 - 3x + 2 = 0") }
-    var variable by rememberSaveable { mutableStateOf("x") }
-    var a1 by rememberSaveable { mutableStateOf("2") }
-    var b1 by rememberSaveable { mutableStateOf("3") }
-    var c1 by rememberSaveable { mutableStateOf("12") }
-    var a2 by rememberSaveable { mutableStateOf("1") }
-    var b2 by rememberSaveable { mutableStateOf("-1") }
-    var c2 by rememberSaveable { mutableStateOf("1") }
+    var equation by rememberSaveable {
+        mutableStateOf(args.prefill("equation") ?: "2x + 4 = 10")
+    }
+    var quadraticEquation by rememberSaveable {
+        mutableStateOf(args.prefill("quadraticEquation", "equation") ?: "x^2 - 3x + 2 = 0")
+    }
+    var variable by rememberSaveable { mutableStateOf(args.prefill("variable") ?: "x") }
+    var a1 by rememberSaveable { mutableStateOf(args.prefill("a1") ?: "2") }
+    var b1 by rememberSaveable { mutableStateOf(args.prefill("b1") ?: "3") }
+    var c1 by rememberSaveable { mutableStateOf(args.prefill("c1") ?: "12") }
+    var a2 by rememberSaveable { mutableStateOf(args.prefill("a2") ?: "1") }
+    var b2 by rememberSaveable { mutableStateOf(args.prefill("b2") ?: "-1") }
+    var c2 by rememberSaveable { mutableStateOf(args.prefill("c2") ?: "1") }
 
     fun num(v: BigDecimal) = fmt.num(v, precision = maxOf(fmt.precision, 10))
 
@@ -93,6 +210,7 @@ fun EquationsToolScreen(args: ToolArgs) {
                                 caption = "0 = 0 — the equation is an identity",
                                 rows = listOf("Standard form" to result.standardForm),
                                 steps = result.steps,
+                                verification = result.verification,
                                 formula = "a·x + b = 0  →  x = −b ÷ a",
                                 explanation = "When the coefficient and the constant both vanish the equation is true for every value.",
                             )
@@ -102,6 +220,7 @@ fun EquationsToolScreen(args: ToolArgs) {
                                 caption = "The variable terms cancel, leaving a false statement",
                                 rows = listOf("Standard form" to result.standardForm),
                                 steps = result.steps,
+                                verification = result.verification,
                                 formula = "a·x + b = 0  →  x = −b ÷ a",
                                 explanation = "A contradiction has no solution: the two sides are parallel lines that never meet.",
                             )
@@ -117,6 +236,7 @@ fun EquationsToolScreen(args: ToolArgs) {
                                         add("Constant term" to num(result.constant))
                                     },
                                     steps = result.steps,
+                                    verification = result.verification,
                                     formula = "a·x + b = 0  →  x = −b ÷ a",
                                     explanation = "The solution is unique when the coefficient of the variable is not zero.",
                                 )
@@ -176,6 +296,7 @@ fun EquationsToolScreen(args: ToolArgs) {
                                 }
                             },
                             steps = result.steps,
+                            verification = result.verification,
                             notes = result.notes,
                             formula = "x = (−b ± √(b² − 4ac)) ÷ 2a",
                             explanation = "Δ > 0 gives two real roots, Δ = 0 a double root, Δ < 0 two complex conjugates a ± bi.",
@@ -232,6 +353,7 @@ fun EquationsToolScreen(args: ToolArgs) {
                                     result.y?.let { add("y" to num(it)) }
                                 },
                                 steps = result.steps,
+                                verification = result.verification,
                                 formula = "D = a₁b₂ − a₂b₁ ;  x = (c₁b₂ − c₂b₁) ÷ D ;  y = (a₁c₂ − a₂c₁) ÷ D",
                                 explanation = "A non-zero determinant means the lines cross once; zero means they are parallel or identical.",
                             )
@@ -335,13 +457,26 @@ fun EquationsToolScreen(args: ToolArgs) {
             copyValue = outcome.copyValue,
             onSave = outcome.value?.let { value ->
                 {
-                    args.onRecord(
+                    args.onRecord.record(
                         when (mode) {
                             EquationMode.Linear -> "linear: $equation"
                             EquationMode.Quadratic -> "quadratic: $quadraticEquation"
                             EquationMode.System -> "system: $a1 x + $b1 y = $c1 ; $a2 x + $b2 y = $c2"
                         },
                         value,
+                        // The values are kept, so that the saved calculation
+                        // opens this tool with the same problem in it.
+                        mapOf(
+                            "equation" to equation,
+                            "quadraticEquation" to quadraticEquation,
+                            "variable" to variable,
+                            "a1" to a1,
+                            "b1" to b1,
+                            "c1" to c1,
+                            "a2" to a2,
+                            "b2" to b2,
+                            "c2" to c2,
+                        ),
                     )
                 }
             },
@@ -353,13 +488,23 @@ fun EquationsToolScreen(args: ToolArgs) {
             }
         }
 
-        if (outcome.steps.isNotEmpty()) {
-            StepsCard(outcome.steps)
-        }
-
         outcome.notes.forEach { InfoNote(it) }
 
-        FormulaCard(formula = outcome.formula, explanation = outcome.explanation)
+        // The explanation of the mathematics, in the same expandable
+        // sections the newer tools use, with the working that actually ran.
+        ExplanationCards(
+            com.calcsuite.engine.advanced.Explanation(
+                definition = equationDefinition(mode),
+                formula = outcome.formula,
+                symbols = equationSymbols(mode),
+                conditions = equationConditions(mode),
+                method = equationMethod(mode),
+                steps = outcome.steps,
+                interpretation = equationInterpretation(mode, outcome),
+                verification = outcome.verification,
+                limitations = equationLimitations(mode),
+            ),
+        )
 
         ExpandablePanel(title = "Syntax help") {
             Text("Numbers: decimals with . or , (2.5 or 2,5)", style = MaterialTheme.typography.bodySmall)

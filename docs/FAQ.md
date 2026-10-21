@@ -19,8 +19,8 @@ Because the APK is not from the Play Store, Android shows a "blocked by Play Pro
 Each release includes a `.sha256` file.
 
 ```bash
-sha256sum CalculatorSuite-v2.0.0.apk
-# compare the output with the contents of CalculatorSuite-v2.0.0.apk.sha256
+sha256sum CalculatorSuite-v3.0.0.apk
+# compare the output with the contents of CalculatorSuite-v3.0.0.apk.sha256
 ```
 
 The APK is signed with a release key, so Android also verifies its integrity during installation.
@@ -93,7 +93,7 @@ It should not, for a polynomial. If the 4th or higher derivative of a polynomial
 
 ### The Calculator says "No elementary antiderivative" for something simple
 
-See the [Calculus guide's limitations section](CALCULUS_GUIDE.md#8-limitations--read-this). The indefinite integrator is a pattern matcher: it recognises `1/x` but not `2/x`, and for powers it does not apply the chain factor. **For anything it does not recognise, use the definite integral** — that path is numerical and always works.
+See the [Calculus guide's limitations section](CALCULUS_GUIDE.md#9-limitations--read-this). The indefinite integrator is a pattern matcher: it recognises `1/x` but not `2/x`, and for powers it does not apply the chain factor. **For anything it does not recognise, use the definite integral** — that path is numerical and always works.
 
 ### How do I type a superscript or a special character?
 

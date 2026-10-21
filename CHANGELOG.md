@@ -2,9 +2,103 @@
 
 All notable changes to Calculator Suite are recorded here.
 
-This project uses a plain, human-written changelog. **Version 1.0.0 was the first public release**; 2.0.0 is the first major one.
+This project uses a plain, human-written changelog. **Version 1.0.0 was the first public release**; 2.0.0 and 3.0.0 are the major ones.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for the version number.
+
+## [3.0.0] — 2026-10-21
+
+A major release. **Electrical Circuits** — a circuit you can draw, wire and work out — joins **eleven electrical calculators**, and the AI problem solver now works on exactly the problem it shows you. `versionName = 3.0.0`, `versionCode = 4`, `minSdk 26`, `targetSdk 36`.
+
+This release upgrades over 2.0.0 in place: the signing key is unchanged, so the app installs straight over the old one with your settings and history intact.
+
+### Added — Electrical Circuits: draw a circuit and work it out
+
+**Ohm's law is now the Electrical Circuits tool**, in the *Other* category as before. The Ohm's law calculator itself has not changed — the same four quantities, the same SI prefixes, the same diagram — and it is still there, as the first of the tool's calculators.
+
+The new part is the **circuit builder**: you put parts on a canvas, wire them together, and the app works out the circuit from its own equations.
+
+- **A canvas you draw on.** Parts are put down by tapping, or dragged straight out of the palette onto the canvas. The picture can be dragged about and pinched to zoom, and everything on it is cut off at the edge of the canvas rather than spilling over the rest of the screen.
+- **The parts are drawn as the standard symbols** — the box of a resistor, the circle with the plus and the minus of a voltage source, the circle with the arrow of a current source, the hinged arm of a switch, and the three lines of the earth symbol of a ground, widest on top. The palette shows the very same pictures.
+- **Wiring by tapping.** Tap a terminal and the wire follows your finger; tap the terminal it goes to and the wire is made. A dot marks every point where three or more terminals meet.
+- **Editing a part.** Tap a part to open it: its name, its value with an SI prefix (`100 kΩ`, `4.7 µF`), its power rating, and — for a switch — whether it is open or closed. The part you have just put down opens straight away, so you can give it its value.
+- **The circuit is solved by modified nodal analysis**, not by a table of patterns: the app writes the equations for the circuit as you have drawn it and solves them with Gaussian elimination and partial pivoting. A circuit that cannot be solved is refused with the reason — no ground, a resistance of zero, a short-circuited source, a part that hangs.
+- **The connections come from the wires, not from the picture.** Two wires that merely cross on the screen join nothing, and a closed switch joins its two ends while an open one does not, exactly as in the circuit itself.
+- **Every part is reported**: the voltage across it, the current through it and the power it turns into heat, together with the resistance the source sees and the power the source delivers.
+- **The working is shown for the circuit in front of you.** Where the network can be reduced, the reduction is written out step by step with the real names and the real values of the parts — `R1 and R2 are in series: 100 Ω + 200 Ω = 300 Ω`. Where it cannot, the nodal method that was used instead is named and explained. The same six sections as the rest of the app: the result and what it means, the formula and its symbols, the working, why the formula applies, and an independent check.
+- **Four states are told apart**: the canvas is empty, the circuit is not finished, the circuit cannot be worked out as it stands, or it has been solved. The message names the part that is at fault.
+- **Seven sample circuits** to start from — a battery and a resistor, two resistors in series, two in parallel, a resistor with a parallel pair, a switch, three parallel branches, and a voltage divider. Each one is a real circuit: every part can be edited and the circuit reworked like any other.
+- **Your work is kept.** The circuit is still on the canvas when you come back to the tool, and a circuit you calculate is saved in the history with the circuit inside it, so tapping that entry opens the tool with that circuit on the canvas.
+
+### Added — eleven electrical calculators
+
+All of them work out their answers from the same engines the circuit builder uses, and give the same six sections with their working.
+
+- **Ohm's law and power** — any two of voltage, current, resistance and power, and the other two are found.
+- **Resistors in series** — the total resistance, the current, the drop and the power of each part, and the total power.
+- **Resistors in parallel** — the combined resistance, the current in each branch and the power of each branch.
+- **A series part and a parallel part** — the commonest mixed network, reduced part by part.
+- **Voltage divider** — the output across the second resistor, with the note that a load on the output changes the answer.
+- **Current divider** — how one current splits between two branches, with the smaller resistance taking the larger share.
+- **Writing a value in another prefix** — volts, amperes, ohms, watts, farads, seconds and joules, converted exactly.
+- **Resistor colour code** — the bands read into a value and a tolerance, and the other way round.
+- **A capacitor** — the charge it holds, the energy stored in it, and the time it takes to charge through a resistance.
+- **How long a circuit takes to settle** — the time constant of an RC or an RL circuit, and what the curve has reached after one and after five of them.
+- **An alternating circuit** — the reactances, the impedance, the current, the phase, the power factor and the real and reactive power.
+
+### Improved — the AI problem solver works on the problem it shows
+
+- **The problem that is shown and the problem that is worked out are now the same thing.** The arguments are checked against the tool's own list and the tool's defaults are filled in once, and that single set is what the engine is given and what the screen shows. Before, the screen showed the engine's own rewriting of the problem, which is a different expression from the one you recognised, and it looked as though the wrong problem had been solved.
+- **A corrected input reaches the engine.** The arguments in the correction dialog are the ones that are run, and the reading is updated to match. A run that fails leaves the last good answer alone and says what went wrong.
+- **The answer is shown as mathematics**: the working first and then the answer, so the result can be checked against the work that produced it.
+- **The answer can be opened in the tool that made it**, with the problem already in the fields.
+
+### Improved — the history reopens the problem it saved
+
+- A **saved calculation now opens its tool with the problem in it**. The history entry keeps the values the calculation was made from, and the tool screen is given them when it opens — a saved circuit comes back with its parts in place, and a saved differential equation comes back with its equation and its limits.
+- An entry whose tool **is not in this build** now shows a screen that says so, instead of an empty page.
+
+### Improved — the equations and the inequalities explain themselves
+
+- The **equations tool** now has a curated explanation in the same expandable sections the newer tools use: what the mode in use means, the formula and its symbols, the conditions the method needs, the working that actually ran, what the answer means and what the tool does not reach.
+- The **inequalities** show their discriminant work: the coefficients, the calculation of Δ, whether the roots are real, repeated or absent, the roots themselves, and what the sign of the quadratic does between them.
+- A **system of inequalities is written one expression per field**, with an "Add expression" button, so the keyboard never has to produce a new line.
+
+### Fixed
+
+- The **differential-equation graph is fitted to its solution**, so the curve is seen over the whole interval it was worked out for, whether it was found symbolically or numerically. The window still has the same number of units in a pixel on each axis, so a slope of one is drawn at forty-five degrees and the slope field is true, and a solution is never drawn beyond the interval it was computed for.
+- The **AI screen's buttons** share one style: one line of text, the same height, the icon beside the label, and the two picture buttons one above the other so that neither has to wrap.
+- The **action buttons** across the app share one style, so that a row of them reads as one group.
+
+### Technical and reliability changes
+
+- The circuit engine is a new package, `engine.electrical`, with no dependency on Android: the model, the topology, the solver, the validator, the explainer, the units and the calculators are all plain Kotlin, and they are tested on the JVM.
+- A circuit is written down in a small text format of its own, so that it can be kept in the history, handed over and read back without the phone's own libraries — and a circuit that cannot be read back is refused rather than half-restored.
+- The electrical units have one table of prefixes, used by the solver, the calculators and the screen alike, so a value can never be scaled twice or by the wrong power of ten.
+- The shared explanation sections are one component, so that every tool that shows its working shows it in the same way.
+- The history, the tool registry and the navigation now share one handoff mechanism, so that a problem can be passed from one screen to another whether it came from the AI, from the history or from another tool.
+
+### Known limitations in 3.0.0
+
+- The **circuit builder is for steady direct current** with ideal parts. There is no transient analysis, no frequency sweep and no non-ohmic component; the alternating-current calculator is a separate calculation for a single frequency, not a simulation of a circuit over time.
+- A circuit needs **one ground**, and the voltages are measured against it.
+- The **switch is ideal**: closed it is a conductor and open it is a break, with no contact resistance.
+- The power rating of a resistor is kept, but the app does not yet warn when a part is being worked harder than its rating.
+- The AI feature still needs a **vision-capable model**, and the limitations of the 2.0.0 release still stand.
+
+### Documentation
+
+- `README.md`, `CHANGELOG.md`, `ROADMAP.md`, `PRIVACY.md`, `SECURITY.md`, `SUPPORT.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `LICENSE`.
+- `docs/`: `FEATURES_AND_TOOLS.md`, `USER_GUIDE.md`, `CALCULUS_GUIDE.md`, `ARCHITECTURE.md`, `BUILDING.md`, `DEPENDENCIES.md`, `FAQ.md`.
+
+### Verification
+
+- 1410 JVM unit tests, 0 failures — 129 of them new, covering the solver against the textbook answers, the topology, the sample circuits, the explanations against the numbers the solver found, the four states of a circuit, the calculators, the units and prefixes, saving a circuit and reading it back, and the geometry of the drawing.
+- Android Lint: 0 errors, and no new warnings.
+- `assembleDebug` and the signed release build both succeed.
+- On-device checks covering the new tool end to end: the samples drawing as schematics, the numbers agreeing with the textbook, a part dragged out of the palette, wires drawn by tapping the terminals, the circuit kept between visits, and a circuit restored from the history.
+
+---
 
 ## [2.0.0] — 2026-10-20
 
@@ -233,5 +327,6 @@ Documented in full in [ROADMAP.md](ROADMAP.md) and [docs/CALCULUS_GUIDE.md](docs
 - `assembleDebug` and the signed release build both succeed.
 - On-device checks covering onboarding (first launch, navigation, skip, finish, restart persistence), the separator setting (all five styles, live update, persistence), portrait lock across 13 destinations, light and dark themes, and 14 assertions on the two calculus fixes.
 
+[3.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.0
 [2.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/2.0.0-release
 [1.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v1.0.0

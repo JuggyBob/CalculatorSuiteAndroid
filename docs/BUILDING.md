@@ -39,7 +39,7 @@ cd CalculatorSuiteAndroid
 ## Everyday commands
 
 ```bash
-# Run the 1267 JVM unit tests
+# Run the 1410 JVM unit tests
 ./gradlew :app:testDebugUnitTest
 
 # Run Android Lint
@@ -84,13 +84,13 @@ Run a single suite or a single test:
 | Variant | Command | Output |
 |---|---|---|
 | `debug` | `:app:assembleDebug` | `app/build/outputs/apk/debug/app-debug.apk` |
-| `release` | `:app:assembleRelease` | `app/build/outputs/apk/release/app-release-unsigned.apk` |
+| `release` | `:app:assembleRelease` | `app/build/outputs/apk/release/app-release.apk` (signed when the signing properties are present, `app-release-unsigned.apk` otherwise) |
 
 The release build is **not minified** (`isMinifyEnabled = false`) and `proguard-rules.pro` is intentionally empty — the app uses no reflection beyond platform APIs, so nothing needs keeping.
 
 ### Producing a signed release
 
-The signed APK published in the 1.0.0 and 2.0.0 releases was produced with a locally held key, and both were signed with the **same key**, so 2.0.0 installs straight over 1.0.0.
+The signed APKs published in the 1.0.0, 2.0.0 and 3.0.0 releases were produced with a locally held key, and all of them were signed with the **same key**, so each release installs straight over the one before it.
 
 The signing configuration is already in `app/build.gradle.kts`, and it is used only when the properties are present, so an ordinary checkout still builds an unsigned release and the continuous build is unaffected. Create a keystore and reference it from `~/.gradle/gradle.properties` (never from a file in the repository):
 
@@ -137,7 +137,7 @@ sha256sum app-release.apk          # Linux / macOS / Git Bash
 Get-FileHash app-release.apk -Algorithm SHA256   # PowerShell
 ```
 
-The published 2.0.0 APK verifies under **APK Signature Scheme v2** and reports `versionName='2.0.0'`, `versionCode='2'`, `minSdkVersion='26'`, `targetSdkVersion='36'`. The 1.0.0 APK reports the same signer, which is what lets 2.0.0 upgrade it in place.
+The published 3.0.0 APK verifies under **APK Signature Scheme v2** and reports `versionName='3.0.0'`, `versionCode='4'`, `minSdkVersion='26'`, `targetSdkVersion='36'`. The 2.0.0 and 1.0.0 APKs report the same signer, which is what lets 3.0.0 upgrade either of them in place.
 
 ## Running the app
 

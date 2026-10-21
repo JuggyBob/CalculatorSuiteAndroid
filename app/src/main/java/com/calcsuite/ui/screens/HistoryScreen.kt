@@ -47,7 +47,7 @@ import java.util.Locale
 fun HistoryScreen(
     history: List<HistoryEntry>,
     onBack: () -> Unit,
-    onOpenTool: (String) -> Unit,
+    onOpenTool: (String, Map<String, String>) -> Unit,
     onDelete: (Long) -> Unit,
     onClearAll: () -> Unit,
 ) {
@@ -116,7 +116,7 @@ fun HistoryScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickableRow { onOpenTool(entry.toolId) },
+                            .clickableRow { onOpenTool(entry.toolId, entry.values) },
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                     ) {

@@ -37,10 +37,11 @@ fun ToolHostScreen(
     favorite: Boolean,
     onBack: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: com.calcsuite.ui.tools.HistoryRecorder,
     onOpenTool: (String) -> Unit,
+    prefill: Map<String, String> = emptyMap(),
 ) {
-    val args = remember(tool, favorite) {
+    val args = remember(tool, favorite, prefill) {
         ToolArgs(
             tool = tool,
             favorite = favorite,
@@ -48,6 +49,7 @@ fun ToolHostScreen(
             onToggleFavorite = onToggleFavorite,
             onRecord = onRecord,
             onOpenTool = onOpenTool,
+            prefillValues = prefill,
         )
     }
     ToolScreenDispatch(args)
@@ -77,6 +79,39 @@ private fun ToolScreenDispatch(args: ToolArgs) {
 /**
  * Defensive fallback for a registry/dispatch mismatch. Unreachable while the
  * registry and the dispatch chain agree; logs loudly if it ever renders.
+ */
+@Composable
+fun MissingToolRoute(toolId: String, onBack: () -> Unit) {
+    SideEffect { Log.e("CalcSuiteApp", "No tool is registered for the id '$toolId'") }
+    ToolScaffold(
+        title = "Tool unavailable",
+        subtitle = "This calculation was made with a tool that is not in this version",
+        onBack = onBack,
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(top = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "There is no tool called \"$toolId\" in this version of the app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "The calculation itself is still in your history.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Defensive fallback for a registry/dispatch mismatch. Unreachable while
+ * the registry and the dispatch chain agree; logs loudly if it ever renders.
  */
 @Composable
 private fun MissingToolScreen(args: ToolArgs) {

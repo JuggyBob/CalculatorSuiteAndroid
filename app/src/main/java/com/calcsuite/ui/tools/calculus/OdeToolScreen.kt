@@ -48,6 +48,7 @@ import com.calcsuite.ui.tools.ToolArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Differential Equations tool.
@@ -79,13 +80,17 @@ fun OdeToolScreen(args: ToolArgs) {
  */
 @Composable
 fun OdeToolContent(args: ToolArgs) {
-    var equation by rememberSaveable { mutableStateOf("dy/dx = 2y") }
+    var equation by rememberSaveable {
+        mutableStateOf(args.prefill("equation") ?: "dy/dx = 2y")
+    }
     var modeName by rememberSaveable { mutableStateOf(SolveMode.SYMBOLIC.name) }
-    var condition by rememberSaveable { mutableStateOf("y(0) = 1") }
+    var condition by rememberSaveable {
+        mutableStateOf(args.prefill("condition") ?: "y(0) = 1")
+    }
     var secondCondition by rememberSaveable { mutableStateOf("") }
-    var from by rememberSaveable { mutableStateOf("0") }
-    var to by rememberSaveable { mutableStateOf("4") }
-    var step by rememberSaveable { mutableStateOf("0.1") }
+    var from by rememberSaveable { mutableStateOf(args.prefill("from") ?: "0") }
+    var to by rememberSaveable { mutableStateOf(args.prefill("to") ?: "4") }
+    var step by rememberSaveable { mutableStateOf(args.prefill("step") ?: "0.1") }
     var methodName by rememberSaveable { mutableStateOf(NumericalMethod.RK4.name) }
     var showField by rememberSaveable { mutableStateOf(true) }
     var view by remember { mutableStateOf(PlotViewport(span = 12.0)) }
@@ -316,6 +321,13 @@ fun OdeToolContent(args: ToolArgs) {
             solution = current.solution,
             mode = mode,
             args = args,
+            values = mapOf(
+                "equation" to equation,
+                "condition" to condition,
+                "from" to from,
+                "to" to to,
+                "step" to step,
+            ),
             view = view,
             onViewChange = { view = it },
             showField = showField,
@@ -337,6 +349,8 @@ private fun OdeAnswer(
     solution: OdeSolution,
     mode: SolveMode,
     args: ToolArgs,
+    /** The values the calculation was made from, for the history. */
+    values: Map<String, String>,
     view: PlotViewport,
     onViewChange: (PlotViewport) -> Unit,
     showField: Boolean,
@@ -358,7 +372,13 @@ private fun OdeAnswer(
         value = headline,
         caption = solution.method.label,
         approx = false,
-        onCopy = { args.onRecord("${solution.equation}", it) },
+        onCopy = {
+                    args.onRecord.record(
+                          "\${solution.equation}",
+                          it,
+                          values,
+                      )
+                },
         copyValue = headline,
     )
 
@@ -478,6 +498,34 @@ private fun OdeAnswer(
     val numerical = solution.numerical
     val accent = MaterialTheme.colorScheme.primary
     val second = MaterialTheme.colorScheme.tertiary
+    // The picture is fitted to the solution that was computed, so that the
+    // curve is seen over the whole interval it was worked out for. The user
+    // can still drag and pinch it afterwards.
+    val fitted = remember(numerical?.points, solution, parsed, values["from"], values["to"]) {
+        val points = numerical?.points.orEmpty().map { it.x to it.y }
+        if (points.isNotEmpty()) {
+            PlotViewport.fitting(points)
+        } else {
+            // The symbolic solution is sampled over the interval it was
+            // solved for, so that the picture shows the whole of it.
+            val from = values["from"]?.toDoubleOrNull() ?: 0.0
+            val to = values["to"]?.toDoubleOrNull() ?: 4.0
+            val interval = PlotViewport(
+                centreX = (from + to) / 2,
+                span = (to - from).coerceAtLeast(0.001),
+            )
+            val sampled = buildCurves(solution, null, parsed, interval, accent, second)
+                .flatMap { it.pieces }
+                .flatten()
+            PlotViewport.fitting(sampled)
+        }
+    }
+
+    LaunchedEffect(fitted) {
+        // The window is set through the callback, because the view
+        // belongs to the screen.
+        if (numerical != null) onViewChange(fitted)
+    }
     val curves = remember(solution, view, accent, second) {
         buildCurves(solution, numerical, parsed, view, accent, second)
     }
@@ -506,7 +554,7 @@ private fun OdeAnswer(
             TextButton(onClick = onToggleField) {
                 Text(if (showField) "Hide slope field" else "Show slope field")
             }
-            TextButton(onClick = { onViewChange(PlotViewport(span = 12.0)) }) {
+            TextButton(onClick = { onViewChange(fitted) }) {
                 Text("Reset view")
             }
         }

@@ -30,7 +30,7 @@ Nothing in sections 2 or 3 is on a timeline. Section 2 is a list of facts about 
 - **Finance**: loan amortisation with extra payments, compound interest with effective annual rate, sales tax, tip splitting with cent allocation, unit-price comparison, and currency with reference rates plus an offline cache.
 - **Health**: BMI, MET-based caloric burn, US Navy body fat.
 - **Date & time**: exact age, date arithmetic with month-end clamping, interval calculation.
-- **Other**: mileage and trip cost, Ohm's law.
+- **Other**: mileage and trip cost, and the Electrical Circuits tool — a circuit you draw, wire and work out, with eleven electrical calculators beside it.
 - **Advanced mathematics**: measure theory, a topology explorer and functional analysis, each computing real values and stating what it does not reach.
 
 ### Platform
@@ -47,7 +47,7 @@ Nothing in sections 2 or 3 is on a timeline. Section 2 is a list of facts about 
 
 ### Quality
 
-- 1267 JVM unit tests; Lint clean; debug and signed release builds succeed.
+- 1410 JVM unit tests; Lint clean; debug and signed release builds succeed.
 - Every engine is pure Kotlin with no Android dependencies, which is what makes the whole suite testable without an emulator.
 - The AI feature keeps its transport behind an interface, so the whole path from the picture to the answer is testable with a mocked provider and no key.
 
@@ -56,6 +56,8 @@ Nothing in sections 2 or 3 is on a timeline. Section 2 is a list of facts about 
 ## 2. Outstanding work (verified to exist)
 
 These are real, confirmed by reading the code. They are documented rather than hidden.
+
+**What 3.0.0 changed here.** The Electrical Circuits tool is new: a circuit you draw, wire and work out, with eleven electrical calculators beside it. The Ohm's law calculator is unchanged and is still the first of them, under the new tool name; the old `other.ohms_law` id still opens the tool, so nothing that points at it breaks. The AI problem solver now works on exactly the problem it shows you, and a saved calculation opens its tool with the problem in it. The items below are still open and are still true.
 
 **What 2.0.0 changed here.** The sign in the calculus parser used to bind tighter than the power, so `-x^2` meant `(-x)^2`; it is now looser, as the parser’s own grammar says. A negative factor in a product used to be printed without brackets, so `x * -2` was shown as `x-2`; it is now bracketed. The root finder is polished with Newton’s method, so the text no longer overstates the method. The rest of the items below are still open and are still true.
 
@@ -79,6 +81,15 @@ These are real, confirmed by reading the code. They are documented rather than h
 | **Volume description mentions cups; only the US cup exists** in that family (the Imperial cup exists only in Cooking). |
 | **GCF & LCM silently swallows one error** | When every input is zero the engine returns `Undefined`, but the screen only reads the success path, so nothing is rendered at all. |
 | **Stale KDoc** | The Algebra dispatcher comment says "nine tools" while routing ten. Two engine functions (`percentDecrease`, `probabilityOfExactlySuccesses`) are unreachable from the UI. |
+
+### Electrical Circuits
+
+| Issue | Detail |
+|---|---|
+| **The circuit builder is steady direct current only** | There is no transient analysis, no frequency sweep and no non-ohmic component. The alternating-current calculator is a separate calculation at one frequency, not a simulation of a circuit over time. |
+| **A resistor's power rating is kept but not checked against** | The value is stored and shown in the editor, but the app does not yet warn when a part is being worked harder than its rating. |
+| **A circuit needs one ground** | The voltages are measured against it, and a circuit without one is refused with that reason. |
+| **The switch is ideal** | Closed it is a conductor and open it is a break; there is no contact resistance and no switching time. |
 
 ### Smaller items
 
@@ -126,7 +137,7 @@ Not commitments. Ordered roughly by how much they would improve the app.
 
 ### Engineering
 
-- Instrumentation (Espresso/Compose UI) tests for a handful of critical flows, to complement the 1267 JVM tests.
+- Instrumentation (Espresso/Compose UI) tests for a handful of critical flows, to complement the 1410 JVM tests.
 - A screenshot-testing baseline, so UI regressions are caught automatically.
 - Reproducibility of the release build — currently signed with a locally held key.
 
@@ -136,5 +147,5 @@ Not commitments. Ordered roughly by how much they would improve the app.
 
 - **Never regress correctness.** A wrong number is a worse bug than a missing feature.
 - **Keep the offline guarantee.** Any new feature must not require the network, with the possible exception of clearly-labelled reference data such as exchange rates.
-- **Keep engines pure.** It is what makes 1267 tests possible without an emulator, and it should stay that way.
+- **Keep engines pure.** It is what makes 1410 tests possible without an emulator, and it should stay that way.
 - **Keep documentation honest.** If a tool cannot do something its description implies, fix one or the other. Section 2 of this document exists because that promise has to be kept in both directions.

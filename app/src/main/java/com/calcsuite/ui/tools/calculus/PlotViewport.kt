@@ -1,6 +1,8 @@
 package com.calcsuite.ui.tools.calculus
 
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * The window a graph is looked at through.
@@ -47,6 +49,45 @@ data class PlotViewport(
 
         /** A window centred on the origin. */
         fun centred(span: Double) = PlotViewport(span = span)
+
+        /**
+         * The window that shows every one of the given points.
+         *
+         * The width is the larger of the two ranges, because the scales are
+         * the same on both axes: a solution that climbs steeply is drawn
+         * steeply, and it is never cut off. A little room is left around
+         * the points so that the curve does not touch the edge.
+         *
+         * @param points the points to show, as x and y.
+         * @param margin the room to leave around them, as a fraction.
+         */
+        fun fitting(
+            points: List<Pair<Double, Double>>,
+            margin: Double = 0.08,
+        ): PlotViewport {
+            val usable = points.filter { it.first.isFinite() && it.second.isFinite() }
+            if (usable.isEmpty()) return Default
+            var lowestX = Double.POSITIVE_INFINITY
+            var highestX = Double.NEGATIVE_INFINITY
+            var lowestY = Double.POSITIVE_INFINITY
+            var highestY = Double.NEGATIVE_INFINITY
+            for ((x, y) in usable) {
+                lowestX = min(lowestX, x)
+                highestX = max(highestX, x)
+                lowestY = min(lowestY, y)
+                highestY = max(highestY, y)
+            }
+            val width = highestX - lowestX
+            val height = highestY - lowestY
+            // The window has to be at least this big, so that a single point
+            // or a flat line is still visible.
+            val span = max(max(width, height), 1.0) * (1.0 + 2 * margin)
+            return PlotViewport(
+                centreX = (lowestX + highestX) / 2,
+                centreY = (lowestY + highestY) / 2,
+                span = span,
+            )
+        }
     }
 }
 

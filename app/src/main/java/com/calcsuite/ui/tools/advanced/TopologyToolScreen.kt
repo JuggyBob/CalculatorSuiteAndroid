@@ -39,6 +39,7 @@ import com.calcsuite.ui.components.SegmentedChoice
 import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.tools.ToolArgs
 import kotlin.math.abs
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Topology Explorer.
@@ -93,7 +94,7 @@ fun TopologyContent(args: ToolArgs) {
     )
 
     when (section) {
-        "A set of real numbers" -> RealLineSection()
+        "A set of real numbers" -> RealLineSection(args)
         "A finite space" -> FiniteSpaceSection()
         "A region of the plane" -> PlaneSection()
         else -> ShapesSection()
@@ -104,8 +105,8 @@ fun TopologyContent(args: ToolArgs) {
  * A set of real numbers, drawn on a line.
  */
 @Composable
-private fun RealLineSection() {
-    var text by rememberSaveable { mutableStateOf("0, 1; 2, 3") }
+private fun RealLineSection(args: ToolArgs) {
+    var text by rememberSaveable { mutableStateOf(args.prefill("text") ?: "0, 1; 2, 3") }
     val set = remember(text) { parseSet(text) }
 
     SectionCard(title = "The set") {

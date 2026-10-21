@@ -30,7 +30,8 @@ Source root: `app/src/main/java/com/calcsuite/`
 | `engine.geometry` | Shapes, bodies, shared geometry maths | No |
 | `engine.health` | BMI, calories, body fat | No |
 | `engine.datetime` | Age, date maths, intervals | No (`java.time`) |
-| `engine.other` | Mileage, Ohm's law | No |
+| `engine.other` | Mileage and trip cost | No |
+| `engine.electrical` | The circuit model, the topology, the DC solver (modified nodal analysis), the validator, the explainer, the series/parallel reducer, the units and the electrical calculators | No |
 | `engine.advanced` | The advanced mathematics: complex numbers and analysis, matrices and linear algebra, the Fourier engine, the finite-difference PDE engine, the measure and topology models, and the shared `Explanation` model | No |
 | `data` | `ToolRegistry` (the catalogue), `SettingsRepository`, `HistoryRepository`, `CurrencyRepository`, icon definitions | Yes |
 | `ai` | The AI feature: the ten providers, the HTTP client, the credential store, the image loader, the tool registry and the pipeline | Yes (keystore, HTTP) |
@@ -130,7 +131,9 @@ Routes.MAIN ──▶ CategoryScreen ──▶ ToolHostScreen ──▶ <Domain>
      └──▶ SettingsScreen
 ```
 
-Routes are string constants in `Routes`. `onOpenTool` marks the tool as recently used and pushes `tool/{toolId}`; `ToolHostScreen` resolves the id through `ToolRegistry.byId` and pops the stack if the id is unknown.
+Routes are string constants in `Routes`. `onOpenTool` marks the tool as recently used and pushes `tool/{toolId}`; `ToolHostScreen` resolves the id through `ToolRegistry.byId`, and an id that is not in this build gets a screen that says so instead of an empty page.
+
+A tool may be **renamed** without breaking the things that point at it. `ToolRegistry` keeps a table of the ids that have changed, so a history entry, a favourite or a recently-used item made with the old id still opens the tool that is there now.
 
 Above the `NavHost`, `CalcSuiteApp` shows the onboarding flow while `settings.onboardingComplete` is false. Settings are collected as a **nullable** value so the welcome pages cannot flash for a user who has already been through them.
 
@@ -250,7 +253,7 @@ Locked to portrait twice over: `android:screenOrientation="portrait"` in the man
 
 ## Testing
 
-1267 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
+1410 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
 
 ```
 app/src/test/java/com/calcsuite/engine/

@@ -60,6 +60,8 @@ import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.theme.NumberTextStyle
 import com.calcsuite.ui.tools.ToolArgs
 import kotlin.math.abs
+import com.calcsuite.ui.tools.prefill
+import com.calcsuite.ui.tools.HistoryRecorder
 
 /**
  * Calculus calculator.
@@ -77,16 +79,28 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
     // tools in the Calculus category.
     val operation = tool.operation
 
-    var expression by rememberSaveable { mutableStateOf(tool.defaultExpression) }
-    var variable by rememberSaveable { mutableStateOf("x") }
-    var atPoint by rememberSaveable { mutableStateOf("1") }
-    var lowerLimit by rememberSaveable { mutableStateOf("0") }
-    var upperLimit by rememberSaveable { mutableStateOf("3") }
-    var secondVariable by rememberSaveable { mutableStateOf("y") }
-    var seriesStart by rememberSaveable { mutableStateOf("1") }
-    var seriesEnd by rememberSaveable { mutableStateOf("10") }
-    var centre by rememberSaveable { mutableStateOf("0") }
-    var order by rememberSaveable { mutableStateOf("6") }
+    var expression by rememberSaveable {
+        mutableStateOf(args.prefill("expression") ?: tool.defaultExpression)
+    }
+    var variable by rememberSaveable { mutableStateOf(args.prefill("variable") ?: "x") }
+    var atPoint by rememberSaveable { mutableStateOf(args.prefill("atPoint", "point") ?: "1") }
+    var lowerLimit by rememberSaveable {
+        mutableStateOf(args.prefill("lowerLimit", "lowerBound") ?: "0")
+    }
+    var upperLimit by rememberSaveable {
+        mutableStateOf(args.prefill("upperLimit", "upperBound") ?: "3")
+    }
+    var secondVariable by rememberSaveable {
+        mutableStateOf(args.prefill("secondVariable") ?: "y")
+    }
+    var seriesStart by rememberSaveable {
+        mutableStateOf(args.prefill("seriesStart", "from", "firstTerm") ?: "1")
+    }
+    var seriesEnd by rememberSaveable {
+        mutableStateOf(args.prefill("seriesEnd", "to", "lastTerm") ?: "10")
+    }
+    var centre by rememberSaveable { mutableStateOf(args.prefill("centre") ?: "0") }
+    var order by rememberSaveable { mutableStateOf(args.prefill("order") ?: "6") }
     var side by rememberSaveable { mutableStateOf(BothSides) }
     var view by remember { mutableStateOf(GraphView.Default) }
 
@@ -273,7 +287,7 @@ private fun DerivativePanel(
     onAtPoint: (String) -> Unit,
     onVariable: (String) -> Unit,
     onSecondVariable: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: HistoryRecorder,
 ) {
     FormulaCard(
         formula = "f′(x) = lim(h→0) (f(x+h) − f(x)) ÷ h  =  d/dx f(x)",
@@ -314,7 +328,15 @@ private fun DerivativePanel(
         value = derivative?.derivative,
         caption = derivative?.steps?.firstOrNull(),
         error = if (derivative == null) "Enter a function of $variable." else null,
-        onCopy = { args -> onRecord("d/d$variable ($expression) = $args", args) },
+        onCopy = { args -> onRecord.record(
+                            "d/d$variable ($expression) = $args", args,
+                            mapOf(
+                            "expression" to expression,
+                            "variable" to variable,
+                            "atPoint" to atPoint,
+                            "secondVariable" to secondVariable,
+                            ),
+                        ) },
         copyValue = derivative?.derivative,
     )
 
@@ -388,7 +410,7 @@ private fun IntegralPanel(
     upperLimit: String,
     onLower: (String) -> Unit,
     onUpper: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: HistoryRecorder,
 ) {
     FormulaCard(
         formula = "∫ f(x) dx = F(x) + C   where F′(x) = f(x)      ∫ₐᵇ f(x) dx = F(b) − F(a)",
@@ -406,7 +428,13 @@ private fun IntegralPanel(
         value = antiderivative?.value,
         error = (indefinite as? CalcResult.Err)?.error?.message,
         caption = antiderivative?.let { if (it.exact) "Antiderivative — found exactly" else it.method },
-        onCopy = { onRecord("∫ $expression d$variable", it) },
+        onCopy = { onRecord.record(
+                            "∫ $expression d$variable", it,
+                            mapOf(
+                            "expression" to expression,
+                            "variable" to variable,
+                            ),
+                        ) },
         copyValue = antiderivative?.value,
     )
 
@@ -425,7 +453,15 @@ private fun IntegralPanel(
         approx = definiteResult?.let { !it.exact } ?: false,
         error = (definite as? CalcResult.Err)?.error?.message,
         caption = definiteResult?.method,
-        onCopy = { onRecord("∫ from $lowerLimit to $upperLimit of $expression", it) },
+        onCopy = { onRecord.record(
+                            "∫ from $lowerLimit to $upperLimit of $expression", it,
+                            mapOf(
+                            "expression" to expression,
+                            "variable" to variable,
+                            "lowerLimit" to lowerLimit,
+                            "upperLimit" to upperLimit,
+                            ),
+                        ) },
         copyValue = definiteResult?.value,
     )
     definiteResult?.let { StepsCard(steps = it.steps, title = "How this was computed") }
@@ -441,7 +477,7 @@ private fun LimitPanel(
     side: String,
     onPoint: (String) -> Unit,
     onSide: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: HistoryRecorder,
 ) {
     FormulaCard(
         formula = "lim($variable→a) f($variable) = the value f approaches as $variable gets close to a",
@@ -480,7 +516,14 @@ private fun LimitPanel(
         value = result?.value,
         error = (limit as? CalcResult.Err)?.error?.message,
         caption = result?.method,
-        onCopy = { onRecord("lim($variable → $point) $expression", it) },
+        onCopy = { onRecord.record(
+                            "lim($variable → $point) $expression", it,
+                            mapOf(
+                            "expression" to expression,
+                            "variable" to variable,
+                            "atPoint" to point,
+                            ),
+                        ) },
         copyValue = result?.value,
     )
     result?.let { StepsCard(steps = it.steps, title = "How this was computed") }
@@ -496,7 +539,7 @@ private fun SeriesPanel(
     end: String,
     onStart: (String) -> Unit,
     onEnd: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: HistoryRecorder,
 ) {
     FormulaCard(
         formula = "∑ₖ₌₁^∞ r^k converges ⇔ |r| < 1, summing to 1 ÷ (1 − r)      ∑ₖ₌₁^∞ 1/k^2 = π^2 ÷ 6",
@@ -521,7 +564,15 @@ private fun SeriesPanel(
         } else {
             (series as? CalcResult.Err)?.error?.message
         },
-        onCopy = { onRecord("series ∑ from k = $start of $expression", it) },
+        onCopy = { onRecord.record(
+                            "series ∑ from k = $start of $expression", it,
+                            mapOf(
+                            "expression" to expression,
+                            "variable" to variable,
+                            "seriesStart" to start,
+                            "seriesEnd" to end,
+                            ),
+                        ) },
         copyValue = result?.verdict,
     )
     result?.let { StepsCard(steps = it.steps, title = "Convergence test") }
@@ -583,7 +634,7 @@ private fun SumProductPanel(
     end: String,
     onStart: (String) -> Unit,
     onEnd: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: HistoryRecorder,
 ) {
     FormulaCard(
         formula = "∑ from k=a to b of g(k)      ∏ from k=a to b of g(k)",
@@ -608,7 +659,15 @@ private fun SumProductPanel(
         } else {
             (sum as? CalcResult.Err)?.error?.message
         },
-        onCopy = { onRecord("∑ from $start to $end of $expression", it) },
+        onCopy = { onRecord.record(
+                            "∑ from $start to $end of $expression", it,
+                            mapOf(
+                            "expression" to expression,
+                            "variable" to variable,
+                            "seriesStart" to start,
+                            "seriesEnd" to end,
+                            ),
+                        ) },
         copyValue = sumResult?.verdict,
     )
     sumResult?.let { StepsCard(steps = it.steps, title = "Terms evaluated") }
@@ -625,7 +684,15 @@ private fun SumProductPanel(
         } else {
             (product as? CalcResult.Err)?.error?.message
         },
-        onCopy = { onRecord("∏ from $start to $end of $expression", it) },
+        onCopy = { onRecord.record(
+                            "∏ from $start to $end of $expression", it,
+                            mapOf(
+                            "expression" to expression,
+                            "variable" to variable,
+                            "seriesStart" to start,
+                            "seriesEnd" to end,
+                            ),
+                        ) },
         copyValue = productResult?.verdict,
     )
     productResult?.let { StepsCard(steps = it.steps, title = "Factors evaluated") }
@@ -647,7 +714,7 @@ private fun RootsPanel(
     upperLimit: String,
     onLower: (String) -> Unit,
     onUpper: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: HistoryRecorder,
 ) {
     FormulaCard(
         formula = "Solve f(x) = 0 on [a, b]",
@@ -671,7 +738,14 @@ private fun RootsPanel(
         },
         error = (roots as? CalcResult.Err)?.error?.message,
         caption = result?.let { "${it.roots.size} root(s) in [$lowerLimit, $upperLimit]" },
-        onCopy = { onRecord("roots of $expression = 0", it) },
+        onCopy = { onRecord.record(
+                            "roots of $expression = 0", it,
+                            mapOf(
+                            "expression" to expression,
+                            "lowerLimit" to lowerLimit,
+                            "upperLimit" to upperLimit,
+                            ),
+                        ) },
     )
     result?.let { StepsCard(steps = it.steps, title = "How this was computed") }
 
@@ -694,7 +768,7 @@ private fun ExtremaPanel(
     upperLimit: String,
     onLower: (String) -> Unit,
     onUpper: (String) -> Unit,
-    onRecord: (String, String) -> Unit,
+    onRecord: HistoryRecorder,
 ) {
     FormulaCard(
         formula = "Extrema: solve f′(x) = 0, then classify with f″(x)",
@@ -719,7 +793,14 @@ private fun ExtremaPanel(
         },
         error = (extrema as? CalcResult.Err)?.error?.message,
         caption = result?.let { "${it.points.size} point(s)" },
-        onCopy = { onRecord("extrema of $expression", it) },
+        onCopy = { onRecord.record(
+                            "extrema of $expression", it,
+                            mapOf(
+                            "expression" to expression,
+                            "lowerLimit" to lowerLimit,
+                            "upperLimit" to upperLimit,
+                            ),
+                        ) },
     )
     result?.let { StepsCard(steps = it.steps, title = "How this was computed") }
 }

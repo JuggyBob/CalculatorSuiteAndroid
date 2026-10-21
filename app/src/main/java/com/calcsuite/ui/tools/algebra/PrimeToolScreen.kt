@@ -32,6 +32,7 @@ import com.calcsuite.ui.components.rememberFmt
 import com.calcsuite.ui.theme.NumberTextStyle
 import com.calcsuite.ui.tools.ToolArgs
 import java.math.BigInteger
+import com.calcsuite.ui.tools.prefill
 
 /** Numbers above this many digits are not factorized live (trial/rho time). */
 private const val LIVE_FACTOR_DIGIT_LIMIT = 20
@@ -41,7 +42,7 @@ fun PrimeToolScreen(args: ToolArgs) {
     val fmt = rememberFmt()
     val copy = rememberCopyAction()
 
-    var input by rememberSaveable { mutableStateOf("97") }
+    var input by rememberSaveable { mutableStateOf(args.prefill("input", "number") ?: "97") }
     val n = Num.parseIntOrNull(input)
 
     val check = if (n != null) remember(input) { PrimeEngine.isPrime(n) } else null
@@ -103,7 +104,13 @@ fun PrimeToolScreen(args: ToolArgs) {
                 onCopy = { copy(it, "Verdict") },
                 copyValue = verdict,
                 onSave = verdict?.let { text ->
-                    { args.onRecord("primality of ${check.n}", text) }
+                    {
+                    args.onRecord.record(
+                        "primality of \${check.n}",
+                        text,
+                        mapOf("input" to input),
+                    )
+                }
                 },
             )
 

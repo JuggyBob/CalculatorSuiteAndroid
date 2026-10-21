@@ -25,13 +25,14 @@ import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.components.rememberCopyAction
 import com.calcsuite.ui.components.rememberFmt
 import com.calcsuite.ui.tools.ToolArgs
+import com.calcsuite.ui.tools.prefill
 
 @Composable
 fun GcfLcmToolScreen(args: ToolArgs) {
     val fmt = rememberFmt()
     val copy = rememberCopyAction()
 
-    var input by rememberSaveable { mutableStateOf("18, 24") }
+    var input by rememberSaveable { mutableStateOf(args.prefill("input") ?: "18, 24") }
 
     val parsed = GcfLcmEngine.parseIntegers(input)
     val values = (parsed as? CalcResult.Ok)?.value
@@ -70,7 +71,7 @@ fun GcfLcmToolScreen(args: ToolArgs) {
                 onCopy = { copy(it, "GCF") },
                 copyValue = report.gcf.toString(),
                 onSave = {
-                    args.onRecord(
+                    args.onRecord.record(
                         "GCF & LCM of ${report.values.joinToString(", ")}",
                         "GCF = ${report.gcf}, LCM = ${report.lcm}",
                     )

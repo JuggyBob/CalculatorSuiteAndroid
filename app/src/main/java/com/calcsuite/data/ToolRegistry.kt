@@ -567,9 +567,13 @@ object ToolRegistry {
             Icons.Filled.DirectionsCar,
         ),
         ToolDef(
-            "other.ohms_law", "Ohm's law", ToolCategory.OTHER,
-            "Voltage, current, resistance and power",
-            listOf("electrical", "voltage", "current", "resistance", "watts", "amps", "volts", "ohms", "power"),
+            "other.electrical_circuits", "Electrical Circuits", ToolCategory.OTHER,
+            "Build a circuit, wire it up, and work out the voltages, currents and power",
+            listOf(
+                "electrical", "circuits", "circuit", "voltage", "current", "resistance",
+                "watts", "amps", "volts", "ohms", "power", "ohm's law", "resistor",
+                "series", "parallel", "divider", "switch", "kirchhoff",
+            ),
             Icons.Filled.ElectricBolt,
         ),
     )
@@ -586,6 +590,7 @@ object ToolRegistry {
      */
     private val LEGACY_IDS = mapOf(
         "algebra.calculus" to "calculus.derivatives",
+        "other.ohms_law" to "other.electrical_circuits",
     )
 
     fun byId(id: String): ToolDef? =

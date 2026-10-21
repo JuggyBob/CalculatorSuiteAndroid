@@ -1,4 +1,4 @@
-package com.calcsuite.ui.tools.other
+package com.calcsuite.ui.tools.electrical
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -35,7 +35,6 @@ import com.calcsuite.ui.components.ResultCard
 import com.calcsuite.ui.components.ResultRow
 import com.calcsuite.ui.components.SectionCard
 import com.calcsuite.ui.components.SegmentedChoice
-import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.components.rememberFmt
 import com.calcsuite.ui.tools.ToolArgs
 import java.math.BigDecimal
@@ -44,13 +43,17 @@ import java.math.BigDecimal
  * Ohm's law solver: pick any two of voltage, current, resistance and power,
  * enter their SI-prefixed values, and all four are reported.
  *
+ * This is the calculator that was in the app before the circuit builder, kept
+ * exactly as it was and now one of the calculators inside Electrical
+ * Circuits.
+ *
  * A small Canvas diagram shows the circuit quantities (voltage source,
  * resistor, current direction, power) and every relationship is listed in the
  * formula card. Degenerate combinations (zero resistance with voltage, an
  * inconsistent third value, underdetermined pairs) are reported by the engine.
  */
 @Composable
-fun OhmsLawToolScreen(args: ToolArgs) {
+fun OhmsLawPanel(args: ToolArgs) {
     val fmt = rememberFmt()
 
     var q1 by rememberSaveable { mutableStateOf(Quantity.VOLTAGE) }
@@ -86,112 +89,104 @@ fun OhmsLawToolScreen(args: ToolArgs) {
         else -> (computed as? CalcResult.Err)?.error?.message
     }
 
-    ToolScaffold(
-        title = args.tool.title,
-        subtitle = args.tool.description,
-        onBack = args.onBack,
-        favorite = args.favorite,
-        onToggleFavorite = args.onToggleFavorite,
-    ) {
-        SectionCard(title = "Known quantities (exactly two)") {
-            QuantityPicker(
-                label = "First known quantity",
-                quantity = q1,
-                onQuantity = { q1 = it },
-                value = value1,
-                onValue = { value1 = it },
-                prefixId = prefix1,
-                onPrefix = { prefix1 = it },
-            )
-            Spacer(Modifier.height(4.dp))
-            QuantityPicker(
-                label = "Second known quantity",
-                quantity = q2,
-                onQuantity = { q2 = it },
-                value = value2,
-                onValue = { value2 = it },
-                prefixId = prefix2,
-                onPrefix = { prefix2 = it },
-            )
-        }
-
-        CircuitDiagram(result)
-
-        ResultCard(
-            label = "Derived values",
-            value = result?.let { r ->
-                derivedQuantities(q1, q2).joinToString(" · ") { q ->
-                    "${q.symbol} = ${fmt.num(valueOf(r, q), precision = maxOf(fmt.precision, 10))} ${unitSymbol(q)}"
-                }
-            },
-            caption = result?.let { r -> r.formulas.joinToString("   ·   ") },
-            error = error,
-            onSave = if (result != null && si1 != null && si2 != null) {
-                {
-                    args.onRecord(
-                        "Ohm's law: ${q1.label} ${fmt.num(si1, precision = maxOf(fmt.precision, 10))} ${unitSymbol(q1)}, " +
-                            "${q2.label} ${fmt.num(si2, precision = maxOf(fmt.precision, 10))} ${unitSymbol(q2)}",
-                        Quantity.entries.joinToString(", ") { q ->
-                            "${q.symbol} = ${fmt.num(valueOf(result, q), precision = maxOf(fmt.precision, 10))} ${unitSymbol(q)}"
-                        },
-                    )
-                }
-            } else {
-                null
-            },
+    SectionCard(title = "Known quantities (exactly two)") {
+        QuantityPicker(
+            label = "First known quantity",
+            quantity = q1,
+            onQuantity = { q1 = it },
+            value = value1,
+            onValue = { value1 = it },
+            prefixId = prefix1,
+            onPrefix = { prefix1 = it },
         )
+        Spacer(Modifier.height(4.dp))
+        QuantityPicker(
+            label = "Second known quantity",
+            quantity = q2,
+            onQuantity = { q2 = it },
+            value = value2,
+            onValue = { value2 = it },
+            prefixId = prefix2,
+            onPrefix = { prefix2 = it },
+        )
+    }
 
-        if (result != null) {
-            ResultRow(
-                label = "Voltage V",
-                value = fmt.num(result.voltage, precision = maxOf(fmt.precision, 10)),
-                unit = "V",
-            )
-            ResultRow(
-                label = "Current I",
-                value = fmt.num(result.current, precision = maxOf(fmt.precision, 10)),
-                unit = "A",
-            )
-            ResultRow(
-                label = "Resistance R",
-                value = fmt.num(result.resistance, precision = maxOf(fmt.precision, 10)),
-                unit = "Ω",
-            )
-            ResultRow(
-                label = "Power P",
-                value = fmt.num(result.power, precision = maxOf(fmt.precision, 10)),
-                unit = "W",
-                emphasis = true,
-            )
-            SectionCard(title = "Assumptions") {
-                result.assumptions.forEach { assumption ->
-                    Text(
-                        "• $assumption",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+    CircuitDiagram(result)
+
+    ResultCard(
+        label = "Derived values",
+        value = result?.let { r ->
+            derivedQuantities(q1, q2).joinToString(" · ") { q ->
+                "${q.symbol} = ${fmt.num(valueOf(r, q), precision = maxOf(fmt.precision, 10))} ${unitSymbol(q)}"
             }
-            result.notes.forEach { InfoNote(it) }
-        }
+        },
+        caption = result?.let { r -> r.formulas.joinToString("   ·   ") },
+        error = error,
+        onSave = if (result != null && si1 != null && si2 != null) {
+            {
+                args.onRecord(
+                    "Ohm's law: ${q1.label} ${fmt.num(si1, precision = maxOf(fmt.precision, 10))} ${unitSymbol(q1)}, " +
+                        "${q2.label} ${fmt.num(si2, precision = maxOf(fmt.precision, 10))} ${unitSymbol(q2)}",
+                    Quantity.entries.joinToString(", ") { q ->
+                        "${q.symbol} = ${fmt.num(valueOf(result, q), precision = maxOf(fmt.precision, 10))} ${unitSymbol(q)}"
+                    },
+                )
+            }
+        } else {
+            null
+        },
+    )
 
-        FormulaCard(
-            formula = "V = I × R\nP = V × I = I² × R = V² ÷ R",
-            explanation = "Ohm's law relates voltage, current and resistance; the power law " +
-                "combines them. Enter any two quantities and the other two are solved from these " +
-                "relationships. SI prefixes (µ, m, k, M) are applied before the engine runs, so " +
-                "5 kΩ is passed as 5000 Ω.",
-            variables = listOf(
-                "V" to "voltage in volts",
-                "I" to "current in amperes",
-                "R" to "resistance in ohms",
-                "P" to "power in watts",
-            ),
+    if (result != null) {
+        ResultRow(
+            label = "Voltage V",
+            value = fmt.num(result.voltage, precision = maxOf(fmt.precision, 10)),
+            unit = "V",
         )
-
-        if (result == null) {
-            InfoNote("Enter two known quantities (for example 12 V and 6 Ω) to see the solution.")
+        ResultRow(
+            label = "Current I",
+            value = fmt.num(result.current, precision = maxOf(fmt.precision, 10)),
+            unit = "A",
+        )
+        ResultRow(
+            label = "Resistance R",
+            value = fmt.num(result.resistance, precision = maxOf(fmt.precision, 10)),
+            unit = "Ω",
+        )
+        ResultRow(
+            label = "Power P",
+            value = fmt.num(result.power, precision = maxOf(fmt.precision, 10)),
+            unit = "W",
+            emphasis = true,
+        )
+        SectionCard(title = "Assumptions") {
+            result.assumptions.forEach { assumption ->
+                Text(
+                    "• $assumption",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
+        result.notes.forEach { InfoNote(it) }
+    }
+
+    FormulaCard(
+        formula = "V = I × R\nP = V × I = I² × R = V² ÷ R",
+        explanation = "Ohm's law relates voltage, current and resistance; the power law " +
+            "combines them. Enter any two quantities and the other two are solved from these " +
+            "relationships. SI prefixes (µ, m, k, M) are applied before the engine runs, so " +
+            "5 kΩ is passed as 5000 Ω.",
+        variables = listOf(
+            "V" to "voltage in volts",
+            "I" to "current in amperes",
+            "R" to "resistance in ohms",
+            "P" to "power in watts",
+        ),
+    )
+
+    if (result == null) {
+        InfoNote("Enter two known quantities (for example 12 V and 6 Ω) to see the solution.")
     }
 }
 

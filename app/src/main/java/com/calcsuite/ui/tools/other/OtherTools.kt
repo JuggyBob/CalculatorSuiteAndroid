@@ -11,7 +11,8 @@ import com.calcsuite.ui.tools.ToolArgs
 fun OtherTools(args: ToolArgs): Boolean {
     when (args.tool.id) {
         "other.mileage" -> MileageToolScreen(args)
-        "other.ohms_law" -> OhmsLawToolScreen(args)
+        "other.electrical_circuits" ->
+            com.calcsuite.ui.tools.electrical.ElectricalCircuitsScreen(args)
         else -> return false
     }
     return true

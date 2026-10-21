@@ -45,6 +45,7 @@ import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.tools.ToolArgs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.calcsuite.ui.tools.prefill
 
 /**
  * The Partial Differential Equations tool.
@@ -72,7 +73,7 @@ fun PdeToolScreen(args: ToolArgs) {
 @Composable
 fun PdeToolContent(args: ToolArgs) {
     var kindName by rememberSaveable { mutableStateOf(PdeKind.HEAT.name) }
-    var length by rememberSaveable { mutableStateOf("1") }
+    var length by rememberSaveable { mutableStateOf(args.prefill("length") ?: "1") }
     var spaceSteps by rememberSaveable { mutableStateOf("40") }
     // Enough steps in time for the heat scheme to be stable with the
     // defaults below: the stability number is α·Δt ÷ Δx², and with Δx = 1/40
@@ -83,7 +84,9 @@ fun PdeToolContent(args: ToolArgs) {
     var speed by rememberSaveable { mutableStateOf("1") }
     var leftValue by rememberSaveable { mutableStateOf("0") }
     var rightValue by rememberSaveable { mutableStateOf("0") }
-    var initialText by rememberSaveable { mutableStateOf("sin(pi*x)") }
+    var initialText by rememberSaveable {
+        mutableStateOf(args.prefill("initialText", "initial") ?: "sin(pi*x)")
+    }
     var velocityText by rememberSaveable { mutableStateOf("0") }
     // The boundary and the source are given for the two-dimensional
     // equations. The defaults are chosen so that the picture shows something:
