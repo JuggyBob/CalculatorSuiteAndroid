@@ -49,7 +49,9 @@ This release upgrades over 3.0.1 in place: the signing key is unchanged, so the 
 - 1464 JVM unit tests, 0 failures.
 - Android Lint: 0 errors, and no new warnings.
 - `assembleDebug` and the signed release build both succeed.
-- On a device: the check reaches GitHub and reports "You have the newest version (3.0.1)", and the About screen shows the installed version, the newest release with the day it was published, and the notes of that release.
+- On a device: the check reaches GitHub and reports the newest version, and the About screen shows the installed version, the newest release with the day it was published, and the notes of that release.
+- The whole update was exercised on a device: a build that reports 3.0.1 was installed, the check found the published 3.0.2, the package was downloaded with its progress shown, the digest, the package name, the version code and the signing certificate were checked, Android's own installer asked for the confirmation, and the app was updated in place to 3.0.2.
+- The published APK was replaced once, with a build that includes the fix for reading the signature of the installed app. The version, the version code and the signing certificate are unchanged.
 
 ## [3.0.1] — 2026-10-21
 
