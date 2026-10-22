@@ -90,7 +90,7 @@ The release build is **not minified** (`isMinifyEnabled = false`) and `proguard-
 
 ### Producing a signed release
 
-The signed APKs published in the 1.0.0, 2.0.0, 3.0.0 and 3.0.1 releases were produced with a locally held key, and all of them were signed with the **same key**, so each release installs straight over the one before it.
+The signed APKs published in the 1.0.0, 2.0.0, 3.0.0, 3.0.1 and 3.0.2 releases were produced with a locally held key, and all of them were signed with the **same key**, so each release installs straight over the one before it.
 
 The signing configuration is already in `app/build.gradle.kts`, and it is used only when the properties are present, so an ordinary checkout still builds an unsigned release and the continuous build is unaffected. Create a keystore and reference it from `~/.gradle/gradle.properties` (never from a file in the repository):
 

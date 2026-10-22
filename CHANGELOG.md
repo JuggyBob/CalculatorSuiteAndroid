@@ -6,6 +6,51 @@ This project uses a plain, human-written changelog. **Version 1.0.0 was the firs
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for the version number.
 
+## [3.0.2] — 2026-10-22
+
+A release that lets the app keep itself up to date: **the app can now look for a newer version, download it and hand it to Android's installer**, and **a new About screen shows what changed in the newest release**. It also adds **resistor networks of any size**, **a method selector for systems of equations**, and it fixes the way the circuit canvas zooms and the way a wire finds its terminal. `versionName = 3.0.2`, `versionCode = 6`, `minSdk 26`, `targetSdk 36`.
+
+This release upgrades over 3.0.1 in place: the signing key is unchanged, so the app installs straight over the old one with your settings and history intact.
+
+### Added — Check for updates
+
+- **The app can look for its own update.** The settings now have an **Updates** card with **Check for updates**. The check asks the project's GitHub release page for the newest published release, compares its version with the one that is installed, and says which of the two is newer. Nothing is downloaded until you ask for it.
+- **A newer version can be downloaded inside the app.** The download shows how far it has got, is written to the app's own storage, and is only kept when it is complete; a download that is cut short is thrown away rather than offered.
+- **The file is checked before it is offered to Android.** When the release publishes a digest, the downloaded file is checked against it. The package name, the version code and the signing certificate have to match the app that is installed: a file for another app, a file that is not newer, and a file signed with another certificate are all refused, with a sentence saying why.
+- **Android does the installing.** The package is handed to Android's own installer, which asks you to confirm the installation. The app never installs anything by itself, and never says that it has. If the phone has not yet allowed this app to install packages, the system's "install unknown apps" screen is opened for it instead.
+- **Versions are compared the way versions are meant to be.** A tag of `v3.0.2` is the version `3.0.2`, `0.0.10` is newer than `0.0.9`, a missing part counts as zero (`3` and `3.0` are the same), and a pre-release such as `3.1.0-beta1` is older than `3.1.0`. An update is never offered when the published release is older than the one that is installed, and a release whose version cannot be read is never offered as an update — the app points at the release page instead.
+- **A release with several packages is not guessed at.** If a release publishes more than one installable file, the app says so and offers the release page rather than picking one at random.
+
+### Added — About, and what is new
+
+- **The settings have an About card.** *About Calc Suite* shows the version that is installed, the newest published release with the day it was published, and the notes of that release.
+- **The notes come from the release itself**, so they always say what the release says. When the phone has no connection, the notes of the last release that was read on the device are shown instead, and the screen says that this is what they are.
+- **The notes are drawn with a small, safe subset of Markdown**: headings, lists, bold, italic, code and links. A link shows its text and its address. Nothing in the notes can run.
+- **The installed version is shown at the foot of the settings screen**, together with the number of tools.
+
+### Added — Resistor networks of any size
+
+- The electrical calculators now take a **network of resistors** instead of a fixed number of them. The resistors are added one at a time and joined in series or in parallel, and the app works out the equivalent resistance and the current in each branch. **There is no cap on how many resistors can be added**, and a mixed network — a set in series with a set in parallel — is worked out as well.
+
+### Added — A method for systems of equations
+
+- The **System 2×2** mode of the Equations tool now has a **Method** selector: *Automatic*, *Cramer's rule*, *Substitution*, *Elimination* or *Comparison*. Each method shows the working that it does, and a method that does not apply to the system is refused with a list of the ones that do.
+
+### Fixed
+
+- **Pinch-zoom on the circuit canvas now zooms the right way.** Spreading two fingers apart made the picture smaller; it now makes it bigger. The zoom value is how many world units a pixel covers, and it moves the right way now.
+- **A wire finds the terminal it was dropped on.** The area around a terminal that grabs a wire was too wide, so a wire dropped near one terminal could attach itself to the next one along, and the circuit was then wrongly joined — which is what produced the false "not connected" reports. The area is now 22 dp, and it grows and shrinks with the zoom.
+- **An AI answer can be opened in the calculator.** The button on an AI answer now opens the tool that produced it, in the right mode. Where the app has no matching tool, the button says so instead of opening the wrong screen.
+- **A card inside a card lines up again.** The content of a solution card was indented a second time, so it did not line up with the cards around it. One spacing rule now decides where the content of a card begins, and a card inside a card says that it is one.
+- **A number in front of a square is read.** `1x^2 + y = 9` was refused as "too high a degree", although it is the same as `x^2 + y = 9`. The check on the degree of a product was counting the x² term as a term of degree three; the same check also let `x^2 * y` through and dropped its term.
+
+### Verification
+
+- 1464 JVM unit tests, 0 failures.
+- Android Lint: 0 errors, and no new warnings.
+- `assembleDebug` and the signed release build both succeed.
+- On a device: the check reaches GitHub and reports "You have the newest version (3.0.1)", and the About screen shows the installed version, the newest release with the day it was published, and the notes of that release.
+
 ## [3.0.1] — 2026-10-21
 
 A small release that fixes the circuit builder: **a part can now be dragged where you want it**, and **the name of a part sits over the part it names**. `versionName = 3.0.1`, `versionCode = 5`, `minSdk 26`, `targetSdk 36`.
@@ -348,6 +393,7 @@ Documented in full in [ROADMAP.md](ROADMAP.md) and [docs/CALCULUS_GUIDE.md](docs
 - `assembleDebug` and the signed release build both succeed.
 - On-device checks covering onboarding (first launch, navigation, skip, finish, restart persistence), the separator setting (all five styles, live update, persistence), portrait lock across 13 destinations, light and dark themes, and 14 assertions on the two calculus fixes.
 
+[3.0.2]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.2
 [3.0.1]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.1
 [3.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.0
 [2.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/2.0.0-release

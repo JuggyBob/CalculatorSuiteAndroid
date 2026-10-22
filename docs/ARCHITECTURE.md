@@ -33,13 +33,15 @@ Source root: `app/src/main/java/com/calcsuite/`
 | `engine.other` | Mileage and trip cost | No |
 | `engine.electrical` | The circuit model, the topology, the DC solver (modified nodal analysis), the validator, the explainer, the series/parallel reducer, the units and the electrical calculators | No |
 | `engine.advanced` | The advanced mathematics: complex numbers and analysis, matrices and linear algebra, the Fourier engine, the finite-difference PDE engine, the measure and topology models, and the shared `Explanation` model | No |
-| `data` | `ToolRegistry` (the catalogue), `SettingsRepository`, `HistoryRepository`, `CurrencyRepository`, icon definitions | Yes |
+| `data` | `ToolRegistry` (the catalogue), `SettingsRepository`, `HistoryRepository`, `CurrencyRepository`, `CircuitRepository`, `ToolDestinations` (which AI tool opens which screen), icon definitions | Yes |
+| `updater` | The in-app update: the version rules, the release model and its JSON reader, the GitHub release client, the download, the package checks and the notes reader | Partly (HTTP, the package manager) |
 | `ai` | The AI feature: the ten providers, the HTTP client, the credential store, the image loader, the tool registry and the pipeline | Yes (keystore, HTTP) |
 | `ui.components` | Shared Compose widgets: scaffolding, forms, result cards, inputs, formatting | Yes |
 | `ui.screens` | Main menu, categories, search, history, settings, scientific, onboarding, the calculator panel | Yes |
 | `ui.theme` | Colour, typography, shape, `CalcSuiteTheme` | Yes |
 | `ui.tools` | One screen per tool, grouped by category, plus per-domain dispatchers | Yes |
 | `ui.ai` | The AI problem solver: its screen, its settings screen and its view model | Yes |
+| `ui.update` | The update card and the About dialog, and the view model that drives them | Yes |
 
 **The rule:** `core`, `expr` and every `engine.*` package must compile and run without the Android framework. `java.math`, `java.time` and the rest of the JDK are fine; `android.*` is not.
 
@@ -230,18 +232,21 @@ Three repositories over one shared DataStore instance (`Context.appDataStore`, n
 | `SettingsRepository` | `theme_mode`, `angle_mode`, `precision`, `grouping`, `thousands_separator`, `haptics`, `dynamic_color`, `onboarding_complete`, `favorites`, `recents` | Scalars and small collections |
 | `HistoryRepository` | `history` | A JSON array of entries, capped at 500, oldest dropped first |
 | `CurrencyRepository` | `currency_rates` | Rates plus the fetch timestamp, so results survive a restart and work offline |
+| `ReleaseCache` | `last_release`, `last_release_at` | The last release that was read, so the About screen can show its notes offline |
 
 History is a JSON array rather than a database because it is a bounded, flat list — a database would be more machinery than the problem needs.
 
 ## Networking
 
-Two places, and no more.
+Three places, and no more.
 
 **The currency converter.** `CurrencyRepository.refresh()` issues a single HTTPS `GET` to `open.er-api.com` on `Dispatchers.IO`, with 15-second timeouts, two fixed headers and no analytics parameters. The response is parsed into a `RatesSnapshot`, cached, and re-used offline with a staleness warning past 24 hours.
 
 **The AI problem solver.** `ai/AiClient` sends one HTTPS `POST` to the provider the user chose, on `Dispatchers.IO`, with the picture as base64 in that provider's own image format, the question, the list of eligible tools and the user's API key in the provider's own authentication header. The transport is behind the `AiTransport` interface, so the whole path can be exercised with a fake transport and no network at all. The credential is held by `ai/AiConfigRepository`, which encrypts it with AES/GCM under a key in the Android keystore and never writes it in plain text.
 
-There is no other network code in the project: no telemetry, no crash reporting, no update check and no font or icon download.
+**The update check.** `updater/GitHubReleaseClient` reads the project's own releases from `api.github.com` with a single unauthenticated HTTPS `GET`, on `Dispatchers.IO`. The endpoint is the public one for the latest published release, so no token is embedded in the app and none is needed. The reply is parsed into a `ReleaseInfo`; the version of the release is compared with the installed one; and a release that publishes exactly one installable APK can be downloaded into the app's own cache and handed to Android's installer. The file is checked before it is offered — the digest the release publishes when it publishes one, and then the package name, the version code and the signing certificate. The app never installs anything by itself: Android shows its own confirmation.
+
+There is no other network code in the project: no telemetry, no crash reporting and no font or icon download.
 
 ## Theme
 
@@ -253,13 +258,15 @@ Locked to portrait twice over: `android:screenOrientation="portrait"` in the man
 
 ## Testing
 
-1410 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
+1464 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
 
 ```
 app/src/test/java/com/calcsuite/engine/
     algebra/     convert/     calculus/     datetime/
     finance/     geometry/    health/       other/
 ```
+
+plus `app/src/test/java/com/calcsuite/updater/` for the version rules, the release reader, the update decision and the notes reader.
 
 plus `core/`, `expr/` and a few UI-logic tests (the graph viewport transform, formatting).
 

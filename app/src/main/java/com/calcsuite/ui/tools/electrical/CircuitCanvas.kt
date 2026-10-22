@@ -32,6 +32,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.calcsuite.engine.electrical.CircuitComponent
 import com.calcsuite.engine.electrical.CircuitGeometry
@@ -117,6 +118,14 @@ fun CircuitCanvas(
     val surface = MaterialTheme.colorScheme.surfaceContainerLow
     val density = LocalDensity.current
 
+    // How close a touch has to be to a terminal to count as on it, in world
+    // units. The area is a comfortable size on the screen whatever the
+    // picture is zoomed to, so it is worked out in pixels and then changed
+    // into world units.
+    val touchDp = 22.dp
+    val touchPixels = with(density) { touchDp.toPx() }
+    fun touchRadius(zoom: Double): Double = touchPixels * zoom
+
     /**
      * The world transform, worked out from the state as it is now.
      *
@@ -159,7 +168,7 @@ fun CircuitCanvas(
                         current.circuit,
                         start.first,
                         start.second,
-                        26.0 * current.zoom,
+                        touchRadius(current.zoom),
                     ) != null
                     val grabbed = if (onTerminal) {
                         null
@@ -190,8 +199,11 @@ fun CircuitCanvas(
                             val middle = (first + second) / 2f
                             val spread = (first - second).getDistance()
                             val now = current
+                            // The zoom is the number of world units in a
+                            // pixel, so spreading the fingers apart makes
+                            // it smaller and the picture bigger.
                             val factor = if (lastSpread > 0f) spread / lastSpread else 1f
-                            val zoom = (now.zoom * factor).coerceIn(0.1, 4.0)
+                            val zoom = (now.zoom / factor).coerceIn(0.1, 4.0)
                             val world = transformFor(now).world(middle)
                             send(
                                 now.copy(
@@ -312,7 +324,7 @@ fun CircuitCanvas(
                                     now.circuit,
                                     world.first,
                                     world.second,
-                                    26.0 * now.zoom,
+                                    touchRadius(now.zoom),
                                 )
                                 if (terminal != null) {
                                     send(

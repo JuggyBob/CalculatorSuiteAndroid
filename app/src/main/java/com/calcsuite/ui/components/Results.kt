@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -73,13 +74,19 @@ fun ResultCard(
     onCopy: ((String) -> Unit)? = null,
     copyValue: String? = null,
     onSave: (() -> Unit)? = null,
+    /**
+     * True when the card is used inside another card. Its content then
+     * starts at the same edge as the content around it, instead of being
+     * indented a second time.
+     */
+    nested: Boolean = false,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(if (nested) Modifier else Modifier.padding(ContentIndent)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     label,
@@ -244,9 +251,15 @@ fun StepsCard(
     steps: List<String>,
     modifier: Modifier = Modifier,
     title: String = "Steps",
+    /**
+     * True when the list is used inside a card. It is then a plain block
+     * with a heading, so that it starts at the same edge as the rest of the
+     * card's content instead of being a card inside a card.
+     */
+    nested: Boolean = false,
 ) {
     if (steps.isEmpty()) return
-    SectionCard(modifier, title = title) {
+    val body: @Composable ColumnScope.() -> Unit = {
         steps.forEachIndexed { index, step ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
@@ -255,9 +268,25 @@ fun StepsCard(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.width(20.dp),
                 )
-                Text(step, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    step,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
+    }
+    if (nested) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(PanelGap)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            body()
+        }
+    } else {
+        SectionCard(modifier, title = title) { body() }
     }
 }
 

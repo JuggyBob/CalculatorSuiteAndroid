@@ -1,6 +1,6 @@
 # Features and Tools
 
-Every one of the **66 registered tools** across **8 categories**, with its inputs, the mathematics it actually uses, its results, how it validates input, its limits, and a worked example.
+Every one of the **66 registered tools** across **9 categories**, with its inputs, the mathematics it actually uses, its results, how it validates input, its limits, and a worked example.
 
 | Category | Tools |
 |---|---|
@@ -14,7 +14,9 @@ Every one of the **66 registered tools** across **8 categories**, with its input
 | [Calculus](#8-calculus--14-tools) | 14 |
 | [Advanced Mathematics](#9-advanced-mathematics--3-tools) | 3 |
 
-**Not a tool, but a feature.** The **AI problem solver** (the brain button beside the history button on the main screen) reads a photograph of a mathematical problem, has a chosen AI provider pick the right tool below, and lets that tool's own engine do the mathematics. It is described in the [User Guide](USER_GUIDE.md#9-the-ai-problem-solver).
+**Not a tool, but features.** The **AI problem solver** (the brain button beside the history button on the main screen) reads a photograph of a mathematical problem, has a chosen AI provider pick the right tool below, and lets that tool's own engine do the mathematics. It is described in the [User Guide](USER_GUIDE.md#9-the-ai-problem-solver).
+
+The **update checker** (Settings → *Updates*) asks the project's own GitHub release page whether a newer version has been published, downloads it when there is one, checks the file against the app that is installed, and hands it to Android's installer, which asks you to confirm. *Settings → About* shows the version that is installed, the newest release and its notes. Both are described in the [User Guide](USER_GUIDE.md#7-settings).
 
 **Notation used throughout.** *Exact* means the result is computed with arbitrary-precision arithmetic (`BigDecimal` at 34 significant digits, or `BigInteger`) and is not rounded until display. *Numerical* means a numeric method was used, the result is prefixed `≈`, and the panel names the method.
 
@@ -125,11 +127,11 @@ The `%` on a field is a display suffix only — no unit conversion happens. `15`
 
 - Linear: `Equation` (`2x + 4 = 10`) and `Variable` (default `x`, matched case-insensitively; one letter or word).
 - Quadratic: `Equation` (`x^2 - 3x + 2 = 0`) and `Variable`.
-- System: six numeric fields `a₁ b₁ c₁ a₂ b₂ c₂` for `a₁x + b₁y = c₁`, `a₂x + b₂y = c₂`.
+- System: six numeric fields `a₁ b₁ c₁ a₂ b₂ c₂` for `a₁x + b₁y = c₁`, `a₂x + b₂y = c₂`, and a **Method** selector with *Automatic*, *Cramer's rule*, *Substitution*, *Elimination* and *Comparison*.
 
 **Syntax.** Decimals with `.` or `,`; `+ − × * ÷ / ^`; parentheses and brackets; implicit multiplication (`2x`, `3(x+1)`, `x(x−1)`); fractional coefficients (`1/2 x + 3 = 4`); exactly one `=` sign, with the variable allowed on both sides. A **Syntax help** panel states all of this.
 
-**Method.** Both sides are parsed into degree-≤2 polynomials and subtracted. Linear: `x = −b ÷ a`. Quadratic: `x = (−b ± √(b² − 4ac)) ÷ 2a`; Δ > 0 gives two real roots sorted ascending, Δ = 0 one double root, Δ < 0 complex roots `a ± bi`. Square roots use a Newton iteration at 34 digits, so `√` is exact where it should be. Systems use Cramer's rule.
+**Method.** Both sides are parsed into degree-≤2 polynomials and subtracted. Linear: `x = −b ÷ a`. Quadratic: `x = (−b ± √(b² − 4ac)) ÷ 2a`; Δ > 0 gives two real roots sorted ascending, Δ = 0 one double root, Δ < 0 complex roots `a ± bi`. Square roots use a Newton iteration at 34 digits, so `√` is exact where it should be. A system is solved by the method that is chosen: *Automatic* picks one that fits (Cramer's rule for two linear equations, substitution otherwise), and *Cramer's rule*, *Substitution*, *Elimination* and *Comparison* each show the working that they do. A method that does not apply to the system is refused with a list of the ones that do.
 
 **Results.** `x = …` / `x₁ = …, x₂ = …` / `x = …, y = …`, plus rows for the standard form, the coefficients, the discriminant, and the real/complex roots. Degenerate cases are named explicitly: *"Every value of x"*, *"No solution"*, *"Infinitely many solutions"*. A substitution check confirms the root satisfies the original equation.
 
@@ -717,7 +719,9 @@ They differ by design: 1 January 23:00 → 2 January 01:00 is a calendar interva
 - **Each part's own values.** Tap a part to open it: its name, its value with an SI prefix, its power rating, and — for a switch — whether it is open or closed.
 - **The circuit itself.** A resistance must be greater than zero, a source needs its voltage or current, and a circuit needs a ground.
 
-*The eleven calculators.* Ohm's law and power; resistors in series; resistors in parallel; a series part and a parallel part; a voltage divider; a current divider; writing a value in another prefix; the resistor colour code; a capacitor; the time constant of an RC or an RL circuit; and an alternating circuit.
+*The eleven calculators.* Ohm's law and power; **resistors in series**, with as many resistors as you need; **resistors in parallel**, with as many as you need; a series part and a parallel part; a voltage divider; a current divider; writing a value in another prefix; the resistor colour code; a capacitor; the time constant of an RC or an RL circuit; and an alternating circuit.
+
+The series and parallel calculators are **lists**: a resistor is added with the **+** button and can be taken away again, and the list is as long as it needs to be — there is no cap on how many resistors can be added. The mixed calculator takes a series part and a parallel part.
 
 **Method.** The builder solves the circuit by **modified nodal analysis**: the app writes the equations for the circuit as you have drawn it — one current balance at every point that is not the ground, together with the voltage of each source — and solves them with Gaussian elimination and partial pivoting, reporting a singular system rather than dividing by a number that is nearly zero.
 
@@ -731,7 +735,7 @@ The calculators work in exact decimal arithmetic where the mathematics allows it
 
 **Validation.** Four states are told apart, because each needs something different from you: the canvas is empty; the circuit is not finished (a part is not joined, a value is missing, there is no ground); the circuit cannot be worked out as it stands (a resistance of zero, a short-circuited source, a part that hangs); or it has been solved. The message names the part that is at fault. A part whose value is missing, zero or negative is reported rather than quietly treated as zero.
 
-**Limitations.** The builder is for **steady direct current with ideal parts**: there is no transient analysis, no frequency sweep and no non-ohmic component, and the switch is ideal — a conductor when closed, a break when open. The circuit needs one ground, and the voltages are measured against it. The alternating-current calculator is a separate calculation at one frequency, not a simulation of a circuit over time. The power rating of a resistor is kept, but the app does not yet warn when a part is being worked harder than its rating.
+**Limitations.** The resistor network calculators are for networks of resistors only: there is no cap on how many resistors a list may hold, but a network that is neither in series nor in parallel cannot be reduced by the series and parallel rules. The builder is for **steady direct current with ideal parts**: there is no transient analysis, no frequency sweep and no non-ohmic component, and the switch is ideal — a conductor when closed, a break when open. The circuit needs one ground, and the voltages are measured against it. The alternating-current calculator is a separate calculation at one frequency, not a simulation of a circuit over time. The power rating of a resistor is kept, but the app does not yet warn when a part is being worked harder than its rating.
 
 **Examples.** Two resistors in series, 100 Ω and 200 Ω across 12 V → **300 Ω** seen by the source, **0.04 A** delivered, 4 V across the first and 8 V across the second. Two resistors in parallel, 100 Ω and 200 Ω across 12 V → **66.667 Ω**, **0.18 A** in total, 0.12 A and 0.06 A in the branches.
 

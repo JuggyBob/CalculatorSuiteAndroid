@@ -496,23 +496,9 @@ private fun ElectricalCalculatorsPanel(args: ToolArgs) {
 
     when (which) {
         "ohms" -> OhmsLawPanel(args)
-        "series" -> ResistorNetworkPanel(
-            args = args,
-            title = "Resistors in series",
-            parallel = false,
-            onCalculate = { values, voltage ->
-                ElectricalCalculators.series(values, voltage)
-            },
-        )
-        "parallel" -> ResistorNetworkPanel(
-            args = args,
-            title = "Resistors in parallel",
-            parallel = true,
-            onCalculate = { values, voltage ->
-                ElectricalCalculators.parallel(values, voltage)
-            },
-        )
-        "mixed" -> MixedNetworkPanel(args)
+        "series" -> ResistorListPanel(title = "Resistors in series", parallel = false)
+        "parallel" -> ResistorListPanel(title = "Resistors in parallel", parallel = true)
+        "mixed" -> MixedNetworkPanel()
         "divider" -> DividerPanel(args)
         "current" -> CurrentDividerPanel(args)
         "convert" -> UnitConversionPanel()

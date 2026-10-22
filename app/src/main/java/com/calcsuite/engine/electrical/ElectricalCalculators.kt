@@ -564,4 +564,126 @@ object ElectricalCalculators {
             ),
         )
     }
+
+    // ----------------------------------------------------------- mixed
+
+    /**
+     * A network of resistors joined in series and in parallel.
+     *
+     * The network is a tree: a group holds parts and other groups, and the
+     * reduction is done from the smallest group outwards, so that the
+     * working follows the network the user actually built.
+     */
+    fun network(
+        network: ResistorNetwork,
+        voltage: BigDecimal?,
+    ): CalcResult<CalculatorResult> {
+        val reduction = ResistorNetworkReducer.reduce(network)
+            ?: return err(
+                ErrorKind.InvalidInput,
+                "Every part needs a resistance greater than zero.",
+            )
+        val total = reduction.equivalent
+        val v = voltage?.toDouble()
+        val current = if (v != null && total > 0.0) v / total else null
+        val power = if (v != null && current != null) v * current else null
+
+        val steps = mutableListOf<ExplanationStep>()
+        steps.add(
+            ExplanationStep(
+                title = "The network as it is built",
+                formula = "the parts, and the groups they are in",
+                note = describe(network),
+            ),
+        )
+        for ((index, step) in reduction.steps.withIndex()) {
+            steps.add(
+                ExplanationStep(
+                    title = "${step.names.joinToString(" and ")} are ${step.kind.label}",
+                    formula = ResistorNetworkReducer.formula(step.kind, step.names.size),
+                    calculation = "= " + step.detail,
+                    result = "= ${CircuitExplainer.number(step.result)} Ω",
+                    note = if (index == reduction.steps.lastIndex) {
+                        "This is the resistance of the whole network."
+                    } else {
+                        "This is used in the next step."
+                    },
+                ),
+            )
+        }
+        if (current != null && v != null) {
+            steps.add(
+                ExplanationStep(
+                    title = "The current the source delivers",
+                    formula = "I = V ÷ R",
+                    substitution = "= ${CircuitExplainer.number(v)} V ÷ ${CircuitExplainer.number(total)} Ω",
+                    result = "I = ${CircuitExplainer.number(current)} A",
+                ),
+            )
+        }
+
+        val rows = mutableListOf(
+            "Total resistance" to "${CircuitExplainer.number(total)} Ω",
+        )
+        if (current != null) rows.add("Current" to "${CircuitExplainer.number(current)} A")
+        if (power != null) rows.add("Total power" to "${CircuitExplainer.number(power)} W")
+        rows.add("Parts" to countResistors(network).toString())
+
+        return ok(
+            CalculatorResult(
+                title = "A series and parallel network",
+                headline = "R = ${CircuitExplainer.number(total)} Ω",
+                rows = rows,
+                variables = listOf(
+                    FormulaVariable("R", "the resistance of the whole network",
+                        CircuitExplainer.number(total), "Ω"),
+                ) + (if (v != null) {
+                    listOf(
+                        FormulaVariable(
+                            "V",
+                            "the voltage of the source",
+                            CircuitExplainer.number(v),
+                            "V",
+                        ),
+                    )
+                } else {
+                    emptyList()
+                }),
+                steps = steps,
+                why = "The network is reduced from the inside out: the smallest group " +
+                    "is combined first and is replaced by the resistance it makes, " +
+                    "and so on until one resistance is left.",
+                checks = listOf(
+                    ExplanationStep(
+                        title = "The reductions lead to the answer",
+                        formula = "the last step gives the resistance of the network",
+                        substitution = "= ${CircuitExplainer.number(total)} Ω",
+                        result = "the network has ${countResistors(network)} resistors",
+                    ),
+                ),
+                formula = "R = R₁ + R₂ + … + Rₙ,   1 ÷ R = 1 ÷ R₁ + 1 ÷ R₂ + … + 1 ÷ Rₙ",
+            ),
+        )
+    }
+
+    /**
+     * A description of a network, for the working: the groups and what is in
+     * them.
+     */
+    fun describe(network: ResistorNetwork): String = when (network) {
+        is ResistorNetwork.Resistor -> "${network.name} = ${network.resistance.toPlainString()} Ω"
+        is ResistorNetwork.Series ->
+            "a series group: " + network.children.joinToString(", ") { describe(it) }
+        is ResistorNetwork.Parallel ->
+            "a parallel group: " + network.children.joinToString(", ") { describe(it) }
+    }
+
+    /**
+     * How many resistors a network holds.
+     */
+    fun countResistors(network: ResistorNetwork): Int = when (network) {
+        is ResistorNetwork.Resistor -> 1
+        is ResistorNetwork.Series -> network.children.sumOf { countResistors(it) }
+        is ResistorNetwork.Parallel -> network.children.sumOf { countResistors(it) }
+    }
 }

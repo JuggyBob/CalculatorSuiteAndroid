@@ -30,10 +30,15 @@ enum class ComponentKind(
     val group: ComponentGroup,
     val terminalCount: Int,
     val prefix: String,
+    /**
+     * The short name of the part, for a place where there is only room for
+     * one line, such as the palette on a narrow phone.
+     */
+    val shortLabel: String = label,
 ) {
     RESISTOR("Resistor", ComponentGroup.PASSIVE, 2, "R"),
-    VOLTAGE_SOURCE("Voltage source", ComponentGroup.SOURCE, 2, "V"),
-    CURRENT_SOURCE("Current source", ComponentGroup.SOURCE, 2, "I"),
+    VOLTAGE_SOURCE("Voltage source", ComponentGroup.SOURCE, 2, "V", "V source"),
+    CURRENT_SOURCE("Current source", ComponentGroup.SOURCE, 2, "I", "I source"),
     SWITCH("Switch", ComponentGroup.CONTROL, 2, "S"),
     GROUND("Ground", ComponentGroup.REFERENCE, 1, "GND"),
     ;

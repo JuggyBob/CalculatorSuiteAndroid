@@ -1,5 +1,7 @@
 package com.calcsuite.ui.screens
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,9 +40,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.calcsuite.core.Num
 import com.calcsuite.core.ThousandsSeparator
 import com.calcsuite.data.Settings
@@ -56,12 +63,33 @@ import com.calcsuite.ui.components.rememberFmt
 import com.calcsuite.ui.theme.Accent
 import com.calcsuite.ui.theme.AccentPreset
 import com.calcsuite.ui.theme.ThemeMode
+import com.calcsuite.ui.update.AboutDialog
+import com.calcsuite.ui.update.InstallOutcome
+import com.calcsuite.ui.update.UpdateCard
+import com.calcsuite.ui.update.UpdateUiState
+import com.calcsuite.ui.update.UpdateViewModel
+import com.calcsuite.updater.ReleaseInfo
+import java.io.File
 import java.math.BigDecimal
 
 /** Renders the same 1 234 567.89 the app would show, for the settings preview. */
 private fun sampleNumber(separator: ThousandsSeparator, decimalMark: Char): String {
     val seps = Num.Sep(decimalMark, separator.resolve(decimalMark))
     return Num.format(BigDecimal("1234567.89"), 12, seps)
+}
+
+/**
+ * Opens a page of the web in whatever the phone uses for that.
+ *
+ * A phone without a browser has nothing to show the page in, so the failure
+ * is passed over rather than taken as an error of the app.
+ */
+private fun openPage(context: Context, address: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, address.toUri()))
+    } catch (e: Exception) {
+        // There is nothing on the phone that can show a web page.
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +111,57 @@ fun SettingsScreen(
     onClearHistory: () -> Unit,
 ) {
     var confirmClear by remember { mutableStateOf(false) }
+
+    // The updater, and the About screen that shows the notes of the newest
+    // release.
+    val context = LocalContext.current
+    val updater: UpdateViewModel = viewModel()
+    val updateState by updater.state.collectAsStateWithLifecycle()
+    val installedVersion = remember { updater.installedVersion() }
+    var showAbout by remember { mutableStateOf(false) }
+    var cachedRelease by remember { mutableStateOf<ReleaseInfo?>(null) }
+
+    // The release that is on show: the one that was just read, or the last one
+    // that was read on this device, so that the notes are there offline too.
+    val freshRelease: ReleaseInfo? = when (val state = updateState) {
+        is UpdateUiState.Available -> state.release
+        is UpdateUiState.Downloading -> state.release
+        is UpdateUiState.Ready -> state.release
+        is UpdateUiState.NoPackage -> state.release
+        is UpdateUiState.UpToDate -> state.release
+        else -> null
+    }
+    val aboutRelease: ReleaseInfo? = freshRelease ?: cachedRelease
+    val notesAreCached = freshRelease == null && cachedRelease != null
+
+    // When the About screen opens, the notes of the last release that was read
+    // are shown until a check brings newer ones.
+    LaunchedEffect(showAbout) {
+        if (showAbout && cachedRelease == null) {
+            cachedRelease = updater.cachedRelease()
+        }
+    }
+
+    /** Opens the installer for a downloaded update. */
+    fun installUpdate(file: File) {
+        when (val outcome = updater.install(file)) {
+            is InstallOutcome.Started -> {
+                try {
+                    context.startActivity(updater.installIntent(file))
+                } catch (e: Exception) {
+                    updater.reportProblem("The installer could not be opened on this phone.")
+                }
+            }
+            is InstallOutcome.NeedsPermission -> {
+                try {
+                    context.startActivity(updater.unknownSourcesIntent())
+                } catch (e: Exception) {
+                    updater.reportProblem("The settings screen of the phone could not be opened.")
+                }
+            }
+            is InstallOutcome.Refused -> updater.reportProblem(outcome.message)
+        }
+    }
 
     // The same decimal mark the rest of the app displays with, so the warning
     // below can never disagree with what is on screen.
@@ -231,8 +310,30 @@ fun SettingsScreen(
                 )
             }
 
+            UpdateCard(
+                state = updateState,
+                installedVersion = installedVersion,
+                onCheck = { updater.check() },
+                onDownload = { updater.download() },
+                onCancel = { updater.cancelDownload() },
+                onInstall = {
+                    val state = updateState
+                    if (state is UpdateUiState.Ready) installUpdate(state.file)
+                },
+                onOpenReleasePage = { openPage(context, it) },
+            )
+
+            SectionCard(title = "About") {
+                SettingRow(
+                    label = "About Calc Suite",
+                    description = "The installed version, the newest release and what changed in it",
+                ) {
+                    TextButton(onClick = { showAbout = true }) { Text("Open") }
+                }
+            }
+
             Text(
-                "Calc Suite 1.0 \u00b7 ${ToolRegistry.all.size} tools across " +
+                "Calc Suite $installedVersion \u00b7 ${ToolRegistry.all.size} tools across " +
                     "${ToolCategory.entries.size} categories",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -255,6 +356,24 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { confirmClear = false }) { Text("Cancel") }
             },
+        )
+    }
+
+    if (showAbout) {
+        AboutDialog(
+            installedVersion = installedVersion,
+            release = aboutRelease,
+            fromCache = notesAreCached,
+            state = updateState,
+            onCheck = { updater.check() },
+            onDownload = { updater.download() },
+            onCancel = { updater.cancelDownload() },
+            onInstall = {
+                val state = updateState
+                if (state is UpdateUiState.Ready) installUpdate(state.file)
+            },
+            onOpenReleasePage = { openPage(context, it) },
+            onDismiss = { showAbout = false },
         )
     }
 }

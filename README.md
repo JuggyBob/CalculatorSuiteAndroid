@@ -54,6 +54,7 @@ The design goal was **no dead controls**: every button, field and toggle perform
 | ⭐ **Favourites & history** | Starred tools and a local calculation history, both stored on-device. |
 | 🌓 **Light, dark & dynamic colour** | Follows the system theme, or Android 12+ wallpaper colours. |
 | 🇪🇺 **Thousands separator** | Choose automatic, comma, period, space or apostrophe — display only, never affecting how input is parsed. |
+| 🛠️ **Check for updates in the app** | The settings screen asks the project's GitHub release page whether a newer version exists, downloads it and hands it to Android's installer, which asks you to confirm. The About screen shows what changed in the newest release. |
 | 🔒 **Portrait-only** | Locked to portrait app-wide, so no screen or dialog ever rotates unexpectedly. |
 
 ## Getting the app
@@ -63,10 +64,10 @@ Download the signed APK from the
 
 ```bash
 # Verify the download before installing
-sha256sum -c CalculatorSuite-v3.0.1.apk.sha256
+sha256sum -c CalculatorSuite-v3.0.2.apk.sha256
 
 # Install over USB
-adb install CalculatorSuite-v3.0.1.apk
+adb install CalculatorSuite-v3.0.2.apk
 ```
 
 **Requirements:** any phone or tablet running Android 8.0 (API 26) or newer, arm64-v8a or x86_64. It is a single APK, about 14 MB, with nothing to sign up for. You will need to allow installation from your file manager the first time.
@@ -93,7 +94,7 @@ You need **JDK 17 or newer** (JDK 21 is what CI uses) and an **Android SDK with 
 git clone https://github.com/JuggyBob/CalculatorSuiteAndroid.git
 cd CalculatorSuiteAndroid
 
-./gradlew :app:testDebugUnitTest   # 1410 JVM unit tests
+./gradlew :app:testDebugUnitTest   # 1464 JVM unit tests
 ./gradlew :app:lintDebug           # Android Lint
 ./gradlew :app:assembleDebug       # app/build/outputs/apk/debug/app-debug.apk
 ```

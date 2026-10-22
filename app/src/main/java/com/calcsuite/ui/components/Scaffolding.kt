@@ -135,6 +135,12 @@ fun ToolScaffold(
 fun SectionCard(
     modifier: Modifier = Modifier,
     title: String? = null,
+    /**
+     * True when the card is used inside another card. Its content then
+     * starts at the same edge as the content around it, instead of being
+     * indented a second time.
+     */
+    nested: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
@@ -144,7 +150,7 @@ fun SectionCard(
         tonalElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = if (nested) Modifier else Modifier.padding(ContentIndent),
             verticalArrangement = Arrangement.spacedBy(PanelGap),
         ) {
             if (title != null) {
@@ -158,6 +164,16 @@ fun SectionCard(
         }
     }
 }
+
+/**
+ * The left indent of the content inside a card or a panel.
+ *
+ * It is the one rule for the horizontal spacing, so that content at the same
+ * level always starts at the same place, whichever component draws it. A
+ * component that is used inside another one says so, and then its content
+ * starts at the same edge as the content around it.
+ */
+val ContentIndent = 16.dp
 
 /**
  * The vertical gap between the parts of a card or a panel.
@@ -195,7 +211,7 @@ fun ExpandablePanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { expanded = !expanded }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = ContentIndent, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -212,7 +228,11 @@ fun ExpandablePanel(
             }
             AnimatedVisibility(visible = expanded) {
                 Column(
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    modifier = Modifier.padding(
+                        start = ContentIndent,
+                        end = ContentIndent,
+                        bottom = ContentIndent,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(PanelGap),
                 ) {
                     content()

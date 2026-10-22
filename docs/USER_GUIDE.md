@@ -235,6 +235,26 @@ The setting is **display-only**. Parsing never consults it — `1,234.56` and `1
 
 **The one ambiguous case:** if you pick a separator that is the *same character* as your locale's decimal mark (a period, in a region where the decimal mark is also a period), then a displayed decimal such as `1.234.56` cannot be typed back in unambiguously. The app rejects that rather than guessing, and Settings warns you when you make that combination.
 
+### Updates
+
+The **Updates** card checks whether a newer version of the app has been published.
+
+**Check for updates** asks the project's GitHub release page for the newest published release and compares its version with the one that is installed. The card then says which of the two is newer, and nothing is downloaded until you ask for it.
+
+If a newer version is available, **Download the update** fetches it inside the app. The progress is shown, and the file is only kept when the download is complete. When it has arrived, **Install the update** hands the file to Android's own installer, which asks you to confirm. The app never installs anything by itself.
+
+The file is checked before it is offered: when the release publishes a digest, the download is checked against it, and the package name, the version code and the signing certificate have to match the app that is installed. A file that does not match is refused, and the card says why.
+
+The first time, the phone asks whether this app may install packages; that is Android's own question, and the answer is yours.
+
+### About
+
+**About Calc Suite** shows the version that is installed, the newest published release with the day it was published, and the notes of that release under **What's new**.
+
+The notes are read from the release itself, so they always say what the release says. With no connection, the notes of the last release that was read on the device are shown instead, and the dialog says that this is what they are.
+
+**Release page** opens the release on GitHub in the browser of the phone.
+
 ### History
 
 Shows how many calculations are saved, with a **Clear all history** button and a confirmation dialog.

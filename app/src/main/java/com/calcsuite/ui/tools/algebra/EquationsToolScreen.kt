@@ -19,16 +19,19 @@ import com.calcsuite.core.Num
 import com.calcsuite.engine.algebra.EquationEngine
 import com.calcsuite.engine.algebra.EquationKind
 import com.calcsuite.engine.algebra.QuadraticRoute
-import com.calcsuite.engine.algebra.SystemKind
+import com.calcsuite.engine.algebra.SystemMethod
+import com.calcsuite.engine.algebra.SystemSolver
 import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.ExpandablePanel
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.NumberField
+import com.calcsuite.ui.components.Option
 import com.calcsuite.ui.components.PlainField
 import com.calcsuite.ui.components.ResultCard
 import com.calcsuite.ui.components.ResultRow
 import com.calcsuite.ui.components.SegmentedChoice
+import com.calcsuite.ui.components.SelectField
 import com.calcsuite.ui.components.StepsCard
 import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.components.rememberCopyAction
@@ -105,8 +108,8 @@ private fun equationMethod(mode: EquationMode): String = when (mode) {
             "discriminant is worked out, and the roots are found from it. When " +
             "the discriminant is negative the roots are given as complex numbers."
     EquationMode.System ->
-        "The two equations are solved together by Cramer's rule, with exact " +
-            "fractions throughout."
+        "The two equations are solved together by the chosen method, with exact " +
+            "fractions throughout. Each method shows the working that it does."
 }
 
 /** What the answer means. */
@@ -136,6 +139,24 @@ private fun equationLimitations(mode: EquationMode): String = when (mode) {
     EquationMode.System ->
         "Two equations in two unknowns, both linear. Three equations, or a " +
             "quadratic system, are not read."
+}
+
+/**
+ * A number as the solver reads it: no thousands separator and no exponent.
+ */
+private fun plainNumber(value: BigDecimal): String = value.stripTrailingZeros().toPlainString()
+
+/** The formula of the method that solved the system. */
+private fun systemFormula(method: SystemMethod): String = when (method) {
+    SystemMethod.Automatic -> "A method is chosen for the equations that were entered"
+    SystemMethod.Cramer ->
+        "D = a₁b₂ − a₂b₁ ;  x = (c₁b₂ − c₂b₁) ÷ D ;  y = (a₁c₂ − a₂c₁) ÷ D"
+    SystemMethod.Substitution ->
+        "One equation is rearranged and put into the other, leaving one equation in one unknown"
+    SystemMethod.Elimination ->
+        "The equations are combined so that one variable cancels out"
+    SystemMethod.Comparison ->
+        "Both equations are written with the same variable on its own, and equated"
 }
 
 private data class EquationOutcome(
@@ -183,6 +204,11 @@ fun EquationsToolScreen(args: ToolArgs) {
     var a2 by rememberSaveable { mutableStateOf(args.prefill("a2") ?: "1") }
     var b2 by rememberSaveable { mutableStateOf(args.prefill("b2") ?: "-1") }
     var c2 by rememberSaveable { mutableStateOf(args.prefill("c2") ?: "1") }
+    // The way the system is solved. The choice is kept with the rest of the
+    // problem, so that a saved calculation is solved the same way again.
+    var systemMethod by rememberSaveable {
+        mutableStateOf(args.prefill("systemMethod") ?: SystemMethod.Automatic.name)
+    }
 
     fun num(v: BigDecimal) = fmt.num(v, precision = maxOf(fmt.precision, 10))
 
@@ -317,45 +343,53 @@ fun EquationsToolScreen(args: ToolArgs) {
                         explanation = "Each equation is written as a·x + b·y = c.",
                     )
                 } else {
-                    val solved = EquationEngine.solveSystem2(
-                        values[0]!!, values[1]!!, values[2]!!,
-                        values[3]!!, values[4]!!, values[5]!!,
-                    )
+                    // The equations are written out as they were entered, so
+                    // that the solver reads the same system the screen shows.
+                    val first = "${plainNumber(values[0]!!)}x + ${plainNumber(values[1]!!)}y = " +
+                        plainNumber(values[2]!!)
+                    val second = "${plainNumber(values[3]!!)}x + ${plainNumber(values[4]!!)}y = " +
+                        plainNumber(values[5]!!)
+                    val solved = SystemSolver.solve(first, second, SystemMethod.valueOf(systemMethod))
                     when (solved) {
                         is CalcResult.Err -> EquationOutcome(
                             "2 × 2 system",
                             error = solved.error.message,
-                            formula = "D = a₁b₂ − a₂b₁",
-                            explanation = "Cramer's rule solves the system when the determinant is not zero.",
+                            formula = systemFormula(SystemMethod.valueOf(systemMethod)),
+                            explanation = "Each equation is written as a·x + b·y = c.",
                         )
                         is CalcResult.Ok -> {
                             val result = solved.value
                             EquationOutcome(
                                 label = "2 × 2 system",
-                                value = when (result.kind) {
-                                    SystemKind.Unique -> if (result.x != null && result.y != null) {
-                                        "x = ${num(result.x)}, y = ${num(result.y)}"
-                                    } else {
-                                        "One solution"
-                                    }
-                                    SystemKind.Infinite -> "Infinitely many solutions"
-                                    SystemKind.Inconsistent -> "No solution"
-                                },
-                                copyValue = if (result.x != null && result.y != null) {
-                                    "x = ${Num.formatForCopy(result.x)}, y = ${Num.formatForCopy(result.y)}"
-                                } else {
+                                value = if (result.solutions.isEmpty()) {
                                     result.message
+                                } else {
+                                    result.solutions.joinToString("; ") { (x, y) ->
+                                        "x = ${num(x)}, y = ${num(y)}"
+                                    }
+                                },
+                                copyValue = if (result.solutions.isEmpty()) {
+                                    result.message
+                                } else {
+                                    result.solutions.joinToString("; ") { (x, y) ->
+                                        "x = ${Num.formatForCopy(x)}, y = ${Num.formatForCopy(y)}"
+                                    }
                                 },
                                 caption = result.message,
                                 rows = buildList {
-                                    add("Determinant D" to num(result.determinant))
-                                    result.x?.let { add("x" to num(it)) }
-                                    result.y?.let { add("y" to num(it)) }
+                                    add("Method" to result.method.label)
+                                    result.solutions.forEachIndexed { index, (x, y) ->
+                                        add("Solution ${index + 1}" to "x = ${num(x)}, y = ${num(y)}")
+                                    }
                                 },
                                 steps = result.steps,
-                                verification = result.verification,
-                                formula = "D = a₁b₂ − a₂b₁ ;  x = (c₁b₂ − c₂b₁) ÷ D ;  y = (a₁c₂ − a₂c₁) ÷ D",
-                                explanation = "A non-zero determinant means the lines cross once; zero means they are parallel or identical.",
+                                verification = result.verification.joinToString("\n"),
+                                notes = result.notes + (
+                                    "The methods that apply to this system: " +
+                                        result.available.joinToString(", ") { it.label }
+                                    ),
+                                formula = systemFormula(result.method),
+                                explanation = result.method.description,
                             )
                         }
                     }
@@ -376,6 +410,7 @@ fun EquationsToolScreen(args: ToolArgs) {
                 quadraticEquation = "x^2 - 3x + 2 = 0"
                 variable = "x"
                 a1 = "2"; b1 = "3"; c1 = "12"; a2 = "1"; b2 = "-1"; c2 = "1"
+                systemMethod = SystemMethod.Automatic.name
             }) { Text("Reset") }
         },
     ) {
@@ -445,6 +480,13 @@ fun EquationsToolScreen(args: ToolArgs) {
                         error = if (Num.parseOrNull(value) == null) "Enter a valid number" else null,
                     )
                 }
+                SelectField(
+                    label = "Method",
+                    options = SystemMethod.entries.map { Option(it, it.label) },
+                    selected = SystemMethod.valueOf(systemMethod),
+                    onSelect = { systemMethod = it.name },
+                )
+                InfoNote(SystemMethod.valueOf(systemMethod).description)
             }
         }
 
@@ -476,6 +518,7 @@ fun EquationsToolScreen(args: ToolArgs) {
                             "a2" to a2,
                             "b2" to b2,
                             "c2" to c2,
+                            "systemMethod" to systemMethod,
                         ),
                     )
                 }

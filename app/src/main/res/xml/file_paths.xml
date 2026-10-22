@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app's own cache, where the camera writes the photograph. -->
 <paths>
+    <!-- The camera writes the photograph here. -->
     <cache-path
         name="ai"
         path="ai/" />
+    <!-- The updater writes the downloaded release here, so that the installer
+         of Android can read it without any path of the phone being exposed. -->
+    <cache-path
+        name="updates"
+        path="updates/" />
 </paths>

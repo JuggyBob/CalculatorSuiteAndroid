@@ -39,6 +39,7 @@ import com.calcsuite.ai.AiImage
 import com.calcsuite.ai.tool.AiInterpretationStatus
 import com.calcsuite.ai.tool.AiToolInput
 import com.calcsuite.ai.tool.AiToolRegistry
+import com.calcsuite.data.ToolDestinations
 import com.calcsuite.ui.components.ActionButton
 import com.calcsuite.ui.components.ActionRow
 import com.calcsuite.ui.components.ErrorNotice
@@ -238,6 +239,7 @@ fun AiSolveScreen(
                     StepsCard(
                         steps = outcome.steps,
                         title = "Step by step",
+                        nested = true,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
                 }
@@ -247,6 +249,7 @@ fun AiSolveScreen(
                     approx = outcome.approximate,
                     caption = outcome.method.ifBlank { null },
                     onCopy = { onCopy(outcome.headline) },
+                    nested = true,
                 )
                 if (outcome.expression.isNotBlank() &&
                     outcome.expression != state.confirmed?.arguments?.values?.firstOrNull()
@@ -279,15 +282,25 @@ fun AiSolveScreen(
                         modifier = Modifier.weight(1f),
                     )
                 }
+                // The tool the answer can be opened in. The identifier the
+                // AI gave is resolved to a tool that really exists, and
+                // the action is only offered when there is one.
                 val confirmed = state.confirmed
-                if (confirmed != null) {
+                val destination = confirmed?.let {
+                    ToolDestinations.forAiTool(it.toolId, it.arguments)
+                }
+                if (confirmed != null && destination != null) {
                     ActionButton(
                         text = "Open in the calculator",
-                        onClick = { onOpenTool(confirmed.toolId, confirmed.arguments) },
+                        onClick = { onOpenTool(destination.toolId, destination.values) },
                         icon = Icons.Filled.OpenInNew,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp),
+                    )
+                } else if (confirmed != null) {
+                    InfoNote(
+                        "There is no tool in this version that can open this answer.",
                     )
                 }
             }
