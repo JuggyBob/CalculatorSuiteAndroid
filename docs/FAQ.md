@@ -19,8 +19,8 @@ Because the APK is not from the Play Store, Android shows a "blocked by Play Pro
 Each release includes a `.sha256` file.
 
 ```bash
-sha256sum CalculatorSuite-v3.0.2.apk
-# compare the output with the contents of CalculatorSuite-v3.0.2.apk.sha256
+sha256sum CalculatorSuite-v3.0.3.apk
+# compare the output with the contents of CalculatorSuite-v3.0.3.apk.sha256
 ```
 
 The APK is signed with a release key, so Android also verifies its integrity during installation.

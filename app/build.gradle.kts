@@ -13,11 +13,11 @@ android {
         minSdk = 26
         targetSdk = 36
         // The version code is raised for every published build, so that the
-        // new one installs over the old one: 3.0.1 carries 5, above the 4
-        // of 3.0.0, the 3 of the republished 2.0.0 and the 2 of the first
-        // 2.0.0.
-        versionCode = 6
-        versionName = "3.0.2"
+        // new one installs over the old one: 3.0.3 carries 7, above the 6
+        // of 3.0.2, the 5 of 3.0.1, the 4 of 3.0.0, the 3 of the
+        // republished 2.0.0 and the 2 of the first 2.0.0.
+        versionCode = 7
+        versionName = "3.0.3"
     }
 
     // The release key is held outside the repository. Its location and its

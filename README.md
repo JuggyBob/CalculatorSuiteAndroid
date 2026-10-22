@@ -64,15 +64,15 @@ Download the signed APK from the
 
 ```bash
 # Verify the download before installing
-sha256sum -c CalculatorSuite-v3.0.2.apk.sha256
+sha256sum -c CalculatorSuite-v3.0.3.apk.sha256
 
 # Install over USB
-adb install CalculatorSuite-v3.0.2.apk
+adb install CalculatorSuite-v3.0.3.apk
 ```
 
 **Requirements:** any phone or tablet running Android 8.0 (API 26) or newer, arm64-v8a or x86_64. It is a single APK, about 14 MB, with nothing to sign up for. You will need to allow installation from your file manager the first time.
 
-The 3.0.1 APK is signed with the same key as 3.0.0, 2.0.0 and 1.0.0, so it installs straight over the older version with your settings and history intact.
+The 3.0.3 APK is signed with the same key as 3.0.2, 3.0.1, 3.0.0, 2.0.0 and 1.0.0, so it installs straight over the older version with your settings and history intact.
 
 ## Usage
 

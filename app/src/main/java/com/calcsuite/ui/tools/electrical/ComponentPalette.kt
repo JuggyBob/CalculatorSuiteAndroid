@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -97,7 +97,10 @@ private fun PaletteItem(
     Column(
         Modifier
             .width(80.dp)
-            .height(96.dp)
+            // The card holds a symbol and one line of text, so it is as tall
+            // as that needs and no taller: a fixed height left a band of
+            // empty space under the name of every part.
+            .heightIn(min = 56.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .onGloballyPositioned { root.value = it.positionInRoot() }

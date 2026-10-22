@@ -6,6 +6,23 @@ This project uses a plain, human-written changelog. **Version 1.0.0 was the firs
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for the version number.
 
+## [3.0.3] — 2026-10-22
+
+A small release that makes the palette of parts shorter: **the card of each part is now as tall as the symbol and the name need**, instead of standing a band of empty space below the name. `versionName = 3.0.3`, `versionCode = 7`, `minSdk 26`, `targetSdk 36`.
+
+This release upgrades over 3.0.2 in place: the signing key is unchanged, so the app installs straight over the old one with your settings and history intact.
+
+### Fixed
+
+- **The part cards in the palette are shorter.** Every card holds a symbol and one line of text, but the cards were given a fixed height, so an empty band sat under the name of every part and the palette was a third taller than it needed to be. Each card is now as tall as its content, and all five are the same height.
+
+### Verification
+
+- 1464 JVM unit tests, 0 failures.
+- Android Lint: 0 errors, and no new warnings.
+- `assembleDebug` and the signed release build both succeed.
+- On a device: the palette of the Electrical Circuits tool was opened and the five part cards were checked to be of one height, with the name sitting at the bottom of the card and no empty space under it.
+
 ## [3.0.2] — 2026-10-22
 
 A release that lets the app keep itself up to date: **the app can now look for a newer version, download it and hand it to Android's installer**, and **a new About screen shows what changed in the newest release**. It also adds **resistor networks of any size**, **a method selector for systems of equations**, and it fixes the way the circuit canvas zooms and the way a wire finds its terminal. `versionName = 3.0.2`, `versionCode = 6`, `minSdk 26`, `targetSdk 36`.
@@ -395,6 +412,7 @@ Documented in full in [ROADMAP.md](ROADMAP.md) and [docs/CALCULUS_GUIDE.md](docs
 - `assembleDebug` and the signed release build both succeed.
 - On-device checks covering onboarding (first launch, navigation, skip, finish, restart persistence), the separator setting (all five styles, live update, persistence), portrait lock across 13 destinations, light and dark themes, and 14 assertions on the two calculus fixes.
 
+[3.0.3]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.3
 [3.0.2]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.2
 [3.0.1]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.1
 [3.0.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.0
