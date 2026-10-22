@@ -56,8 +56,7 @@ class ApkInstaller(private val context: Context) {
 
     /** The package, version name and version code of the installed app. */
     fun installed(): InstalledApp {
-        val manager = context.packageManager
-        val info = manager.getPackageInfo(context.packageName, 0)
+        val info = installedInfo()
         return InstalledApp(
             packageName = info.packageName,
             versionName = info.versionName ?: "",
@@ -103,16 +102,8 @@ class ApkInstaller(private val context: Context) {
     @SuppressLint("InlinedApi")
     fun check(file: File): InstallCheck {
         val manager = context.packageManager
-        // The flag that asks for the signature only exists from Android 9; on
-        // the older systems the older flag is used instead.
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            @Suppress("DEPRECATION")
-            PackageManager.GET_SIGNATURES
-        }
         val info = try {
-            manager.getPackageArchiveInfo(file.absolutePath, flags)
+            manager.getPackageArchiveInfo(file.absolutePath, signingFlags())
         } catch (e: Exception) {
             null
         } ?: return InstallCheck.Unreadable("The downloaded package could not be read.")
@@ -136,7 +127,23 @@ class ApkInstaller(private val context: Context) {
         return InstallCheck.Valid
     }
 
-    private fun installedInfo(): PackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+    private fun installedInfo(): PackageInfo =
+        context.packageManager.getPackageInfo(context.packageName, signingFlags())
+
+    /**
+     * The flag that asks the package manager for the signature of a package.
+     *
+     * The flag that asks for the signing certificate only exists from Android
+     * 9; on the older systems the older flag is used instead.
+     */
+    @SuppressLint("InlinedApi")
+    private fun signingFlags(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            @Suppress("DEPRECATION")
+            PackageManager.GET_SIGNATURES
+        }
 
     private fun versionCodeOf(info: PackageInfo): Long =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
