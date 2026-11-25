@@ -17,6 +17,7 @@ import com.calcsuite.engine.algebra.ProportionEngine
 import com.calcsuite.engine.algebra.ProportionMode
 import com.calcsuite.engine.algebra.ProportionSlot
 import com.calcsuite.engine.algebra.ProportionSolution
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.NumberField
@@ -204,6 +205,15 @@ fun ProportionToolScreen(args: ToolArgs) {
             } else {
                 "The value you solve for must not be divided by zero: the partner in its product must not be zero."
             },
+        )
+
+        ExplanationCards(
+            AlgebraExplanationsBasic.proportionExplanation(
+                mode = mode,
+                steps = solved?.steps,
+                verification = solved?.verification,
+                unknown = unknown,
+            ),
         )
     }
 }

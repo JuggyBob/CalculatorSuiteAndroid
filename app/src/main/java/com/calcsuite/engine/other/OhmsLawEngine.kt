@@ -50,6 +50,7 @@ object OhmsLawEngine {
 
     private val CTX = MathContext(34, RoundingMode.HALF_UP)
     private val REL_TOL = BigDecimal("1e-6")
+    private val TWO = BigDecimal(2)
 
     private val ASSUMPTIONS = listOf(
         "Ideal DC circuit: Ohm's law (V = I·R) and the power law (P = V·I) describe the whole circuit.",
@@ -297,7 +298,31 @@ object OhmsLawEngine {
 
     private fun sqrt(value: BigDecimal): BigDecimal {
         if (value.signum() == 0) return BigDecimal.ZERO
-        return BigDecimal.valueOf(Math.sqrt(value.toDouble()))
+        var x = initialGuess(value)
+        repeat(64) {
+            val next = x.add(value.divide(x, CTX), CTX).divide(TWO, CTX)
+            if (next.compareTo(x) == 0) return next
+            x = next
+        }
+        return x
+    }
+
+    /**
+     * A positive starting point for the Newton iteration. Going through a
+     * Double is only a hint: for very large or very small magnitudes it
+     * overflows to Infinity or underflows to 0.0, so fall back to an
+     * order-of-magnitude estimate derived from the decimal exponent.
+     */
+    private fun initialGuess(value: BigDecimal): BigDecimal {
+        val estimate = value.toDouble()
+        if (estimate.isFinite() && estimate > 0.0) {
+            return BigDecimal.valueOf(Math.sqrt(estimate))
+        }
+        // value is in [10^(e-1), 10^e) where e = precision - scale.
+        val e = value.precision().toLong() - value.scale().toLong()
+        var power = e / 2
+        if (e > 0 && e % 2 != 0L) power += 1
+        return BigDecimal.ONE.scaleByPowerOfTen(power.toInt())
     }
 
     private fun plain(value: BigDecimal): String = value.stripTrailingZeros().toPlainString()

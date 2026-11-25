@@ -124,6 +124,12 @@ object BodyFatEngine {
             }
         }
 
+        // The regressions use Double maths; an out-of-range measurement can
+        // overflow to +/-Infinity or produce NaN, which BigDecimal.valueOf
+        // rejects with an exception. Report it as a domain error instead.
+        if (!raw.isFinite()) {
+            return err(ErrorKind.Domain, "Measurements are outside the supported range")
+        }
         val rawValue = BigDecimal.valueOf(raw)
         val clamped = rawValue < MIN_RELIABLE_PERCENT
         val percent = (if (clamped) MIN_RELIABLE_PERCENT else rawValue).setScale(1, RoundingMode.HALF_UP)

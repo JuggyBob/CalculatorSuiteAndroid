@@ -5,6 +5,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
+import java.math.MathContext
+import java.math.RoundingMode
 
 private fun assertExact(expected: String, actual: BigDecimal) {
     assertEquals("expected $expected but was $actual", 0, actual.compareTo(BigDecimal(expected)))
@@ -38,7 +40,17 @@ class PowerFamilyTest {
 
     @Test
     fun btuPerHourIsTheInternationalTableValue() {
-        assertExact("0.29307107017222", PowerFamily.convert(BigDecimal.ONE, "BTU_h", "W").valueOrNull()!!)
+        assertExact("0.2930710701722222222222222222222222", PowerFamily.convert(BigDecimal.ONE, "BTU_h", "W").valueOrNull()!!)
+    }
+
+    @Test
+    fun btuPerHourKeepsFullWorkingPrecision() {
+        val result = PowerFamily.convert(BigDecimal.ONE, "BTU_h", "W").valueOrNull()!!
+        assertExact(
+            BigDecimal("1055.05585262").divide(BigDecimal("3600"), UnitFamily.CTX).toPlainString(),
+            result,
+        )
+        assertExact("0.293071070172222", result.round(MathContext(15, RoundingMode.HALF_UP)))
     }
 
     @Test

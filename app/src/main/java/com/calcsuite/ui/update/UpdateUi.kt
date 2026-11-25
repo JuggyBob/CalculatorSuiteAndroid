@@ -152,6 +152,9 @@ fun AboutDialog(
     onInstall: () -> Unit,
     onOpenReleasePage: (String) -> Unit,
     onDismiss: () -> Unit,
+    onNeverShowAgain: (() -> Unit)? = null,
+    /** The primary action when a newer release can be downloaded. */
+    downloadLabel: String = "Download",
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -238,11 +241,22 @@ fun AboutDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // The release page lives in the scrollable body rather than in
+                // the button row: that leaves the fixed-height button slot with
+                // only the two short actions, which always fit on one line.
+                if (release != null && release.htmlUrl.isNotEmpty()) {
+                    TextButton(
+                        onClick = { onOpenReleasePage(release.htmlUrl) },
+                        modifier = Modifier.align(Alignment.End),
+                    ) {
+                        Text("Release page", maxLines = 1, softWrap = false)
+                    }
+                }
             }
         },
         confirmButton = {
             when (state) {
-                is UpdateUiState.Available -> ActionButton("Download", onClick = onDownload)
+                is UpdateUiState.Available -> ActionButton(downloadLabel, onClick = onDownload)
                 is UpdateUiState.Downloading -> ActionButton("Cancel", onClick = onCancel)
                 is UpdateUiState.Ready -> ActionButton("Install", onClick = onInstall)
                 is UpdateUiState.UpToDate -> Unit
@@ -250,13 +264,18 @@ fun AboutDialog(
             }
         },
         dismissButton = {
+            // One row, two short actions only. Material measures this slot as a
+            // single button-height row; a second line here is what got clipped
+            // at the bottom of the dialog on narrow phones.
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (release != null && release.htmlUrl.isNotEmpty()) {
-                    TextButton(onClick = { onOpenReleasePage(release.htmlUrl) }) {
-                        Text("Release page")
+                if (onNeverShowAgain != null) {
+                    TextButton(onClick = onNeverShowAgain) {
+                        Text("Never show again", maxLines = 1, softWrap = false)
                     }
                 }
-                TextButton(onClick = onDismiss) { Text("Close") }
+                TextButton(onClick = onDismiss) {
+                    Text("Close", maxLines = 1, softWrap = false)
+                }
             }
         },
     )

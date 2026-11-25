@@ -1,6 +1,7 @@
 package com.calcsuite.engine.health
 
 import com.calcsuite.core.CalcResult
+import com.calcsuite.core.ErrorKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -179,5 +180,42 @@ class BodyFatEngineTest {
         assertEquals(4, result.limitations.size)
         assertTrue(result.limitations.any { it.contains("±3–4 percentage points") })
         assertTrue(result.notes.any { it.contains("inches") })
+    }
+
+    @Test
+    fun outOfRangeHeightReturnsDomainErrorInsteadOfThrowing() {
+        val result = BodyFatEngine.estimate(
+            BodyFatInput(FormulaVariant.MALE, BigDecimal("1e309"), BigDecimal("38"), BigDecimal("90")),
+        )
+        assertTrue("Expected failure, was $result", result is CalcResult.Err)
+        val err = result as CalcResult.Err
+        assertEquals(ErrorKind.Domain, err.error.kind)
+        assertEquals("Measurements are outside the supported range", err.error.message)
+    }
+
+    @Test
+    fun overflowingCircumferencesGiveNaNRegressionAndAreRejected() {
+        // Both circumferences overflow to Double Infinity, so their difference
+        // is NaN; the engine must not turn that into an exception or a result.
+        val result = BodyFatEngine.estimate(
+            BodyFatInput(FormulaVariant.MALE, BigDecimal("180"), BigDecimal("1e309"), BigDecimal("2e309")),
+        )
+        assertTrue("Expected failure, was $result", result is CalcResult.Err)
+        assertEquals(ErrorKind.Domain, (result as CalcResult.Err).error.kind)
+    }
+
+    @Test
+    fun outOfRangeFemaleHeightsAreRejectedToo() {
+        val result = BodyFatEngine.estimate(
+            BodyFatInput(
+                variant = FormulaVariant.FEMALE,
+                heightCm = BigDecimal("1e309"),
+                neckCm = BigDecimal("33"),
+                waistCm = BigDecimal("72"),
+                hipCm = BigDecimal("96"),
+            ),
+        )
+        assertTrue("Expected failure, was $result", result is CalcResult.Err)
+        assertEquals("Measurements are outside the supported range", error(result))
     }
 }

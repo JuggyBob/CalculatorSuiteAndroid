@@ -46,6 +46,32 @@ object CombinatoricsEngine {
     /** Iteration guard: min(r, n − r) and r may not exceed this. */
     const val MAX_ITERATIONS = 1_000_000
 
+    /** Largest exact result accepted, in decimal digits, before printing it. */
+    const val MAX_RESULT_DIGITS = 10_000
+
+    /** Largest r whose factorial is expanded in the displayed working. */
+    private const val MAX_FACTORIAL_DISPLAY = 20
+
+    private const val LOG10_2 = 0.3010299956639812
+    private const val DIGIT_MARGIN = 64.0
+
+    /**
+     * log10 of a BigInteger of any size, without rendering it as a decimal
+     * string. Shifting off the top 53 bits keeps the estimate accurate even
+     * when [value] is far too large for [BigInteger.toDouble].
+     */
+    private fun log10Approx(value: BigInteger): Double {
+        val bits = value.bitLength()
+        if (bits == 0) return 0.0
+        if (bits <= 1000) return Math.log10(value.toDouble())
+        val shift = bits - 53
+        return Math.log10(value.shiftRight(shift).toDouble()) + shift * LOG10_2
+    }
+
+    /** Rejects a running result whose estimated size has passed the cap. */
+    private fun tooManyDigits(log10: Double): Boolean =
+        log10 + DIGIT_MARGIN > MAX_RESULT_DIGITS.toDouble()
+
     val CONCEPT_NOTE =
         "Combinations C(n, r) count selections where the order does not matter; " +
             "permutations P(n, r) = C(n, r) × r! count arrangements where the order does matter."
@@ -63,9 +89,18 @@ object CombinatoricsEngine {
         }
         var result = ONE
         var index = ONE
+        var log10 = 0.0
         val offset = n.subtract(k)
         while (index <= k) {
-            result = result.multiply(offset.add(index)).divide(index)
+            val numerator = offset.add(index)
+            log10 += log10Approx(numerator) - log10Approx(index)
+            if (tooManyDigits(log10)) {
+                return err(
+                    ErrorKind.Unavailable,
+                    "The exact selection has more than $MAX_RESULT_DIGITS digits, so it cannot be shown here",
+                )
+            }
+            result = result.multiply(numerator).divide(index)
             index = index.add(ONE)
         }
         return ok(result)
@@ -79,8 +114,17 @@ object CombinatoricsEngine {
         }
         var result = ONE
         var index = ZERO
+        var log10 = 0.0
         while (index < r) {
-            result = result.multiply(n.subtract(index))
+            val factor = n.subtract(index)
+            log10 += log10Approx(factor)
+            if (tooManyDigits(log10)) {
+                return err(
+                    ErrorKind.Unavailable,
+                    "The exact arrangement has more than $MAX_RESULT_DIGITS digits, so it cannot be shown here",
+                )
+            }
+            result = result.multiply(factor)
             index = index.add(ONE)
         }
         return ok(result)
@@ -184,19 +228,37 @@ object CombinatoricsEngine {
         return if (r > BigInteger.valueOf(count.toLong())) "$body × …" else body
     }
 
-    /** Exact product of the numerator factors, without printing every factor. */
-    private fun plainFactorProduct(n: BigInteger, r: BigInteger, descending: Boolean): BigInteger {
+    /**
+     * Product of the numerator factors for the displayed working, as text.
+     *
+     * The exact value is computed separately by [nCr]/[nPr] using
+     * `min(r, n − r)`; this helper only illustrates the formula. It therefore
+     * materialises at most [enumerateFactorCount] factors (the same number the
+     * formula shows) and abbreviates the rest, so a large `r` such as
+     * C(10^12, 10^12 − 1) cannot turn a one-step calculation into a hang.
+     */
+    private fun plainFactorProduct(n: BigInteger, r: BigInteger, descending: Boolean): String {
+        val count = enumerateFactorCount(r)
         var result = ONE
         var index = ZERO
-        while (index < r) {
+        while (index < BigInteger.valueOf(count.toLong())) {
             val value = if (descending) n.subtract(index) else n.subtract(r).add(ONE).add(index)
             result = result.multiply(value)
             index = index.add(ONE)
         }
-        return result
+        return if (r > BigInteger.valueOf(count.toLong())) "$result × …" else result.toString()
     }
 
+    /**
+     * r! as shown in the working. Only small factorials are expanded: building
+     * 100 000! just to print it would cost hundreds of thousands of growing
+     * multiplications and a ~456 000-digit string, long after the answer was
+     * known. Larger factorials stay symbolic.
+     */
     private fun factorialValueText(r: BigInteger): String {
+        if (r > BigInteger.valueOf(MAX_FACTORIAL_DISPLAY.toLong())) {
+            return "$r! (not expanded)"
+        }
         val factorial = factorial(r)
         return when (factorial) {
             is CalcResult.Ok -> factorial.value.toString()

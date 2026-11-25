@@ -1,6 +1,8 @@
 package com.calcsuite.engine.advanced
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.calcsuite.ui.tools.calculus.fieldArgbPixels
 import com.calcsuite.ui.tools.calculus.fieldScale
 import com.calcsuite.ui.theme.fromHsl
 import com.calcsuite.ui.theme.toHsl
@@ -195,5 +197,69 @@ class PdeFieldTest {
             assertEquals("the green of $colour", colour.green, back.green, 0.01f)
             assertEquals("the blue of $colour", colour.blue, back.blue, 0.01f)
         }
+    }
+
+    private val bitmapScale = Triple(
+        Color(0xFF000000),
+        Color(0xFF808080),
+        Color(0xFFFFFFFF),
+    )
+
+    @Test fun theBitmapUsesTheSameColoursAtTheSamePlacesOnTheScale() {
+        // Three columns with values 0, 0.5 and 1 give exactly the three
+        // colours of the scale: the colour maths must not have changed when
+        // the rectangles became pixels.
+        val pixels = fieldArgbPixels(
+            rows = 1,
+            columns = 3,
+            value = { _, column -> column * 0.5 },
+            pixelWidth = 3,
+            pixelHeight = 1,
+            scale = bitmapScale,
+        )
+        assertEquals(3, pixels.size)
+        assertEquals("the low end", bitmapScale.first.toArgb(), pixels[0])
+        assertEquals("the middle", bitmapScale.second.toArgb(), pixels[1])
+        assertEquals("the high end", bitmapScale.third.toArgb(), pixels[2])
+    }
+
+    @Test fun theBitmapKeepsRowZeroAtTheBottom() {
+        // Row 0 of a field is drawn at the bottom, exactly as the rectangles
+        // were: the first pixel row is field row rows - 1.
+        val pixels = fieldArgbPixels(
+            rows = 2,
+            columns = 3,
+            value = { row, _ -> if (row == 0) 0.0 else 1.0 },
+            pixelWidth = 3,
+            pixelHeight = 2,
+            scale = bitmapScale,
+        )
+        assertEquals(6, pixels.size)
+        assertEquals("the top-left pixel", bitmapScale.third.toArgb(), pixels[0])
+        assertEquals("the top-right pixel", bitmapScale.third.toArgb(), pixels[2])
+        assertEquals("the bottom-left pixel", bitmapScale.first.toArgb(), pixels[3])
+        assertEquals("the bottom-right pixel", bitmapScale.first.toArgb(), pixels[5])
+    }
+
+    @Test fun theBitmapIsSampledAtMostAtPixelResolution() {
+        // A large field sampled into a small canvas makes one pixel per
+        // canvas pixel, taking the cell nearest each pixel's centre: the
+        // top-left pixel of a 7 by 5 sample reads row 360, column 28.
+        val pixels = fieldArgbPixels(
+            rows = 400,
+            columns = 400,
+            value = { row, column -> (row * 400 + column).toDouble() },
+            pixelWidth = 7,
+            pixelHeight = 5,
+            scale = bitmapScale,
+        )
+        assertEquals(35, pixels.size)
+        val topLeft = Color(pixels[0])
+        val bottomRight = Color(pixels[34])
+        assertTrue(
+            "the top of the picture must be the high end of the field",
+            topLeft.red > bottomRight.red + 0.3f,
+        )
+        assertTrue("the sampled colour must be opaque", topLeft.alpha == 1f)
     }
 }

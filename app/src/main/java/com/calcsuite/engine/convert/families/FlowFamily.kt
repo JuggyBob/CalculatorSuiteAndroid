@@ -70,6 +70,7 @@ object FlowTimeEngine {
         val flowUnit = FlowFamily.unit(flowUnitId)
             ?: return err(ErrorKind.InvalidInput, "Unknown flow unit")
         if (seconds.signum() < 0) return err(ErrorKind.Domain, "Time must not be negative")
+        if (flowRate.signum() < 0) return err(ErrorKind.Domain, "Flow rate must not be negative")
         val targetVolumeUnit = volumeUnitFor(flowUnitId)
             ?: return err(ErrorKind.InvalidInput, "Unknown flow unit")
         val cubicMetres = flowRate.multiply(flowUnit.factor, CTX).multiply(seconds, CTX)

@@ -20,6 +20,9 @@ internal sealed interface Token {
 }
 
 internal object Lexer {
+    /** Same limit as `Num.parseOrNull`; exponents beyond it cannot be represented. */
+    const val MAX_EXPONENT = 10_000
+
     fun tokenize(input: String): List<Token> {
         val tokens = ArrayList<Token>()
         var i = 0
@@ -43,7 +46,19 @@ internal object Lexer {
                         var j = i + 1
                         if (j < n && (input[j] == '+' || input[j] == '-')) j++
                         if (j < n && input[j].isDigit()) {
-                            while (j < n && input[j].isDigit()) j++
+                            // Accumulate in a Long and reject as soon as the
+                            // magnitude passes the limit. This also stops a
+                            // very long run of digits from ever reaching
+                            // BigDecimal, where it would allocate unbounded
+                            // memory. Leading zeroes are fine.
+                            var magnitude = 0L
+                            while (j < n && input[j].isDigit()) {
+                                magnitude = magnitude * 10L + (input[j] - '0')
+                                if (magnitude > MAX_EXPONENT) {
+                                    throw ExprParseException("Exponent is too large (limit ±$MAX_EXPONENT)")
+                                }
+                                j++
+                            }
                             tokens.add(Token.Num(input.substring(start, j)))
                             i = j
                             continue
@@ -87,9 +102,30 @@ internal object Lexer {
 
 class ExprParseException(message: String) : Exception(message)
 
+/** Maximum nesting accepted by the recursive-descent parser. */
+internal const val MAX_PARSE_DEPTH = 256
+
 internal class ExpressionParser(input: String) {
     private val tokens: List<Token> = Lexer.tokenize(input)
     private var pos = 0
+
+    /**
+     * Recursive descent needs one stack frame per unary operator, bracket level
+     * and function argument. Without a limit a few thousand characters turn a
+     * harmless typo into a [StackOverflowError] that no `catch (Exception)`
+     * can see. 256 is far beyond anything a calculator expression needs.
+     */
+    private var depth = 0
+
+    private inline fun <T> withinDepth(block: () -> T): T {
+        if (depth >= MAX_PARSE_DEPTH) throw ExprParseException("Expression nesting is too deep")
+        depth++
+        return try {
+            block()
+        } finally {
+            depth--
+        }
+    }
 
     private fun peek(): Token = tokens[pos]
     private fun next(): Token = tokens[pos++]
@@ -149,8 +185,13 @@ internal class ExpressionParser(input: String) {
     private fun startsPrimary(t: Token): Boolean =
         t is Token.Num || t is Token.Ident || t == Token.LParen
 
-    private fun parseUnary(): Expr {
-        return when (peek()) {
+    /**
+     * Every recursive step in the grammar passes through here: unary chains,
+     * brackets and function arguments all re-enter at [parseUnary], so one
+     * guard covers the whole tree.
+     */
+    private fun parseUnary(): Expr = withinDepth {
+        when (peek()) {
             Token.Minus -> { pos++; Expr.Unary(UnOp.Neg, parseUnary()) }
             Token.Plus -> { pos++; Expr.Unary(UnOp.Pos, parseUnary()) }
             else -> parsePower()

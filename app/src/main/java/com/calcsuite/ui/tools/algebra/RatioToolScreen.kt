@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.calcsuite.core.CalcResult
 import com.calcsuite.core.Num
 import com.calcsuite.engine.algebra.RatioEngine
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.NumberField
@@ -420,6 +421,14 @@ fun RatioToolScreen(args: ToolArgs) {
         if (mode == RatioMode.Compare) {
             InfoNote("Ratios are compared as fractions (a ÷ b); no tolerance is needed because the cross products are exact.")
         }
+
+        ExplanationCards(
+            AlgebraExplanationsBasic.ratioExplanation(
+                modeName = mode.name,
+                steps = outcome.steps,
+                verification = if (mode == RatioMode.UnknownPart) outcome.caption else null,
+            ),
+        )
     }
 }
 

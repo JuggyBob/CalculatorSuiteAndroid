@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Legacy backup scheme, used on Android 11 (API 30) and below.
+     On Android 12+ data_extraction_rules.xml takes precedence.
+     "file" resolves from Context.getFilesDir(), so these paths reach
+     files/datastore/...; "root" would resolve one directory too high. -->
+<full-backup-content>
+    <!-- The shared "calcsuite" DataStore holds calculation history: health,
+         finance and AI answers, in clear text. Keep it out of backups. -->
+    <exclude domain="file" path="datastore/calcsuite.preferences_pb" />
+
+    <!-- The "calcsuite_ai" DataStore holds an encrypted API key. It cannot be
+         decrypted on a restored device, so there is no reason to back it up. -->
+    <exclude domain="file" path="datastore/calcsuite_ai.preferences_pb" />
+
+    <!-- DataStore writes through a ".tmp" sibling. Excluding the whole
+         datastore directory also keeps those transient copies out. -->
+    <exclude domain="file" path="datastore" />
+</full-backup-content>

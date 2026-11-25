@@ -4,6 +4,7 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
 import java.math.RoundingMode
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 /**
@@ -49,9 +50,38 @@ object Num {
      * Parses user text into a [BigDecimal] using the convention documented on
      * [Num]. Returns null when the text is not a valid number.
      */
+    /**
+     * Decimal marks used by device locales but not natively understood here
+     * (Arabic `٫` is the common case). Built once, on demand, so a number
+     * formatted for the current locale can be typed straight back in.
+     */
+    private val localeDecimalMarks: Set<Char> by lazy {
+        (Locale.getAvailableLocales().mapTo(HashSet<Char>()) {
+            DecimalFormatSymbols.getInstance(it).decimalSeparator
+        } + '\u066B').toSet() - setOf('.', ',', '\'', ' ', '\u00A0', '\u202F')
+    }
+
+    /** Locale grouping marks that are not already handled as separators. */
+    private val localeGroupingMarks: Set<Char> by lazy {
+        (Locale.getAvailableLocales().mapTo(HashSet<Char>()) {
+            DecimalFormatSymbols.getInstance(it).groupingSeparator
+        } + '\u066C').toSet() - setOf('.', ',', '\'', ' ', '\u00A0', '\u202F')
+    }
+
+    /** Maps locale-specific marks onto the `.`/`,` convention used below. */
+    private fun normalizeLocaleMarks(text: String): String = buildString(text.length) {
+        for (c in text) {
+            when (c) {
+                in localeDecimalMarks -> append('.')
+                in localeGroupingMarks -> append(',')
+                else -> append(c)
+            }
+        }
+    }
+
     fun parseOrNull(raw: String?): BigDecimal? {
         if (raw == null) return null
-        val compact = raw.trim()
+        val compact = normalizeLocaleMarks(raw.trim())
             .replace("\u00A0", "")   // no-break space
             .replace("\u202F", "")   // narrow no-break space
             .replace(" ", "")
@@ -237,7 +267,7 @@ object Num {
         if (value.signum() == 0) return "0"
         val rounded = value.round(MathContext(sig, RoundingMode.HALF_UP))
         val stripped = rounded.stripTrailingZeros()
-        val exponent = stripped.precision() - stripped.scale() - 1
+        val exponent = decimalExponent(stripped)
         return when {
             exponent >= 13 || exponent <= -6 -> formatScientific(stripped, seps)
             else -> formatPlain(stripped, seps)
@@ -261,8 +291,18 @@ object Num {
 
     /** Always-plain string for copy actions: full precision, `E` for extremes. */
     fun formatForCopy(value: BigDecimal): String = value.stripTrailingZeros().let {
-        val exponent = it.precision() - it.scale() - 1
+        val exponent = decimalExponent(it)
         if (exponent >= 13 || exponent <= -6) it.toEngineeringString() else it.toPlainString()
+    }
+
+    /**
+     * Decimal exponent in `Int` range. `precision() - scale()` is computed in
+     * `Long` so extreme scales cannot overflow before the choice between
+     * plain and scientific notation is made.
+     */
+    private fun decimalExponent(value: BigDecimal): Int {
+        val exponent = value.precision().toLong() - value.scale().toLong() - 1L
+        return exponent.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
     }
 
     private fun formatPlain(value: BigDecimal, seps: Sep): String {
@@ -294,7 +334,7 @@ object Num {
     }
 
     private fun formatScientific(value: BigDecimal, seps: Sep): String {
-        val exponent = value.precision() - value.scale() - 1
+        val exponent = decimalExponent(value)
         val mantissa = value.movePointLeft(exponent).stripTrailingZeros()
         var mantissaText = mantissa.toPlainString()
         if (seps.decimal != '.') mantissaText = mantissaText.replace('.', seps.decimal)

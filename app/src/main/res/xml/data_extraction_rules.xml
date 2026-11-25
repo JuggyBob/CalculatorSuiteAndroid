@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cloud and device-to-device copies, used on Android 12 (API 31) and above.
+     "file" resolves from Context.getFilesDir(), i.e. files/datastore/...;
+     "root" would resolve one directory too high. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- History is stored unencrypted in the shared DataStore. -->
+        <exclude domain="file" path="datastore/calcsuite.preferences_pb" />
+        <!-- The AI store holds an encrypted key that cannot be restored. -->
+        <exclude domain="file" path="datastore/calcsuite_ai.preferences_pb" />
+        <!-- Covers the ".tmp" files DataStore writes while committing. -->
+        <exclude domain="file" path="datastore" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/calcsuite.preferences_pb" />
+        <exclude domain="file" path="datastore/calcsuite_ai.preferences_pb" />
+        <exclude domain="file" path="datastore" />
+    </device-transfer>
+</data-extraction-rules>

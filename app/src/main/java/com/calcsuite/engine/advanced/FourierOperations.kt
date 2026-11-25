@@ -34,7 +34,7 @@ object FourierOperations {
         from: Double = 0.0,
     ): SeriesResult? {
         val series = FourierEngine.series(function, variable, period, harmonics, from) ?: return null
-        val error = FourierEngine.rmsError(function, variable, series)
+        val error = FourierEngine.rmsErrorOrNull(function, variable, series) ?: return null
         val steps = mutableListOf<String>()
         steps.add("The function is expanded in the basis cos(2πnx/T) and sin(2πnx/T), " +
             "which repeats with the period T = ${formatReal(period)}.")
@@ -68,7 +68,8 @@ object FourierOperations {
                     "estimates rather than exact values.",
             ),
             method = "Each coefficient is the integral of the function against the basis " +
-                "function, divided by the period. The integrals use an adaptive Simpson rule.",
+                "function, divided by the period. The integrals use a fixed composite " +
+                "Simpson rule with enough panels to resolve the highest harmonic kept.",
             steps = steps,
             interpretation = "The constant term is the average of the function over one " +
                 "period, and the first harmonic is the biggest swing of the shape. Each " +
@@ -93,8 +94,20 @@ object FourierOperations {
     /**
      * The discrete Fourier transform of a list of samples.
      */
-    fun transform(samples: DoubleArray, interval: Double = 1.0): TransformResult {
-        val transform = FourierEngine.transform(samples, interval)
+    fun transform(samples: DoubleArray, interval: Double = 1.0): TransformResult =
+        transformOrNull(samples, interval) ?: throw IllegalArgumentException(
+            "the transform needs finite samples and at most " +
+                "${FourierEngine.MAX_SAMPLES} of them",
+        )
+
+    /**
+     * The transform with its working, or null when the samples cannot be used.
+     *
+     * User input goes through this overload so an over-long or non-finite
+     * list is shown as a validation error rather than thrown.
+     */
+    fun transformOrNull(samples: DoubleArray, interval: Double = 1.0): TransformResult? {
+        val transform = FourierEngine.transformOrNull(samples, interval) ?: return null
         val steps = mutableListOf<String>()
         steps.add("The ${transform.sampleCount} samples are treated as one period of " +
             "length ${formatReal(transform.interval)}.")
@@ -102,9 +115,9 @@ object FourierOperations {
             "and the phase of each frequency.")
         val strongest = transform.bins.maxByOrNull { it.magnitude }
         if (strongest != null) {
-            steps.add("The largest bin is the ${strongest.index + 1}${ordinal(strongest.index + 1)} " +
-                "harmonic, at a frequency of ${formatReal(strongest.frequency)} with an " +
-                "amplitude of ${formatReal(strongest.magnitude)}.")
+            steps.add("The largest bin is bin ${strongest.index}, at a frequency of " +
+                "${formatReal(strongest.frequency)} with a magnitude of " +
+                "${formatReal(strongest.magnitude)}.")
         }
         steps.add("The spacing of the frequency bins is ${formatReal(transform.frequencyResolution)}.")
         return TransformResult(transform, Explanation(
@@ -135,10 +148,4 @@ object FourierOperations {
         ))
     }
 
-    private fun ordinal(n: Int): String = when (n) {
-        1 -> "st"
-        2 -> "nd"
-        3 -> "rd"
-        else -> "th"
-    }
 }

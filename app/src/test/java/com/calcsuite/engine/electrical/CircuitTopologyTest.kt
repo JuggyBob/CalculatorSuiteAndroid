@@ -233,4 +233,20 @@ class CircuitTopologyTest {
         assertEquals("two terminals meet there", 2, terminals.size)
         assertNotNull("the component of a terminal is found", topology.componentOf(terminals.first()))
     }
+
+    @Test fun aLongChainOfWiresDoesNotOverflowTheStack() {
+        val length = 10_000
+        val components = (0..length).map { component("R$it", ComponentKind.RESISTOR) }
+        // Each wire puts the previous terminal under the next one, so the
+        // union-find tree is a chain as long as the chain of wires. Its first
+        // terminal is the deepest, and is the first one whose root is looked
+        // up: a recursive find would overflow the stack here.
+        val wires = (0 until length).map { i -> wire("w$i", "R${i + 1}", 0, "R$i", 0) }
+        val topology = CircuitTopology(Circuit(components, wires))
+        assertEquals("all the free ends are on their own nodes", length + 2, topology.nodeCount)
+        assertTrue(
+            "the ends of the long chain are joined",
+            topology.areJoined(TerminalRef("R0", 0), TerminalRef("R$length", 0)),
+        )
+    }
 }

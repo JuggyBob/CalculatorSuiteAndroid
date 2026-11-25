@@ -34,6 +34,7 @@ Pinned through the Compose BOM, currently **2026.05.01**.
 | `androidx.compose.ui:ui` | from BOM | Apache-2.0 | Core Compose runtime, layout and drawing primitives |
 | `androidx.compose.ui:ui-graphics` | from BOM | Apache-2.0 | `Color`, `ImageVector`, `Canvas`, `Path` — used by the diagrams and the graph |
 | `androidx.compose.ui:ui-tooling-preview` | from BOM | Apache-2.0 | `@Preview` support |
+| `androidx.compose.ui:ui-tooling` | from BOM | Apache-2.0 | `debugImplementation` only — Compose preview rendering in Android Studio; not shipped in the release APK |
 | `androidx.compose.foundation:foundation` | from BOM | Apache-2.0 | `LazyRow`, gesture detectors, `pager`, shape/clip modifiers |
 | `androidx.compose.material3:material3` | from BOM | Apache-2.0 | Material 3 components: `Scaffold`, `TopAppBar`, `TextField`, `Slider`, `AlertDialog`, `Surface` |
 | `androidx.compose.material:material-icons-extended` | from BOM | Apache-2.0 | The extended icon set used by the tool registry (category and tool glyphs) |
@@ -44,7 +45,7 @@ Pinned through the Compose BOM, currently **2026.05.01**.
 
 | Dependency | Version | Licence | Purpose |
 |---|---|---|---|
-| `junit:junit` | 4.13.2 | EPL-1.0 | The test framework — all 1410 tests are JVM unit tests |
+| `junit:junit` | 4.13.2 | EPL-1.0 | The test framework — all 1779 tests are JVM unit tests |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-test` | 1.7.3 | Apache-2.0 | Coroutine test dispatchers |
 | `org.json:json` | 20250107 | Public Domain | A real `org.json` implementation, because the `android.jar` stub throws at runtime in JVM unit tests. Used to test currency-rate JSON parsing. |
 
@@ -56,8 +57,8 @@ These are part of the Android platform, not third-party dependencies, but they a
 |---|---|
 | `java.math.BigDecimal` / `BigInteger` / `MathContext` | Exact decimal and integer arithmetic throughout every engine |
 | `java.time` | All date and time arithmetic (Age, Date math, Interval) |
-| `java.net.HttpURLConnection` | The single currency-rate HTTPS request |
-| `org.json` | Parsing the currency-rate response (real implementation supplied by the test-only dependency above) |
+| `java.net.HttpURLConnection` | HTTPS requests for currency rates, the AI providers and the GitHub release check |
+| `org.json` | Parsing JSON responses — currency rates and release metadata (real implementation supplied by the test-only dependency above) |
 | `java.security.SecureRandom` | The optional cryptographically secure mode of the Number generator |
 | `android.content.pm.ActivityInfo` | The portrait orientation constant |
 
@@ -70,9 +71,10 @@ Worth stating, because their absence is a design decision:
 - **No ad mediation**
 - **No crash reporting / diagnostics upload**
 - **No remote configuration**
-- **No HTTP client library** (OkHttp, Retrofit) — `HttpURLConnection` covers the one request
+- **No HTTP client library** (OkHttp, Retrofit) — `HttpURLConnection` covers the few requests the app makes, one per operation
 - **No image-loading library** (Coil, Glide) — the app has a launcher icon and inline diagrams, nothing remote
-- **No DI framework** (Hilt, Koin, Dagger) — `AppContainer` is a small manual holder in `CalculatorApp.kt`
+- **No JSON serialization library** (Gson, Moshi, kotlinx.serialization) — `org.json` covers the two small payloads directly
+- **No DI framework** (Hilt, Koin, Dagger) — `AppContainer` is a small manual holder in `CalcSuiteApp.kt`
 - **No database** (Room, SQLite) — DataStore Preferences holds settings, history and cached rates
 - **No web view** and no dynamic code loading
 

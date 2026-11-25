@@ -1,6 +1,7 @@
 package com.calcsuite.engine.convert.families
 
 import com.calcsuite.engine.convert.UnitFamily
+import com.calcsuite.engine.convert.UnitFamily.Companion.CTX
 import com.calcsuite.engine.convert.bd
 import com.calcsuite.engine.convert.linear
 import com.calcsuite.engine.convert.pow10
@@ -23,7 +24,7 @@ val PowerFamily = UnitFamily(
         linear("MW", "Megawatts", "MW", pow10(6), "Metric (SI)"),
         linear("hp", "Mechanical horsepower", "hp", bd("745.69987158227022"), "Imperial / US"),
         linear("PS", "Metric horsepower", "PS", bd("735.49875"), "Metric (SI)"),
-        linear("BTU_h", "BTU per hour (IT)", "BTU/h", bd("0.29307107017222"), "Imperial / US"),
+        linear("BTU_h", "BTU per hour (IT)", "BTU/h", bd("1055.05585262").divide(bd("3600"), CTX), "Imperial / US"),
     ),
     notes = listOf(
         "1 mechanical hp = 550 ft·lbf/s = 745.69987158227022 W.",

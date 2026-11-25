@@ -174,4 +174,30 @@ class DateMathEngineTest {
         )
         assertEquals("The requested shift is out of range", message)
     }
+
+    @Test
+    fun overflowingFixedUnitShiftsAreReportedNotThrown() {
+        // java.time throws ArithmeticException (Math.addExact/multiplyExact) here, not DateTimeException.
+        val days = error(
+            DateMathEngine.apply(LocalDate.of(2024, 1, 1), DateMathEngine.Shift(days = Long.MAX_VALUE)),
+        )
+        assertEquals("The requested shift is out of range", days)
+
+        val weeks = error(
+            DateMathEngine.apply(
+                LocalDateTime.of(2024, 1, 1, 12, 0),
+                DateMathEngine.Shift(weeks = Long.MAX_VALUE),
+            ),
+        )
+        assertEquals("The requested shift is out of range", weeks)
+
+        val hours = error(
+            DateMathEngine.apply(
+                LocalDateTime.of(2024, 1, 1, 12, 0),
+                DateMathEngine.Shift(hours = Long.MAX_VALUE),
+                subtract = true,
+            ),
+        )
+        assertEquals("The requested shift is out of range", hours)
+    }
 }

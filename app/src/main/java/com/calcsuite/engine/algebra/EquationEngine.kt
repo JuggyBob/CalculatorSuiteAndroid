@@ -191,7 +191,11 @@ object EquationEngine {
         return try {
             ok(EqParser(EqLexer.tokenize(text), variable).parse())
         } catch (failure: EqParseException) {
-            err(ErrorKind.Syntax, failure.message ?: "The expression could not be parsed")
+            err(failure.kind, failure.message ?: "The expression could not be parsed")
+        } catch (_: StackOverflowError) {
+            // Every public entry that parses routes through this function, so
+            // all of them return the same Err shape for pathologically deep input.
+            err(ErrorKind.Syntax, "The expression is nested too deeply")
         }
     }
 
@@ -567,7 +571,10 @@ internal sealed interface EqToken {
     data object End : EqToken
 }
 
-internal class EqParseException(message: String) : Exception(message)
+internal class EqParseException(
+    message: String,
+    val kind: ErrorKind = ErrorKind.Syntax,
+) : Exception(message)
 
 internal object EqLexer {
     fun tokenize(input: String): List<EqToken> {
@@ -609,11 +616,29 @@ internal object EqLexer {
 
 // ------------------------------------------------------------------- parser
 
+/** Deepest expression nesting accepted by the recursive-descent parsers. */
+private const val MAX_NESTING_DEPTH = 128
+
 internal class EqParser(
     private val tokens: List<EqToken>,
     private val variable: String,
 ) {
     private var position = 0
+
+    /** Deepest expression nesting accepted; deeper input would exhaust the stack. */
+    private var nestingDepth = 0
+
+    private inline fun <T> deeper(block: () -> T): T {
+        nestingDepth++
+        if (nestingDepth > MAX_NESTING_DEPTH) {
+            throw EqParseException("The expression is nested too deeply")
+        }
+        return try {
+            block()
+        } finally {
+            nestingDepth--
+        }
+    }
 
     private fun peek(): EqToken = tokens[position]
     private fun advance(): EqToken = tokens[position++]
@@ -640,7 +665,7 @@ internal class EqParser(
 
     private fun unwrap(result: CalcResult<Polynomial>): Polynomial = when (result) {
         is CalcResult.Ok -> result.value
-        is CalcResult.Err -> throw EqParseException(result.error.message)
+        is CalcResult.Err -> throw EqParseException(result.error.message, result.error.kind)
     }
 
     private fun parseSum(): Polynomial {
@@ -680,8 +705,8 @@ internal class EqParser(
         token is EqToken.Number || token is EqToken.Name || token == EqToken.LParen
 
     private fun parseUnary(): Polynomial = when (peek()) {
-        EqToken.Minus -> { advance(); parseUnary().negate() }
-        EqToken.Plus -> { advance(); parseUnary() }
+        EqToken.Minus -> { advance(); deeper { parseUnary() }.negate() }
+        EqToken.Plus -> { advance(); deeper { parseUnary() } }
         else -> parsePower()
     }
 
@@ -698,6 +723,11 @@ internal class EqParser(
         if (token !is EqToken.Number) throw EqParseException("The exponent must be a whole number")
         val value = Num.parseOrNull(token.text)
             ?: throw EqParseException("Malformed exponent \"${token.text}\"")
+        // toInt() silently wraps large values (e.g. 4294967296 becomes 0), which
+        // would turn x^4294967296 into the constant 1. Reject before narrowing.
+        if (value > BigDecimal.valueOf(2)) {
+            throw EqParseException("Only exponents 0, 1 and 2 are supported")
+        }
         val exponent = try {
             value.toBigIntegerExact().toInt()
         } catch (_: ArithmeticException) {
@@ -725,7 +755,7 @@ internal class EqParser(
                 )
             }
             EqToken.LParen -> {
-                val inner = parseSum()
+                val inner = deeper { parseSum() }
                 if (peek() != EqToken.RParen) throw EqParseException("Missing closing bracket")
                 advance()
                 inner

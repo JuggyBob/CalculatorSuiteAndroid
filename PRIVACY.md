@@ -1,8 +1,8 @@
 # Privacy Policy
 
-**Last reviewed: 21 October 2026 — Applies to Calculator Suite 3.0.1**
+**Last reviewed: 25 November 2026 — Applies to Calculator Suite 3.1.0**
 
-The short version: Calculator Suite does not collect, transmit, sell or share personal data. It has no accounts, no analytics, no advertising and no tracking. Everything you do in the app stays on your device, with one narrow, documented exception for currency exchange rates.
+The short version: Calculator Suite does not collect, transmit, sell or share personal data. It has no accounts, no analytics, no advertising and no tracking. Everything you do in the app stays on your device, apart from three narrow, documented network paths: currency exchange rates, the optional AI problem solver and the update check.
 
 This document describes what the app actually does, based on a review of the source code in this repository.
 
@@ -16,16 +16,17 @@ there is no data controller receiving your information.
 
 ## 2. Permissions the app requests
 
-The manifest declares exactly two permissions:
+The manifest declares three permissions:
 
 | Permission | Why it is needed | Where it is used |
 |---|---|---|
-| `android.permission.INTERNET` | Fetching currency exchange rates | Currency converter only |
-| `android.permission.ACCESS_NETWORK_STATE` | Telling "you're offline" apart from "the server is down", so the app can show cached rates instead of an error | Currency converter only |
+| `android.permission.INTERNET` | Fetching currency exchange rates, sending the optional AI request and checking GitHub for a newer release | Currency converter, AI problem solver (if enabled) and update check |
+| `android.permission.ACCESS_NETWORK_STATE` | Telling "you're offline" apart from "the server is down", so the app can show cached rates or cached release details instead of an error | Currency converter and update check |
+| `android.permission.REQUEST_INSTALL_PACKAGES` | Handing a verified APK to Android's installer when you choose to install an update | Update prompt only, after you press "Download & install now" |
 
 The merged release manifest also contains `com.calcsuite.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, which AndroidX adds automatically for its own internal broadcast receivers. It is a self-defined, signature-level permission and is never granted to other apps.
 
-The app requests **no** runtime permissions — there is no dialog asking for location, camera, microphone, contacts, storage or notifications, and the app cannot be granted them.
+The app requests **no** runtime permissions — there is no dialog asking for location, camera, microphone, contacts, storage or notifications, and the app cannot be granted them. `REQUEST_INSTALL_PACKAGES` is an install-time permission, not a runtime one: when you choose an update, Android shows its own confirmation and on some devices asks you to allow installs from unknown apps first. Nothing is installed without your confirmation.
 
 ## 3. What is stored on your device
 
@@ -36,26 +37,29 @@ All persistence uses Android **DataStore Preferences**, in the app's private int
 | Calculation history | `history` key — a JSON array, max **500** entries | To show your recent calculations | Until you delete it or uninstall |
 | Favourites | `favorites` key — a set of tool ids | To show starred tools first | Until you change it or uninstall |
 | Recently used tools | `recents` key — max 8 tool ids | To show recents on the main screen | Until you change it or uninstall |
-| Settings | `theme_mode`, `angle_mode`, `precision`, `grouping`, `thousands_separator`, `haptics`, `dynamic_color` | To remember your preferences | Until you change it or uninstall |
+| Settings | `theme_mode`, `angle_mode`, `precision`, `grouping`, `thousands_separator`, `haptics`, `dynamic_color`, `accent` | To remember your preferences | Until you change it or uninstall |
 | Onboarding state | `onboarding_complete` | So the welcome pages appear once only | Until you change it or uninstall |
+| Suppressed update prompts | `suppressed_release_tags` — a set of release tags, in the updater DataStore | To remember which releases you chose "Never show again" for | Until you clear app data |
+| Last automatic update check | `last_auto_check` — a timestamp, in the updater DataStore | To keep the start-up check to at most once every three hours | Replaced at the next automatic check |
+| Cached release details | `last_release` and `last_release_at` — release metadata and when it was fetched, in the updater DataStore | So the update screen has something to show when you are offline | Until refreshed or you clear app data |
 | Cached exchange rates | `currency_rates` key — rates plus the fetch timestamp | So the currency converter works offline | Until refreshed or you clear app data |
 | AI provider and model | `ai_provider` and `ai_model` keys | So the app knows which service and which model you chose | Until you change it or uninstall |
 | AI API key | `ai_credential` key — **encrypted** with a key held in the Android keystore | So the app can authenticate to the provider you chose | Until you remove it or uninstall |
 
-A history entry records the **tool**, a **text summary of the input**, the **result** and a **timestamp**. For example, a Loan calculation stores something like
+A history entry records the **tool id**, the **values you entered** (keyed by that tool's field names), a short text summary, the **result** and a **timestamp**. For example, a Loan calculation stores something like
 `principal 250000 · rate 4.5 % · term 30` → `1265.85`. It does not store anything else about you.
 
-You can erase all of it at any time with **Settings → History → Clear all history**, or by clearing the app's storage in Android settings. Uninstalling removes everything.
+You can erase all of it at any time with **Settings → History and data → Clear all history**, or by clearing the app's storage in Android settings. Uninstalling removes everything.
 
 ### Android backups
 
-Android's system backup may include app data if you have device backup enabled. That backup is handled by Android and your device manufacturer, under Google's terms — not by this project. The app does not opt out of it.
+Android's system backup may include app data if you have device backup enabled. That backup is handled by Android and your device manufacturer, under Google's terms — not by this project. As of 3.1.0 the app opts out for its own data: `backup_rules.xml` (Android 11 and below) and `data_extraction_rules.xml` (Android 12 and above) exclude the whole DataStore directory from cloud backup and device-to-device transfer. That covers calculation history, settings, cached rates, the AI configuration and the update-check cache, so none of them are backed up.
 
 ## 4. Network activity
 
-**Every tool except Currency converter and the AI problem solver makes no network requests at all.** There is no telemetry, no crash reporting, no update check, no "are you an Android user?" ping and no font/icon download.
+**Every tool except Currency converter and the AI problem solver makes no network requests at all.** There is no telemetry, no crash reporting, no "are you an Android user?" ping and no font/icon download. The update check runs once at start, not from a tool.
 
-There are exactly two things that talk to the internet, and both are opt-in and visible to you.
+There are three things that talk to the internet: currency rates, the optional AI problem solver and the update check. The first two are opt-in and visible to you; the update check runs only after onboarding, is throttled to three hours and is network-aware.
 
 ### Currency converter
 
@@ -107,9 +111,21 @@ The **AI problem solver** is the one feature that can send something you supply 
 | Together AI | `api.together.xyz` |
 | Fireworks AI | `api.fireworks.ai` |
 
-**Cost.** The request is a normal API call, so it is billed by that provider according to its own pricing, using your key. The app never makes a request you did not ask for, never retries on its own, and never moves you to a different model without your say-so. The **Test the connection** button sends one very short message, which is enough to tell you whether the key and the model work.
+**Cost.** The request is a normal API call, so it is billed by that provider according to its own pricing, using your key. The app never makes an AI request you did not ask for, never retries on its own, and never moves you to a different model without your say-so. The **Test the connection** button sends one very short message, which is enough to tell you whether the key and the model work.
 
 **If you never configure the AI feature**, no picture, and nothing else, is ever sent anywhere.
+
+### Update check
+
+After onboarding, Calculator Suite checks GitHub once at start for a newer release — at most once every three hours, and only when a network connection is available. If the check fails, the app falls back to the cached release details rather than showing an error. The request is an unauthenticated HTTPS `GET` to:
+
+```
+https://api.github.com/repos/JuggyBob/CalculatorSuiteAndroid/releases/latest
+```
+
+It carries two fixed headers, `Accept: application/vnd.github+json` and `User-Agent: CalcSuite-Android` — no token, no device identifier, no analytics parameter and no data about your calculations. The reply is capped at 2 MiB. Links are restricted to GitHub's own HTTPS hosts (the API, `github.com` and GitHub content hosts), checked again after any redirect.
+
+When a newer release has an installable APK, the app shows a popup with the release notes and a **Download & install now** button. The APK is capped at 512 MiB and is checked against the digest the release publishes (SHA-256 or SHA-512), then its package name, version code and signing certificate, before being handed to Android. **The app never installs anything by itself** — Android shows its own confirmation, and on some devices asks you to allow installs from unknown apps first. **Never show again** suppresses prompts for that release version only; the choice is stored locally in `suppressed_release_tags`, and you can still check for updates manually at any time.
 
 ### No other network use
 
@@ -125,7 +141,7 @@ None. Calculator Suite contains:
 - no A/B testing or remote configuration
 - no attribution or install tracking
 
-If you see network traffic from this app other than the currency request and the AI request you asked for, it is not coming from this codebase — please report it via the [private security advisory channel](SECURITY.md).
+If you see network traffic from this app other than the currency request, the AI request you asked for and the update check, it is not coming from this codebase — please report it via the [private security advisory channel](SECURITY.md).
 
 ## 6. Third-party services
 
@@ -133,8 +149,9 @@ If you see network traffic from this app other than the currency request and the
 |---|---|---|
 | [open.er-api.com](https://www.exchangerate-api.com) | Reference currency exchange rates | Base currency code only |
 | The AI provider **you chose** (see the table above) | Reading the mathematical problem in a picture you supply | The picture, the question, the list of tools, and your API key |
+| [GitHub](https://github.com/JuggyBob/CalculatorSuiteAndroid/releases) | Checking for a newer release | Nothing — an unauthenticated request to the public releases API |
 
-The second row applies only if you turn the AI feature on yourself. No other third party receives any data. No data is sold, rented or shared for advertising. There is no data broker, no analytics vendor and no CDN.
+The AI row applies only if you turn the feature on yourself; the GitHub row is the automatic update check. No other third party receives any data. No data is sold, rented or shared for advertising. There is no data broker, no analytics vendor and no CDN.
 
 ## 7. Children
 
@@ -144,7 +161,7 @@ Calculator Suite is safe for all ages and collects nothing from anyone, includin
 
 Because Calculator Suite does not collect personal data, there is generally nothing for us to disclose, correct or delete — the data lives only on your device, and you control it directly.
 
-- To delete your history: **Settings → Clear all history**.
+- To delete your history: **Settings → History and data → Clear all history**.
 - To delete everything: clear the app's storage in Android settings, or uninstall.
 - To ask what is stored: it is exactly the table in section 3.
 
@@ -154,7 +171,7 @@ You also have whatever rights your jurisdiction grants over data that never leav
 
 - Release builds are signed, so you can verify that an installed APK is genuinely this project.
 - All local data is in sandboxed private storage.
-- The single network call uses HTTPS.
+- All network calls use HTTPS.
 - The app is portrait-only and declares one exported component (the launcher activity).
 
 To report a vulnerability, please use the private channel in [SECURITY.md](SECURITY.md) rather than a public issue.
@@ -180,7 +197,9 @@ that might be a security or privacy **breach**, please use the private channel i
 | Personal data collected | No |
 | Data sold or shared | No |
 | Analytics / ads / tracking | None |
-| Local storage | History (≤500), favourites, recents, settings, cached rates |
-| Network requests | One HTTPS request to `open.er-api.com` for currency rates, base currency code only |
-| Data leaves the device | Currency base code only, to a rate provider |
-| Deletion | Settings → Clear all history, or clear app data / uninstall |
+| Local storage | History (≤500, with input values and tool ids), favourites, recents, settings (including accent), cached rates, cached release details and update-prompt state |
+| Network requests | HTTPS to `open.er-api.com` for currency rates (base code only), to your chosen AI provider if enabled, and to `api.github.com` for the update check |
+| Data leaves the device | Currency base code; the picture and question you send to your chosen AI provider; an unauthenticated update check with no personal data |
+| Update check | Once at start after onboarding, throttled to three hours, network-aware, with cached fallback and per-version "Never show again" |
+| Backup | DataStore files excluded from Android cloud backup and device-to-device transfer |
+| Deletion | Settings → History and data → Clear all history, or clear app data / uninstall |

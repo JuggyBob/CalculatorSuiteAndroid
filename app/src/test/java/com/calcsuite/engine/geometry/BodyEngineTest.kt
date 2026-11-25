@@ -263,4 +263,20 @@ class BodyEngineTest {
             }
         }
     }
+
+    @Test fun nearDegeneratePyramidBaseKeepsHeronPrecision() {
+        val r = okValue(
+            BodyEngine.triangularPyramid(bd("1"), bd("1"), bd("1.999999999999999999999999999999999"), bd("3")),
+        )
+        val expected = bd("3.162277660168379331998893544432717e-17")
+        assertClose(expected, quantity(r, "Base area (unit²)"), 1e-9, "base area")
+        assertClose(expected, r.primary!!, 1e-9, "volume with h = 3")
+    }
+
+    @Test fun fieldsMatchDefaultMode() {
+        assertEquals(
+            listOf("a"),
+            BodyEngine.fields(BodyKind.TRIANGULAR_PYRAMID).map { it.id },
+        )
+    }
 }

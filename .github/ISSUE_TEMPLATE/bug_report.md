@@ -59,12 +59,13 @@ Expected:   1265.84  (my bank quotes this)
 
 | | |
 |---|---|
-| **App version** | <!-- shown at the bottom of Settings --> |
+| **App version** | <!-- e.g. 3.1.0, shown on the About page --> |
 | **Device** | <!-- e.g. Pixel 7 --> |
 | **Android version** | <!-- e.g. Android 14 --> |
-| **Theme** | <!-- light / dark / system, and whether dynamic colour is on --> |
+| **Theme** | <!-- system / light / dark / amoled, and whether dynamic colour is on --> |
 | **Thousands separator** | <!-- Auto / Comma / Period / Space / Apostrophe --> |
 | **Result precision** | <!-- 3–15 significant digits --> |
+| **Update popup** | <!-- did the update popup appear on this launch? If so, which version did it offer? --> |
 
 ## Anything else
 

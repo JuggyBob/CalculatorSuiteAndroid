@@ -1,5 +1,7 @@
 package com.calcsuite.engine.finance
 
+import java.util.Locale
+
 /**
  * Static metadata for one currency.
  *
@@ -93,7 +95,7 @@ object CurrencyCatalog {
         currencies.associateBy { it.code }
 
     /** Case-insensitive lookup by ISO code (e.g. `usd`, `GBP`). */
-    fun byCode(code: String): CurrencyDef? = byCodeIndex[code.trim().uppercase()]
+    fun byCode(code: String): CurrencyDef? = byCodeIndex[code.trim().uppercase(Locale.ROOT)]
 
     /** All ISO codes, useful for quick membership tests. */
     val codes: Set<String> = byCodeIndex.keys

@@ -64,9 +64,17 @@ class Poly private constructor(val coeffs: List<Rat>) {
         return of(out)
     }
 
-    /** Exact polynomial division; the remainder is returned alongside. */
-    fun divmod(other: Poly): Pair<Poly, Poly> {
-        require(!other.isZero()) { "Division by the zero polynomial" }
+    /**
+     * Exact polynomial division; the remainder is returned alongside. A zero
+     * divisor is a programming error; callers handling user input should use
+     * [divmodOrNull].
+     */
+    fun divmod(other: Poly): Pair<Poly, Poly> = divmodOrNull(other)
+        ?: throw IllegalArgumentException("Division by the zero polynomial")
+
+    /** Null-safe form of [divmod]: returns null for a zero divisor. */
+    fun divmodOrNull(other: Poly): Pair<Poly, Poly>? {
+        if (other.isZero()) return null
         if (degree < other.degree) return ZERO to this
         val remainder = ArrayList<Rat>(coeffs)
         val quotient = List<Rat>(degree - other.degree + 1) { Rat.ZERO }.toMutableList()

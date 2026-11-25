@@ -12,12 +12,54 @@ import kotlin.math.sqrt
  */
 class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
 
-    init {
-        require(rows > 0 && cols > 0) { "a matrix needs at least one row and one column" }
-        require(data.size == rows * cols) { "the data does not fit the shape" }
+    companion object {
+        /**
+         * The largest matrix accepted from user input.
+         *
+         * These matrices are the ones a person writes down; beyond thirty by
+         * thirty the elimination methods are slow and the display is useless.
+         */
+        const val MAX_DIM = 30
+
+        /** A hard allocation ceiling, so the primary constructor cannot overflow. */
+        private const val HARD_DIM = 1000
+        private const val HARD_ELEMENTS = 1_000_000L
+
+        /** Builds the backing array, refusing a shape that could overflow. */
+        private fun checkedData(rows: Int, cols: Int): DoubleArray {
+            val count = rows.toLong() * cols.toLong()
+            if (rows !in 1..HARD_DIM || cols !in 1..HARD_DIM || count > HARD_ELEMENTS) {
+                throw IllegalArgumentException("the matrix dimensions are too large")
+            }
+            return DoubleArray(count.toInt())
+        }
+
+        /** A matrix of the given shape, or null if it is outside [MAX_DIM]. */
+        fun ofOrNull(rows: Int, cols: Int): Matrix? {
+            if (rows !in 1..MAX_DIM || cols !in 1..MAX_DIM) return null
+            return Matrix(rows, cols)
+        }
+
+        /** A matrix from values, or null if the shape or an entry is unusable. */
+        fun ofOrNull(rows: Int, cols: Int, data: DoubleArray): Matrix? {
+            if (rows !in 1..MAX_DIM || cols !in 1..MAX_DIM) return null
+            if (data.size.toLong() != rows.toLong() * cols.toLong()) return null
+            if (data.any { !it.isFinite() }) return null
+            return Matrix(rows, cols, data.copyOf())
+        }
     }
 
-    constructor(rows: Int, cols: Int) : this(rows, cols, DoubleArray(rows * cols))
+    init {
+        require(rows > 0 && cols > 0) { "a matrix needs at least one row and one column" }
+        require(rows <= HARD_DIM && cols <= HARD_DIM) { "the matrix dimensions are too large" }
+        // Compare as Long: an overflowing Int product could otherwise pass the
+        // size check and give a matrix whose data is shorter than its shape.
+        require(data.size.toLong() == rows.toLong() * cols.toLong()) {
+            "the data does not fit the shape"
+        }
+    }
+
+    constructor(rows: Int, cols: Int) : this(rows, cols, checkedData(rows, cols))
 
     operator fun get(row: Int, col: Int): Double = data[row * cols + col]
 
@@ -35,8 +77,12 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
     }
 
     /** The matrix product. */
-    operator fun times(o: Matrix): Matrix {
-        require(cols == o.rows) { "the shapes do not match" }
+    operator fun times(o: Matrix): Matrix = timesOrNull(o)
+        ?: throw IllegalArgumentException("the shapes do not match")
+
+    /** The matrix product, or null when the shapes do not match. */
+    fun timesOrNull(o: Matrix): Matrix? {
+        if (cols != o.rows) return null
         val out = Matrix(rows, o.cols)
         for (r in 0 until rows) {
             for (c in 0 until o.cols) {
@@ -49,8 +95,12 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
     }
 
     /** The product with a column vector. */
-    operator fun times(v: DoubleArray): DoubleArray {
-        require(v.size == cols) { "the shapes do not match" }
+    operator fun times(v: DoubleArray): DoubleArray = timesOrNull(v)
+        ?: throw IllegalArgumentException("the shapes do not match")
+
+    /** The product with a vector, or null when the shapes do not match. */
+    fun timesOrNull(v: DoubleArray): DoubleArray? {
+        if (v.size != cols) return null
         val out = DoubleArray(rows)
         for (r in 0 until rows) {
             var sum = 0.0
@@ -61,8 +111,12 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
     }
 
     /** The matrix with a column added. */
-    fun withColumn(column: DoubleArray): Matrix {
-        require(column.size == rows) { "the column does not fit" }
+    fun withColumn(column: DoubleArray): Matrix = withColumnOrNull(column)
+        ?: throw IllegalArgumentException("the column does not fit")
+
+    /** The matrix with a column added, or null if it does not fit. */
+    fun withColumnOrNull(column: DoubleArray): Matrix? {
+        if (column.size != rows || cols >= MAX_DIM) return null
         val out = Matrix(rows, cols + 1)
         for (r in 0 until rows) {
             for (c in 0 until cols) out[r, c] = this[r, c]
@@ -89,7 +143,12 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
             for (r in column + 1 until n) {
                 if (abs(work[r * n + column]) > abs(work[pivot * n + column])) pivot = r
             }
-            if (abs(work[pivot * n + column]) < 1e-14) return 0.0
+            // The test has to follow the size of the column: an absolute
+            // threshold would call a matrix of small entries singular.
+            val columnScale = (column until n).maxOf { abs(work[it * n + column]) }
+            if (columnScale == 0.0 || abs(work[pivot * n + column]) <= 1e-14 * columnScale) {
+                return 0.0
+            }
             if (pivot != column) {
                 for (c in 0 until n) {
                     val t = work[column * n + c]
@@ -108,9 +167,9 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
         return det
     }
 
-    /** The inverse, or null when the matrix is singular. */
+    /** The inverse, or null when the matrix is not square or is singular. */
     fun inverse(): Matrix? {
-        require(isSquare) { "only a square matrix has an inverse" }
+        if (!isSquare) return null
         val n = rows
         val work = DoubleArray(n * 2 * n)
         for (r in 0 until n) {
@@ -122,7 +181,10 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
             for (r in column + 1 until n) {
                 if (abs(work[r * 2 * n + column]) > abs(work[pivot * 2 * n + column])) pivot = r
             }
-            if (abs(work[pivot * 2 * n + column]) < 1e-13) return null
+            val columnScale = (column until n).maxOf { abs(work[it * 2 * n + column]) }
+            if (columnScale == 0.0 || abs(work[pivot * 2 * n + column]) <= 1e-13 * columnScale) {
+                return null
+            }
             if (pivot != column) {
                 for (c in 0 until 2 * n) {
                     val t = work[column * 2 * n + c]
@@ -153,9 +215,12 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
         val work = copyData()
         var rank = 0
         for (column in 0 until m) {
+            val columnScale = (rank until n).maxOf { abs(work[it * m + column]) }
+            if (columnScale == 0.0) continue
+            val threshold = 1e-10 * columnScale
             var pivot = -1
             for (r in rank until n) {
-                if (abs(work[r * m + column]) > 1e-10) { pivot = r; break }
+                if (abs(work[r * m + column]) > threshold) { pivot = r; break }
             }
             if (pivot < 0) continue
             for (c in 0 until m) {
@@ -183,7 +248,7 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
      * Returns null when the system has no unique solution.
      */
     fun solve(b: DoubleArray): DoubleArray? {
-        require(isSquare) { "only a square system can be solved this way" }
+        if (!isSquare || b.size != rows) return null
         val n = rows
         val work = DoubleArray(n * (n + 1))
         for (r in 0 until n) {
@@ -195,7 +260,10 @@ class Matrix(val rows: Int, val cols: Int, val data: DoubleArray) {
             for (r in column + 1 until n) {
                 if (abs(work[r * (n + 1) + column]) > abs(work[pivot * (n + 1) + column])) pivot = r
             }
-            if (abs(work[pivot * (n + 1) + column]) < 1e-13) return null
+            val columnScale = (column until n).maxOf { abs(work[it * (n + 1) + column]) }
+            if (columnScale == 0.0 || abs(work[pivot * (n + 1) + column]) <= 1e-13 * columnScale) {
+                return null
+            }
             if (pivot != column) {
                 for (c in 0 until n + 1) {
                     val t = work[column * (n + 1) + c]

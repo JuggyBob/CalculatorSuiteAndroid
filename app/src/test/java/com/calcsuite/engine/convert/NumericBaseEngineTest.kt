@@ -128,6 +128,23 @@ class NumericBaseEngineTest {
     }
 
     @Test
+    fun inputLongerThanTheLimitIsRejectedQuickly() {
+        val started = System.nanoTime()
+        val result = NumericBaseEngine.parse("1".repeat(5000), 2)
+        val elapsedMillis = (System.nanoTime() - started) / 1_000_000
+        expectError(ErrorKind.InvalidInput, result, "too long")
+        assertTrue("long input should fail before accumulation, took ${elapsedMillis}ms", elapsedMillis < 1000)
+    }
+
+    @Test
+    fun theLengthLimitItselfIsStillParsed() {
+        val max = NumericBaseEngine.MAX_INPUT_LENGTH
+        val expected = BigInteger.ONE.shiftLeft(max).subtract(BigInteger.ONE)
+        assertEquals(expected, NumericBaseEngine.parse("1".repeat(max), 2).valueOrNull()!!)
+        expectError(ErrorKind.InvalidInput, NumericBaseEngine.parse("1".repeat(max + 1), 2), "too long")
+    }
+
+    @Test
     fun roundTripAcrossManyBases() {
         val value = ns(123456789)
         for (base in 2..36) {

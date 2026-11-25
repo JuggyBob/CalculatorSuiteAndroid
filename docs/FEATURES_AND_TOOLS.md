@@ -16,11 +16,13 @@ Every one of the **66 registered tools** across **9 categories**, with its input
 
 **Not a tool, but features.** The **AI problem solver** (the brain button beside the history button on the main screen) reads a photograph of a mathematical problem, has a chosen AI provider pick the right tool below, and lets that tool's own engine do the mathematics. It is described in the [User Guide](USER_GUIDE.md#9-the-ai-problem-solver).
 
-The **update checker** (Settings → *Updates*) asks the project's own GitHub release page whether a newer version has been published, downloads it when there is one, checks the file against the app that is installed, and hands it to Android's installer, which asks you to confirm. *Settings → About* shows the version that is installed, the newest release and its notes. Both are described in the [User Guide](USER_GUIDE.md#7-settings).
+The **update checker** asks the project's own GitHub release page whether a newer version has been published. It checks on start, after onboarding, at most once every three hours, and falls back to cached release details when there is no connection. When a newer version is found it shows a notes popup with **Download & install now** and a per-version **Never show again**; downloading happens only when you ask, and the file is checked against the app that is installed before it is handed to Android's installer, which asks you to confirm. *Settings → About CalcSuite* shows the version that is installed, the newest release and its notes. Both are described in the [User Guide](USER_GUIDE.md#7-settings).
 
 **Notation used throughout.** *Exact* means the result is computed with arbitrary-precision arithmetic (`BigDecimal` at 34 significant digits, or `BigInteger`) and is not rounded until display. *Numerical* means a numeric method was used, the result is prefixed `≈`, and the panel names the method.
 
 **Engine coverage.** In each tool's *Limitations*, the wording is drawn from the source. Where the in-app catalogue description promises more than the implementation delivers, that is called out explicitly and tracked in the [Roadmap](../ROADMAP.md).
+
+**Analysis panels.** Eight expandable panels — Definition, Formula, Conditions, Method, Step-by-step work, Interpretation, Verification and Limitations — appear in **17 tools**: eight in Algebra (Percentage, Average, Proportion, Ratio, GCF & LCM, Combinations, Prime checker, Number generator) and nine in Calculus (Derivatives, Integrals, Limits, Taylor & Maclaurin, Summations & Products, Infinite Series, Roots, Extrema & Optimization, Function Graphing). In the calculus tools they are hidden in fullscreen, so the plot gets the whole screen.
 
 ---
 
@@ -460,7 +462,7 @@ Matching is nearest-row from a measurement, with an exact tolerance of 0.05 mm; 
 
 > **These are reference mid-market rates.** They are not the rates your bank, card issuer or exchange service applies. The app says so in its own data-source note.
 
-**Limitations.** No rate is fetched for any other tool — the converter is the app's only network feature. Reference rates have no buy/sell spread and no fees. See [PRIVACY.md](../PRIVACY.md) for exactly what is transmitted.
+**Limitations.** Three paths use the network: currency rates here, the optional AI problem solver (only when you use it), and the GitHub update check. Reference rates have no buy/sell spread and no fees. See [PRIVACY.md](../PRIVACY.md) for exactly what is transmitted.
 
 **Related.** All finance tools are money-exact (`BigDecimal`).
 
@@ -1014,6 +1016,8 @@ The old catch-all Calculus tool has been split into fourteen focused ones. They 
 **Inputs.** The **equation** — heat, wave, Laplace or Poisson — the **Initial condition u(x, 0)**, the **Initial velocity u_t(x, 0)**, the two end values, the **Number of points in space**, the **Number of steps in time**, the **Time to reach**, the **Diffusivity α** or the **Speed c**, and for the two-dimensional route the **Size of the side**, the **Boundary values**, the **source f(x, y)**, the **Points on each side** and the **Maximum sweeps**. The coefficients **A**, **B** and **C** classify the equation as elliptic, parabolic or hyperbolic.
 
 **Method.** Finite differences. The stability condition is checked before anything is computed, and the tool refuses a step that would make the numbers grow. The two-dimensional route relaxes the grid until the values stop changing.
+
+The field is drawn as a bitmap at the canvas resolution, at no more than one pixel per cell. In a profiling run that removed the frame-time spikes: janky frames fell from 29.91% to 22.22%, the 90th-percentile frame from 34 ms to 22 ms, and the worst frame from 101 ms to 34 ms.
 
 **Results.** The solution, the stability number and the limit it must satisfy, the steady state, the number of sweeps used, and a colour map of the field. The colours follow the accent colour you have chosen, and a flat field is explained rather than left looking like a failure.
 

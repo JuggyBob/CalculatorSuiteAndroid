@@ -72,15 +72,12 @@ object MeasureEngine {
             for (b in second.intervals) {
                 val from = max(a.from, b.from)
                 val to = min(a.to, b.to)
-                if (to > from) {
-                    out.add(
-                        Interval(
-                            from,
-                            to,
-                            openFrom = a.openFrom || b.openFrom,
-                            openTo = a.openTo || b.openTo,
-                        ),
-                    )
+                val openFrom = a.openFrom || b.openFrom
+                val openTo = a.openTo || b.openTo
+                // A single shared point is still in the intersection when
+                // both intervals include it; that is how point sets survive.
+                if (to > from || (to == from && !openFrom && !openTo)) {
+                    out.add(Interval(from, to, openFrom, openTo))
                 }
             }
         }
@@ -89,19 +86,46 @@ object MeasureEngine {
 
     /** The complement of a set, relative to a bounding interval. */
     fun complement(set: RealSet, within: DoubleArray): RealSet {
-        val out = mutableListOf<Interval>()
-        var cursor = within[0]
-        for (interval in set.intervals) {
-            if (interval.from > cursor) {
-                // The end of the gap is open when the set includes that point,
-                // because the point belongs to the set and not to its
-                // complement.
-                out.add(Interval(cursor, interval.from, openTo = !interval.openFrom))
+        if (within.size < 2 || !within[0].isFinite() || !within[1].isFinite() ||
+            within[0] >= within[1]
+        ) return RealSet.EMPTY
+        val low = within[0]
+        val high = within[1]
+        // Only the part of the set inside the bounds can take points away.
+        val clipped = set.intervals.mapNotNull { interval ->
+            val from = max(low, interval.from)
+            val to = min(high, interval.to)
+            val openFrom = if (from > interval.from) false else interval.openFrom
+            val openTo = if (to < interval.to) false else interval.openTo
+            if (to > from || (to == from && !openFrom && !openTo)) {
+                Interval(from, to, openFrom, openTo)
+            } else {
+                null
             }
-            cursor = max(cursor, interval.to)
         }
-        if (cursor < within[1]) {
-            out.add(Interval(cursor, within[1], openFrom = true))
+        val out = mutableListOf<Interval>()
+        var cursor = low
+        // True when the point at the cursor belongs to the set, so the gap
+        // that follows it has to leave that point out.
+        var cursorCovered = false
+        for (interval in clipped) {
+            if (interval.from > cursor) {
+                out.add(
+                    Interval(
+                        cursor,
+                        interval.from,
+                        openFrom = cursorCovered,
+                        openTo = !interval.openFrom,
+                    ),
+                )
+            }
+            if (interval.to > cursor || (interval.to == cursor && !interval.openTo)) {
+                cursor = max(cursor, interval.to)
+                cursorCovered = !interval.openTo
+            }
+        }
+        if (cursor < high) {
+            out.add(Interval(cursor, high, openFrom = cursorCovered))
         }
         return RealSet.fromIntervals(out)
     }
@@ -178,7 +202,8 @@ object MeasureEngine {
         subintervals: Int = 64,
         samplesPerSubinterval: Int = 8,
     ): RiemannSums? {
-        if (to <= from || subintervals < 1) return null
+        if (to <= from || subintervals < 1 || samplesPerSubinterval < 1) return null
+        if (!from.isFinite() || !to.isFinite()) return null
         val width = (to - from) / subintervals
         val lowerSums = mutableListOf<Double>()
         val upperSums = mutableListOf<Double>()
@@ -191,6 +216,7 @@ object MeasureEngine {
             var highest = Double.NEGATIVE_INFINITY
             for (k in 0..samplesPerSubinterval) {
                 val value = f(a + width * k / samplesPerSubinterval) ?: return null
+                if (!value.isFinite()) return null
                 lowest = min(lowest, value)
                 highest = max(highest, value)
             }

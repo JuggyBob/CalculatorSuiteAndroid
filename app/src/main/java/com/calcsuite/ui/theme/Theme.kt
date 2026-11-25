@@ -7,8 +7,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.LocalTonalElevationEnabled
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 
 private val LightScheme = lightColorScheme(
@@ -77,7 +79,41 @@ private val DarkScheme = darkColorScheme(
     inverseSurface = DarkInverseSurface,
 )
 
-enum class ThemeMode { System, Light, Dark }
+// The accent families are the dark ones: only the surfaces change for AMOLED.
+private val AmoledScheme = darkColorScheme(
+    primary = DarkPrimary,
+    onPrimary = DarkOnPrimary,
+    primaryContainer = DarkPrimaryContainer,
+    onPrimaryContainer = DarkOnPrimaryContainer,
+    secondary = DarkSecondary,
+    onSecondary = DarkOnSecondary,
+    secondaryContainer = DarkSecondaryContainer,
+    onSecondaryContainer = DarkOnSecondaryContainer,
+    tertiary = DarkTertiary,
+    onTertiary = DarkOnTertiary,
+    tertiaryContainer = DarkTertiaryContainer,
+    onTertiaryContainer = DarkOnTertiaryContainer,
+    error = DarkError,
+    onError = DarkOnError,
+    errorContainer = DarkErrorContainer,
+    onErrorContainer = DarkOnErrorContainer,
+    background = AmoledBackground,
+    onBackground = AmoledOnBackground,
+    surface = AmoledSurface,
+    onSurface = AmoledOnSurface,
+    surfaceVariant = AmoledSurfaceVariant,
+    onSurfaceVariant = AmoledOnSurfaceVariant,
+    outline = AmoledOutline,
+    outlineVariant = AmoledOutlineVariant,
+    surfaceContainerLowest = AmoledSurfaceContainerLowest,
+    surfaceContainerLow = AmoledSurfaceContainerLow,
+    surfaceContainer = AmoledSurfaceContainer,
+    surfaceContainerHigh = AmoledSurfaceContainerHigh,
+    surfaceContainerHighest = AmoledSurfaceContainerHighest,
+    inverseSurface = AmoledInverseSurface,
+)
+
+enum class ThemeMode { System, Light, Dark, Amoled }
 
 /**
  * The app's own colour scheme, before an accent is applied.
@@ -85,7 +121,11 @@ enum class ThemeMode { System, Light, Dark }
  * It is exposed so that the accent can be tested against the scheme it
  * starts from.
  */
-fun baseScheme(dark: Boolean): ColorScheme = if (dark) DarkScheme else LightScheme
+fun baseScheme(dark: Boolean, amoled: Boolean = false): ColorScheme = when {
+    amoled -> AmoledScheme
+    dark -> DarkScheme
+    else -> LightScheme
+}
 
 @Composable
 fun CalcSuiteTheme(
@@ -95,13 +135,17 @@ fun CalcSuiteTheme(
     accent: Accent = Accent.DEFAULT,
     content: @Composable () -> Unit,
 ) {
+    val amoled = themeMode == ThemeMode.Amoled
     val dark = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
-        ThemeMode.Dark -> true
+        ThemeMode.Dark, ThemeMode.Amoled -> true
     }
     val context = LocalContext.current
     val base = when {
+        // AMOLED ignores dynamic colour: a wallpaper-derived scheme would
+        // tint the background and the surface, so they would not be black.
+        amoled -> baseScheme(dark = true, amoled = true)
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> DarkScheme
@@ -114,6 +158,16 @@ fun CalcSuiteTheme(
         colorScheme = scheme,
         typography = CalcTypography,
         shapes = CalcShapes,
-        content = content,
-    )
+    ) {
+        if (amoled) {
+            // The default dark-theme elevation overlay is translucent white:
+            // on an elevated card it would lift true black to grey. Disabling
+            // tonal elevation turns that tinting off, keeping AMOLED black.
+            CompositionLocalProvider(LocalTonalElevationEnabled provides false) {
+                content()
+            }
+        } else {
+            content()
+        }
+    }
 }

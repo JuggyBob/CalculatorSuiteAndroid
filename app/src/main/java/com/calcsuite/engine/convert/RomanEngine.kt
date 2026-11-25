@@ -4,6 +4,7 @@ import com.calcsuite.core.CalcResult
 import com.calcsuite.core.ErrorKind
 import com.calcsuite.core.err
 import com.calcsuite.core.ok
+import java.util.Locale
 
 /**
  * Roman numerals, 1–3999, using strict subtractive notation.
@@ -22,6 +23,9 @@ object RomanEngine {
 
     /** Numerals must stay at or below this value: there is no standard symbol above M. */
     const val MAX_VALUE = 3999
+
+    /** Canonical numerals are at most 15 characters; this leaves room for non-standard forms. */
+    const val MAX_INPUT_LENGTH = 64
 
     private val STEPS: List<Pair<Int, String>> = listOf(
         1000 to "M",
@@ -82,16 +86,19 @@ object RomanEngine {
 
     /** True when [text] is a canonical Roman numeral in 1–3999. */
     fun isValidRoman(text: String): Boolean {
-        val upper = text.trim().uppercase()
-        if (upper.isEmpty()) return false
+        val upper = text.trim().uppercase(Locale.ROOT)
+        if (upper.isEmpty() || upper.length > MAX_INPUT_LENGTH) return false
         if (!CANONICAL_PATTERN.matches(upper)) return false
         return tolerantParse(upper)?.let { it in 1..MAX_VALUE } == true
     }
 
     /** Parses a canonical Roman numeral; explains the canonical form otherwise. */
     fun parse(text: String): CalcResult<Int> {
-        val upper = text.trim().uppercase()
+        val upper = text.trim().uppercase(Locale.ROOT)
         if (upper.isEmpty()) return err(ErrorKind.InvalidInput, "Enter a Roman numeral")
+        if (upper.length > MAX_INPUT_LENGTH) {
+            return err(ErrorKind.InvalidInput, "A Roman numeral is at most $MAX_INPUT_LENGTH characters")
+        }
         val invalidChar = upper.firstOrNull { it !in SYMBOL_VALUES }
         if (invalidChar != null) {
             return err(
@@ -127,20 +134,20 @@ object RomanEngine {
      * I/X/C subtract from a larger following symbol; V/L/D never subtract.
      */
     private fun tolerantParse(upper: String): Int? {
-        var total = 0
+        if (upper.length > MAX_INPUT_LENGTH) return null
+        // Accumulate in Long so a capped but long non-standard form cannot
+        // silently wrap around in an Int before the range check below.
+        var total = 0L
         var index = 0
         while (index < upper.length) {
             val value = SYMBOL_VALUES[upper[index]] ?: return null
             val next = if (index + 1 < upper.length) SYMBOL_VALUES[upper[index + 1]] else null
             val subtracts = next != null && next > value && (upper[index] == 'I' || upper[index] == 'X' || upper[index] == 'C')
-            if (subtracts) {
-                total += next!! - value
-                index += 2
-            } else {
-                total += value
-                index += 1
-            }
+            val contribution = (if (subtracts) next!! - value else value).toLong()
+            total += contribution
+            if (total !in 0..Int.MAX_VALUE.toLong()) return null
+            index += if (subtracts) 2 else 1
         }
-        return total
+        return total.toInt()
     }
 }

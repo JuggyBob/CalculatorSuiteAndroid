@@ -19,6 +19,7 @@ import com.calcsuite.core.CalcResult
 import com.calcsuite.core.Num
 import com.calcsuite.engine.algebra.Factorization
 import com.calcsuite.engine.algebra.PrimeEngine
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.NumberField
@@ -44,17 +45,28 @@ fun PrimeToolScreen(args: ToolArgs) {
 
     var input by rememberSaveable { mutableStateOf(args.prefill("input", "number") ?: "97") }
     val n = Num.parseIntOrNull(input)
+    // Mirror the engine's cap so typing more digits never starts the 40-base
+    // Miller-Rabin work (or a neighbour search) on the composition thread.
+    val tooLargeForPrimality = n != null && n.abs().toString().length > PrimeEngine.MAX_PRIME_DIGITS
 
-    val check = if (n != null) remember(input) { PrimeEngine.isPrime(n) } else null
+    val check = if (n != null && !tooLargeForPrimality) remember(input) { PrimeEngine.isPrime(n) } else null
     val factorization: CalcResult<Factorization>? = if (n != null && n >= BigInteger.valueOf(2L) &&
-        n.toString().length <= LIVE_FACTOR_DIGIT_LIMIT
+        !tooLargeForPrimality && n.toString().length <= LIVE_FACTOR_DIGIT_LIMIT
     ) {
         remember(input) { PrimeEngine.factorizeDetailed(n) }
     } else {
         null
     }
-    val nextPrime = if (n != null) remember(input) { PrimeEngine.nextPrime(n).valueOrNull() } else null
-    val previousPrime = if (n != null) remember(input) { PrimeEngine.previousPrime(n) } else null
+    val nextPrime = if (n != null && !tooLargeForPrimality) {
+        remember(input) { PrimeEngine.nextPrime(n).valueOrNull() }
+    } else {
+        null
+    }
+    val previousPrime = if (n != null && !tooLargeForPrimality) {
+        remember(input) { PrimeEngine.previousPrime(n) }
+    } else {
+        null
+    }
 
     val verdict: String? = when {
         n == null -> null
@@ -74,6 +86,8 @@ fun PrimeToolScreen(args: ToolArgs) {
     val inputError: String? = when {
         input.isBlank() -> "Enter a whole number"
         n == null -> "Enter a valid whole number"
+        tooLargeForPrimality ->
+            "Numbers over ${PrimeEngine.MAX_PRIME_DIGITS} digits cannot be tested here"
         else -> null
     }
 
@@ -94,7 +108,10 @@ fun PrimeToolScreen(args: ToolArgs) {
             placeholder = "97",
             error = inputError,
         )
-        InfoNote("Whole numbers of any size are accepted; very large integers are tested with Miller-Rabin.")
+        InfoNote(
+            "Whole numbers up to ${PrimeEngine.MAX_PRIME_DIGITS} digits are tested with Miller-Rabin; " +
+                "larger values are rejected so the screen stays responsive.",
+        )
 
         if (check != null) {
             ResultCard(
@@ -205,5 +222,7 @@ fun PrimeToolScreen(args: ToolArgs) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+
+        ExplanationCards(AlgebraExplanationsNumber.primeExplanation(check, factorization))
     }
 }

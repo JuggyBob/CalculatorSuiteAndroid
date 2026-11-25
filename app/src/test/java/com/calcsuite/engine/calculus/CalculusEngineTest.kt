@@ -103,7 +103,10 @@ class CalculusEngineTest {
         // The engines print expressions and then re-parse them (extrema scans
         // f', the series test re-evaluates a geometric term), so printing must
         // not change the meaning.
-        val env = mapOf("x" to 1.7, "y" to 2.3)
+        // x must be inside [−1, 1] for the asin/acos cases: the evaluator now
+        // rejects out-of-domain arguments instead of returning NaN, so the
+        // comparison point has to be one where every expression is defined.
+        val env = mapOf("x" to 0.7, "y" to 2.3)
         for (src in listOf(
             "x^2 - 4*x", "4*x - x^2", "x^2*y^3", "x^3", "x*x^2", "1/x",
             "tan(x)", "sin(x^2)", "cos(x)/x", "ln(x)", "e^x", "asin(x)",

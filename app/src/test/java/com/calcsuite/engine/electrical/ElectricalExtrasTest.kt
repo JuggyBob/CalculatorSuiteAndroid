@@ -227,6 +227,46 @@ class ElectricalExtrasTest {
         assertTrue("the reason is given: $message", message.contains("greater than zero"))
     }
 
+    @Test fun aValueThatRoundsUpToThreeDigitsStillHasTwoDigitBands() {
+        // 99.6 rounds to 100 and used to index the eleventh digit band.
+        val result = value(ElectricalExtras.toBands(dec("99.6")))
+        assertEquals("the carried value is named", "100 Ω", result.headline)
+        val bands = row(result, "Bands")!!
+        assertTrue("the first band is the first digit: $bands", bands.startsWith("Brown"))
+        assertTrue("the multiplier carries: $bands", bands.endsWith("Brown"))
+    }
+
+    @Test fun theGreyAndWhiteMultiplierBandsAreKnown() {
+        val bands = listOf(
+            ElectricalExtras.digitBands[4],
+            ElectricalExtras.digitBands[7],
+            ElectricalExtras.multiplierBands.first { it.colour == "Grey" },
+        )
+        assertEquals("47 × 10⁸ is read", "4700000000 Ω", value(ElectricalExtras.fromBands(bands)).headline)
+        assertEquals(
+            "a gigohm is written with the grey multiplier",
+            "1000000000 Ω",
+            value(ElectricalExtras.toBands(dec("1000000000"))).headline,
+        )
+    }
+
+    @Test fun aCapacitorWithABadChargingResistanceIsRefused() {
+        val message = error(ElectricalExtras.capacitor(dec("0.0001"), dec("12"), dec("0")))
+        assertTrue("the reason is given: $message", message.contains("greater than zero"))
+    }
+
+    @Test fun anUnknownTimeConstantKindIsRefused() {
+        val message = error(ElectricalExtras.timeConstant("resistor", dec("1000"), dec("1")))
+        assertTrue("the kind is named: $message", message.contains("RC or RL"))
+    }
+
+    @Test fun anAlternatingCircuitRefusesBadReactanceParts() {
+        val negativeL = error(ElectricalExtras.ac(dec("50"), dec("230"), dec("100"), dec("-0.1"), null))
+        assertTrue("the reason is given: $negativeL", negativeL.contains("inductance"))
+        val zeroC = error(ElectricalExtras.ac(dec("50"), dec("230"), dec("100"), null, dec("0")))
+        assertTrue("the reason is given: $zeroC", zeroC.contains("capacitance"))
+    }
+
     @Test fun everyExtraNamesItsVariablesAndChecks() {
         val result = value(ElectricalExtras.capacitor(dec("0.0001"), dec("12"), dec("1000")))
         assertTrue("there are variables", result.variables.isNotEmpty())

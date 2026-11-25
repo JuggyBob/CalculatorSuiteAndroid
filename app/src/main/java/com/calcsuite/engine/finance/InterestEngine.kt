@@ -5,7 +5,6 @@ import com.calcsuite.core.ErrorKind
 import com.calcsuite.core.err
 import com.calcsuite.core.ok
 import java.math.BigDecimal
-import java.math.BigInteger
 import java.math.MathContext
 import java.math.RoundingMode
 
@@ -307,31 +306,42 @@ object InterestEngine {
      * **Fractional exponents have no exact BigDecimal method**: this falls back
      * to `exp(ln(x)·y)` in double precision for the final step, and the returned
      * `approximate` flag is true. Returns null when the result is not finite
-     * (overflow), so callers can report it instead of emitting Infinity.
+     * (overflow) or an arithmetic step fails, so callers can report it instead
+     * of emitting Infinity or letting an exception escape.
      */
     internal fun decimalPow(
         base: BigDecimal,
         exponent: BigDecimal,
         mc: MathContext = MC,
     ): Pair<BigDecimal, Boolean>? {
-        val stripped = exponent.stripTrailingZeros()
-        if (stripped.scale() <= 0) {
-            val integer = try {
-                stripped.toBigIntegerExact()
-            } catch (_: ArithmeticException) {
-                null
-            }
-            if (integer != null && integer.abs() <= BigInteger.valueOf(100_000L)) {
-                val e = integer.toInt()
-                val result = if (e >= 0) {
-                    base.pow(e, mc)
-                } else {
-                    BigDecimal.ONE.divide(base.pow(-e, mc), mc)
+        // 0^negative would divide by zero in the exact path; the double path
+        // also treats it as non-finite, so report "not representable" instead.
+        if (base.signum() == 0 && exponent.signum() < 0) return null
+        return try {
+            val stripped = exponent.stripTrailingZeros()
+            val exactLimit = BigDecimal.valueOf(100_000L)
+            // Compare before converting: toBigIntegerExact() on something like
+            // 1e1000000000 would try to build a billion-digit BigInteger.
+            if (stripped.scale() <= 0 && stripped.abs() <= exactLimit) {
+                val integer = try {
+                    stripped.toBigIntegerExact()
+                } catch (_: ArithmeticException) {
+                    null
                 }
-                return result to false
+                if (integer != null) {
+                    val e = integer.toInt()
+                    val result = if (e >= 0) {
+                        base.pow(e, mc)
+                    } else {
+                        BigDecimal.ONE.divide(base.pow(-e, mc), mc)
+                    }
+                    return result to false
+                }
             }
+            doublePow(base, exponent)
+        } catch (_: ArithmeticException) {
+            null
         }
-        return doublePow(base, exponent)
     }
 
     /** `e^x` in double precision; null when not finite. */

@@ -15,11 +15,12 @@ import java.math.RoundingMode
  * ## Rounding policy
  * Money is tracked in whole cents: every scheduled payment, every interest
  * charge and every balance is a cent amount (scale 2, HALF_UP). The level
- * payment is rounded to the nearest cent (HALF_UP); when that is a fraction
- * of a cent *below* the exact annuity payment, the small residue is cleared
- * by adjusting the final instalment, so the balance reaches exactly zero at
- * the end of the contractual term. Because balances are updated by exact
- * decimal subtraction, `Σ principal payments = principal` holds exactly.
+ * payment is rounded to the nearest cent (HALF_UP); when that is *below* the
+ * exact annuity payment, the resulting residue (which grows with the term)
+ * is cleared by adjusting the final instalment, so the balance reaches
+ * exactly zero at the end of the contractual term. Because balances are
+ * updated by exact decimal subtraction, `Σ principal payments = principal`
+ * holds exactly.
  *
  * ## Extras
  * An extra amount can be added to every payment and/or as a one-off lump sum
@@ -37,9 +38,6 @@ object LoanEngine {
     val MC: MathContext = MathContext(20, RoundingMode.HALF_UP)
 
     private val HUNDRED = BigDecimal("100")
-
-    /** Upper bound for clearing a rounded-down payment on the final instalment. */
-    private val FINAL_RESIDUE_LIMIT = BigDecimal("1.5")
 
     /** Schedules are truncated to this many rows; totals still use all periods. */
     const val MAX_SCHEDULE_ROWS = 1200
@@ -173,15 +171,13 @@ object LoanEngine {
             if (payment.compareTo(due) >= 0) {
                 // Normal last payment (with or without extras): pay only what is due.
                 payment = due
-            } else if (
-                period == periods &&
-                due.compareTo(scheduledPayment.multiply(FINAL_RESIDUE_LIMIT, MC)) <= 0
-            ) {
-                // Rounding the level payment down leaves a residue of a few
-                // cents after the contractual term; the final instalment
-                // absorbs it so the loan ends on schedule. The 1.5× bound keeps
-                // genuinely non-amortising inputs (balance still growing) out
-                // of this branch.
+            } else if (period == periods) {
+                // Rounding the level payment down leaves a residue after the
+                // contractual term; for long terms that residue can exceed
+                // one whole payment. The final instalment always absorbs it
+                // so the loan ends on schedule. Every earlier period has
+                // already been checked for a positive principal reduction,
+                // which keeps genuinely non-amortising inputs out.
                 payment = due
             }
             val principalPart = payment.subtract(interest)
@@ -266,18 +262,25 @@ object LoanEngine {
             "Showing the first ${result.schedule.size} of ${result.payoffPeriods} periods."
         }
 
-    /** "5 years 0 months"-style label for a number of periods. */
+    /**
+     * "5 years 0 months"-style label for a number of periods.
+     * Returns "Unavailable" for a non-positive [paymentsPerYear] or a negative
+     * [periods], so a malformed value can never throw while rendering a screen.
+     */
     fun payoffLabel(periods: Int, paymentsPerYear: Int): String {
+        if (paymentsPerYear < 1 || periods < 0) return "Unavailable"
+        // Months can exceed Int range for a very long term; use Long arithmetic
+        // all the way to the label instead of narrowing with toInt().
         val months = BigDecimal.valueOf(periods.toLong())
             .multiply(BigDecimal("12"))
             .divide(BigDecimal.valueOf(paymentsPerYear.toLong()), 0, RoundingMode.HALF_UP)
-            .toInt()
+            .toLong()
         val years = months / 12
         val rest = months % 12
         return when {
-            years == 0 -> "$rest month${if (rest == 1) "" else "s"}"
-            rest == 0 -> "$years year${if (years == 1) "" else "s"}"
-            else -> "$years year${if (years == 1) "" else "s"} $rest month${if (rest == 1) "" else "s"}"
+            years == 0L -> "$rest month${if (rest == 1L) "" else "s"}"
+            rest == 0L -> "$years year${if (years == 1L) "" else "s"}"
+            else -> "$years year${if (years == 1L) "" else "s"} $rest month${if (rest == 1L) "" else "s"}"
         }
     }
 }

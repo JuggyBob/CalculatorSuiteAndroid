@@ -187,6 +187,15 @@ class AccentTest {
         val darkHsl = dark.primary.toHsl()
         assertEquals("the hue should not change", hsl.hue.toDouble(), darkHsl.hue.toDouble(), 0.02)
     }
+
+    @Test fun theDefaultAccentIsStillGreenForTheAmoledTheme() {
+        assertEquals(AccentPreset.GREEN, Accent.DEFAULT.preset)
+        val base = baseScheme(dark = true, amoled = true)
+        val scheme = accentScheme(base, Accent.DEFAULT.colour, dark = true)
+        assertEquals("AMOLED background must stay the app's own", base.background, scheme.background)
+        assertEquals("AMOLED surface must stay the app's own", base.surface, scheme.surface)
+        assertEquals("AMOLED text must stay the app's own", base.onSurface, scheme.onSurface)
+    }
 }
 
 /** The relative brightness of a colour. */

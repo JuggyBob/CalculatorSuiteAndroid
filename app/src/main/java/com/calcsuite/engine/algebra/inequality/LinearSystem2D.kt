@@ -77,6 +77,13 @@ object LinearSystem2D {
         }
         val x = variables[0]
         val y = variables[1]
+        // flatten() treats every relation as a condition that must hold. An
+        // "or" would need the union of half-planes, not their intersection.
+        if (containsOr(relation)) {
+            return InequalityResult.Failed(
+                "This mode cannot draw an \"or\" between inequalities. Solve each inequality separately.",
+            )
+        }
         val parts = flatten(relation)
         if (parts.isEmpty()) return InequalityResult.Failed("Enter at least one inequality")
 
@@ -155,6 +162,12 @@ object LinearSystem2D {
         is Rel.Simple -> listOf(relation)
         is Rel.And -> relation.parts.flatMap { flatten(it) }
         is Rel.Or -> relation.parts.flatMap { flatten(it) }
+    }
+
+    private fun containsOr(relation: Rel): Boolean = when (relation) {
+        is Rel.Simple -> false
+        is Rel.And -> relation.parts.any { containsOr(it) }
+        is Rel.Or -> true
     }
 
     /** The linear form of an expression, or null when it is not linear in x and y. */

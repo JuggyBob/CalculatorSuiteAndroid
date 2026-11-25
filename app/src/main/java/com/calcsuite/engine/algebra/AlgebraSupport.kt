@@ -23,11 +23,13 @@ internal fun bigSqrt(value: BigDecimal, context: MathContext = ALG_CTX): BigDeci
     if (value.compareTo(BigDecimal.ONE) == 0) return BigDecimal.ONE
     val work = MathContext(context.precision + 12, RoundingMode.HALF_UP)
     val two = BigDecimal.valueOf(2)
+    // Relative, not absolute: an absolute stop would fire long before convergence
+    // for very small values and quietly return a root with too few digits.
     val tolerance = BigDecimal.ONE.scaleByPowerOfTen(-(context.precision + 6))
     var x = sqrtSeed(value)
     repeat(400) {
         val next = x.add(value.divide(x, work), work).divide(two, work)
-        if (next.subtract(x).abs() < tolerance) return next.round(context)
+        if (next.subtract(x).abs().compareTo(x.abs().multiply(tolerance)) <= 0) return next.round(context)
         x = next
     }
     return x.round(context)
@@ -64,7 +66,7 @@ internal fun bigNthRoot(value: BigDecimal, n: Int, context: MathContext = ALG_CT
         val next = x.multiply(nMinusOne, work)
             .add(value.divide(power, work), work)
             .divide(nBd, work)
-        if (next.subtract(x).abs() < tolerance) return next.round(context)
+        if (next.subtract(x).abs().compareTo(x.abs().multiply(tolerance)) <= 0) return next.round(context)
         x = next
     }
     return x.round(context)

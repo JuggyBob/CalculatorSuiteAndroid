@@ -56,6 +56,9 @@ data class ComplexNum(val re: Double, val im: Double = 0.0) {
     /** True when the imaginary part is zero to working precision. */
     val isReal: Boolean get() = abs(im) < 1e-12
 
+    /** True when both parts are finite, so the number can be shown as an answer. */
+    val isFinite: Boolean get() = re.isFinite() && im.isFinite()
+
     /** True when the number is exactly zero. */
     val isZero: Boolean get() = re == 0.0 && im == 0.0
 

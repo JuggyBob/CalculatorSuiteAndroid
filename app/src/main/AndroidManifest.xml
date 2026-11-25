@@ -19,6 +19,9 @@
         android:name=".CalculatorApp"
         android:label="Calc Suite"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="true"
         android:theme="@style/Theme.CalcSuite">
         <activity

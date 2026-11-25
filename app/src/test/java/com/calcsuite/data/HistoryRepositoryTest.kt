@@ -58,4 +58,40 @@ class HistoryRepositoryTest {
     @Test fun historyIsCappedAtFiveHundred() {
         assertEquals(500, HistoryRepository.MAX_ENTRIES)
     }
+
+    @Test fun decodeCapsEntryCountAndKeepsTheNewest() {
+        val many = (1L..600L).map { HistoryEntry(it, "t", "T", "c", "in", "res", it) }
+        val decoded = HistoryRepository.decode(HistoryRepository.encode(many))
+        assertEquals(HistoryRepository.MAX_ENTRIES, decoded.size)
+        assertEquals(1L, decoded.first().id)
+        assertEquals(500L, decoded.last().id)
+    }
+
+    @Test fun oversizedStoredJsonIsRejected() {
+        val huge = "x".repeat(HistoryLimits.MAX_STORED_JSON_LENGTH + 1)
+        assertTrue(HistoryRepository.decode(huge).isEmpty())
+    }
+
+    @Test fun decodeTruncatesLongFieldsAndValues() {
+        val longText = "x".repeat(HistoryLimits.MAX_TEXT_LENGTH + 50)
+        val longValue = "v".repeat(HistoryLimits.MAX_VALUE_LENGTH + 50)
+        val entry = HistoryEntry(
+            id = 1L, toolId = "t", toolTitle = "T", category = "c",
+            input = longText, result = longText, timestamp = 1L,
+            values = (0 until HistoryLimits.MAX_VALUES_PER_ENTRY + 5).associate {
+                "k$it" to longValue
+            },
+        )
+        val decoded = HistoryRepository.decode(HistoryRepository.encode(listOf(entry)))
+        assertEquals(1, decoded.size)
+        assertEquals(HistoryLimits.MAX_TEXT_LENGTH, decoded[0].input.length)
+        assertEquals(HistoryLimits.MAX_TEXT_LENGTH, decoded[0].result.length)
+        assertEquals(HistoryLimits.MAX_VALUES_PER_ENTRY, decoded[0].values.size)
+        assertTrue(decoded[0].values.values.all { it.length == HistoryLimits.MAX_VALUE_LENGTH })
+    }
+
+    @Test fun deeplyNestedJsonDoesNotCrash() {
+        val nested = "[".repeat(20_000) + "0" + "]".repeat(20_000)
+        assertTrue(HistoryRepository.decode(nested).isEmpty())
+    }
 }

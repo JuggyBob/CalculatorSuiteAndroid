@@ -83,7 +83,7 @@ data class RealSet(val intervals: List<Interval>) {
     /**
      * The closure: the set together with all its limit points.
      */
-    fun closure(): RealSet = RealSet(intervals.map { it.closure() })
+    fun closure(): RealSet = fromIntervals(intervals.map { it.closure() })
 
     /**
      * The boundary: the parts of the closure that are not in the interior.
@@ -92,13 +92,14 @@ data class RealSet(val intervals: List<Interval>) {
         val points = mutableListOf<Interval>()
         for (interval in intervals) {
             if (interval.isPoint) {
-                points.add(interval)
+                if (interval.from.isFinite()) points.add(interval)
                 continue
             }
-            // Both ends of an interval are limit points of it, whether they
-            // are included or not, so both are in the boundary.
-            points.add(Interval(interval.from, interval.from))
-            points.add(Interval(interval.to, interval.to))
+            // Both finite ends of an interval are limit points of it, whether
+            // they are included or not, so both are in the boundary. An
+            // infinite end is not a point of the real line.
+            if (interval.from.isFinite()) points.add(Interval(interval.from, interval.from))
+            if (interval.to.isFinite()) points.add(Interval(interval.to, interval.to))
         }
         return RealSet.fromIntervals(points)
     }
@@ -172,13 +173,20 @@ data class RealSet(val intervals: List<Interval>) {
             val merged = mutableListOf<Interval>()
             var current = sorted.first()
             for (next in sorted.drop(1)) {
-                val touching = next.from <= current.to
-                // Two intervals that meet at a point are merged, and the point
-                // is kept when either of them includes it.
+                // Intervals that only meet at a missing point are not a single
+                // interval: (0, 1) ∪ (1, 2) is not (0, 2). Every other kind of
+                // contact joins them.
+                val touching = next.from < current.to ||
+                    (next.from == current.to && !(current.openTo && next.openFrom))
                 if (touching) {
-                    val openFrom = current.openFrom && next.openFrom
-                    val openTo = if (next.to > current.to) next.openTo else current.openTo
+                    // The left end is still current's; a point that next also
+                    // starts at is kept when either interval keeps it. The
+                    // right end is the later of the two, and is excluded only
+                    // when every interval reaching it excludes it.
+                    val openFrom = current.openFrom && (next.from > current.from || next.openFrom)
                     val to = maxOf(current.to, next.to)
+                    val openTo = (current.to < to || current.openTo) &&
+                        (next.to < to || next.openTo)
                     current = Interval(current.from, to, openFrom, openTo)
                 } else {
                     merged.add(current)
@@ -215,6 +223,7 @@ fun parseInterval(text: String): Interval? {
     }
     val bounds = inner.split(",").map { it.trim().toDoubleOrNull() ?: return null }
     if (bounds.size != 2 || bounds[0] > bounds[1]) return null
+    if (bounds.any { !it.isFinite() }) return null
     return Interval(
         from = bounds[0],
         to = bounds[1],
@@ -236,23 +245,74 @@ data class FiniteSpace(
     /** The smallest open neighbourhood of each point, as indices into [points]. */
     val neighbourhoods: List<List<Int>>,
 ) {
-    /** The open sets of the space: every union of the smallest neighbourhoods. */
-    fun openSets(): List<Set<Int>> {
+    companion object {
+        /**
+         * The largest finite space the tool will enumerate.
+         *
+         * Enumerating the topology visits one mask per subset, so the work
+         * doubles with every added point. Twelve points mean at most 4096
+         * masks, which is quick; 31 points made the old `1 shl size` overflow
+         * and silently gave a wrong answer.
+         */
+        const val MAX_POINTS = 12
+
+        /**
+         * Builds a space, or null when it is too large or its neighbourhoods
+         * do not describe exactly the given points.
+         *
+         * Callers that read user text should use this rather than the
+         * constructor, so an over-large space is rejected instead of throwing.
+         */
+        fun ofOrNull(points: List<String>, neighbourhoods: List<List<Int>>): FiniteSpace? {
+            if (points.isEmpty() || points.size > MAX_POINTS) return null
+            if (neighbourhoods.size != points.size) return null
+            if (neighbourhoods.any { it.any { index -> index !in points.indices } }) return null
+            return FiniteSpace(points, neighbourhoods)
+        }
+    }
+
+    init {
+        // The engine guard as well as the parser guard: no space may be built
+        // that would make the enumeration overflow or run for a long time.
+        require(points.size <= MAX_POINTS) {
+            "a finite space may have at most $MAX_POINTS points"
+        }
+        require(neighbourhoods.size == points.size) {
+            "there must be one neighbourhood for every point"
+        }
+    }
+
+    /**
+     * The open sets of the space: every union of the smallest neighbourhoods.
+     *
+     * Computed once and shared. The topology is immutable, and several of the
+     * questions below ask about it repeatedly; rebuilding it each time would
+     * repeat the whole exponential enumeration.
+     */
+    private val computedOpenSets: List<Set<Int>> by lazy {
         val out = mutableSetOf<Set<Int>>()
         out.add(emptySet())
-        val total = 1 shl points.size
-        for (mask in 1 until total) {
+        // A Long mask keeps the shift well defined even if the guard above is
+        // bypassed by reflection; with at most twelve points it is exact.
+        val total = 1L shl points.size
+        for (mask in 1L until total) {
             val union = mutableSetOf<Int>()
             for (i in points.indices) {
-                if (mask and (1 shl i) != 0) union.addAll(neighbourhoods[i])
+                if (mask and (1L shl i) != 0L) union.addAll(neighbourhoods[i])
             }
             out.add(union)
         }
-        return out.toList()
+        out.toList()
     }
 
+    /** The same family as a set, for constant-time membership tests. */
+    private val openSetLookup: Set<Set<Int>> by lazy { computedOpenSets.toSet() }
+
+    /** The open sets of the space: every union of the smallest neighbourhoods. */
+    fun openSets(): List<Set<Int>> = computedOpenSets
+
     /** True when the subset is open. */
-    fun isOpen(subset: Set<Int>): Boolean = subset in openSets().toSet()
+    fun isOpen(subset: Set<Int>): Boolean = subset in openSetLookup
 
     /** True when the subset is closed. */
     fun isClosed(subset: Set<Int>): Boolean = isOpen(points.indices.toSet() - subset)
@@ -262,7 +322,7 @@ data class FiniteSpace(
      */
     fun interior(subset: Set<Int>): Set<Int> {
         var out = emptySet<Int>()
-        for (candidate in openSets()) {
+        for (candidate in computedOpenSets) {
             if (candidate.all { it in subset }) {
                 if (candidate.size > out.size) out = candidate
             }
@@ -278,7 +338,7 @@ data class FiniteSpace(
         // which is the intersection of all the closed sets that contain it.
         var out = points.indices.toSet()
         var first = true
-        for (candidate in openSets()) {
+        for (candidate in computedOpenSets) {
             val complement = points.indices.toSet() - candidate
             if (subset.all { it in complement }) {
                 if (first) {
@@ -300,10 +360,9 @@ data class FiniteSpace(
      * two non-empty open parts.
      */
     fun isConnected(): Boolean {
-        val opens = openSets().toSet()
-        for (candidate in opens) {
+        for (candidate in openSetLookup) {
             if (candidate.isEmpty() || candidate.size == points.size) continue
-            if (isOpen(points.indices.toSet() - candidate)) return false
+            if ((points.indices.toSet() - candidate) in openSetLookup) return false
         }
         return true
     }
@@ -360,7 +419,7 @@ data class PlaneRegion(
     /** The area of the region. */
     val area: Double
         get() = when (kind) {
-            Kind.RECTANGLE -> (b - a) * (b - a)
+            Kind.RECTANGLE -> 4 * radius * radius
             Kind.DISC -> Math.PI * radius * radius
             Kind.HALF_PLANE, Kind.WHOLE_PLANE -> Double.POSITIVE_INFINITY
         }

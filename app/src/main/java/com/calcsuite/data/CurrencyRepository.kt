@@ -60,13 +60,15 @@ object RateParser {
             if (status != "success") {
                 return err(ErrorKind.Unavailable, root.optString("error-type", "Rate provider reported an error"))
             }
-            val base = root.optString("base_code", root.optString("base", "USD"))
+            val rawBase = root.optString("base_code", root.optString("base", "USD"))
+            val base = if (RateLimits.isValidCurrencyCode(rawBase)) rawBase else "USD"
             val ratesObject = root.optJSONObject("rates")
                 ?: return err(ErrorKind.Unavailable, "Rate data was missing from the provider response")
-            val rates = HashMap<String, BigDecimal>(ratesObject.length())
+            val rates = HashMap<String, BigDecimal>(minOf(ratesObject.length(), RateLimits.MAX_RATES))
             val keys = ratesObject.keys()
-            while (keys.hasNext()) {
+            while (keys.hasNext() && rates.size < RateLimits.MAX_RATES) {
                 val code = keys.next()
+                if (!RateLimits.isValidCurrencyCode(code)) continue
                 val raw = ratesObject.optDouble(code, Double.NaN)
                 if (raw.isFinite() && raw > 0.0) {
                     rates[code] = BigDecimal.valueOf(raw)
@@ -75,16 +77,20 @@ object RateParser {
             if (rates.isEmpty()) {
                 return err(ErrorKind.Unavailable, "The provider returned no usable rates")
             }
-            val lastUpdate = root.optLong("time_last_update_unix", fetchedAtMillis / 1000L) * 1000L
+            val fetchedSeconds = RateLimits.saneFetchedSeconds(fetchedAtMillis)
+            val rawUpdate = root.optLong("time_last_update_unix", fetchedSeconds)
+            val lastUpdate = RateLimits.saneProviderSeconds(rawUpdate, fetchedAtMillis) * 1000L
             ok(
                 RatesSnapshot(
                     base = base,
                     rates = rates,
-                    fetchedAtMillis = fetchedAtMillis,
+                    fetchedAtMillis = fetchedSeconds * 1000L,
                     providerUpdatedAtMillis = lastUpdate,
                     sourceLabel = SOURCE_LABEL,
                 ),
             )
+        } catch (_: StackOverflowError) {
+            err(ErrorKind.Unavailable, "The exchange-rate data could not be read")
         } catch (_: Exception) {
             err(ErrorKind.Unavailable, "The exchange-rate data could not be read")
         }
@@ -129,21 +135,26 @@ class CurrencyRepository(context: Context) {
     /** Cached snapshot, or null when the app has never fetched successfully. */
     val cached: Flow<RatesSnapshot?> = store.data.map { prefs ->
         val json = prefs[KEY_RATES_JSON] ?: return@map null
+        if (json.length > RateLimits.MAX_RESPONSE_CHARS) return@map null
         val fetchedAt = prefs[KEY_RATES_FETCHED] ?: 0L
         RateParser.parse(json, fetchedAt).valueOrNull()
     }
 
     /** Fetches fresh rates and stores them on success. */
     suspend fun refresh(base: String = "USD"): CalcResult<RatesSnapshot> = withContext(Dispatchers.IO) {
-        val result = fetchRates(base)
-        if (result is CalcResult.Ok) {
-            store.edit { prefs ->
-                prefs[KEY_RATES_JSON] = result.value.toJson()
-                prefs[KEY_RATES_FETCHED] = result.value.fetchedAtMillis
-                prefs[KEY_RATES_BASE] = result.value.base
+        if (!RateLimits.isValidCurrencyCode(base)) {
+            err<RatesSnapshot>(ErrorKind.InvalidInput, RateLimits.INVALID_CODE_MESSAGE)
+        } else {
+            val result = fetchRates(base)
+            if (result is CalcResult.Ok) {
+                store.edit { prefs ->
+                    prefs[KEY_RATES_JSON] = result.value.toJson()
+                    prefs[KEY_RATES_FETCHED] = result.value.fetchedAtMillis
+                    prefs[KEY_RATES_BASE] = result.value.base
+                }
             }
+            result
         }
-        result
     }
 
     private fun RatesSnapshot.toJson(): String {
@@ -158,6 +169,11 @@ class CurrencyRepository(context: Context) {
     }
 
     private fun fetchRates(base: String): CalcResult<RatesSnapshot> {
+        // Only a plain three-letter code may reach the URL: anything else is
+        // rejected before a request is built.
+        if (!RateLimits.isValidCurrencyCode(base)) {
+            return err(ErrorKind.InvalidInput, RateLimits.INVALID_CODE_MESSAGE)
+        }
         val url = URL("https://open.er-api.com/v6/latest/$base")
         var connection: HttpURLConnection? = null
         return try {
@@ -172,7 +188,9 @@ class CurrencyRepository(context: Context) {
             if (code != 200) {
                 return err(ErrorKind.Unavailable, "Exchange-rate service returned HTTP $code")
             }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val body = connection.inputStream.bufferedReader().use { reader ->
+                RateLimits.readTextCapped(reader, RateLimits.MAX_RESPONSE_CHARS)
+            }
             RateParser.parse(body, System.currentTimeMillis())
         } catch (e: java.net.UnknownHostException) {
             err(ErrorKind.Unavailable, "No internet connection")

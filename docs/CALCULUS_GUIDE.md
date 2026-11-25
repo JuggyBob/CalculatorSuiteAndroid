@@ -2,13 +2,15 @@
 
 The calculus tools take **one expression** and run a piece of mathematics on it, showing the working for each. There are fourteen of them — derivatives, integrals, limits, Taylor and Maclaurin, summations and products, infinite series, roots, extrema, the function graph, differential equations, multivariable calculus, Fourier analysis, complex analysis and partial differential equations — and they all share the expression language described below.
 
+Nine of these tools — Derivatives, Integrals, Limits, Taylor & Maclaurin, Summations & Products, Infinite Series, Roots, Extrema & Optimization and Function Graphing — share eight expandable **analysis panels**: Definition, Formula, Conditions, Method, Step-by-step work, Interpretation, Verification and Limitations.
+
 > **This guide is deliberately specific about limits.** Some of the symbolic engine's boundaries produce surprising results, and a document that glossed over them would be worse than useless. Everything in [Limitations](#9-limitations--read-this) is verified against the code.
 
 ---
 
 ## 1. The expression language
 
-The Calculus tool has **its own parser**, separate from the scientific calculator's. The two do not share syntax, and the scientific calculator's functions and angle modes are *not* available here.
+The calculus tools have **their own parser**, separate from the scientific calculator's. The two do not share syntax, and the scientific calculator's functions and angle modes are *not* available here.
 
 ### Grammar
 
@@ -50,19 +52,17 @@ primary    := number | constant | name '(' args ')' | name | '(' expression ')'
 | Rounding | `abs` `sign` `floor` `ceil` `round` |
 | Other | `min` `max` `fact` |
 
-**The tool always works in radians.** There is no degree mode here — convert explicitly with `deg(x)` and `rad(x)` if you need to.
+**The tools always work in radians.** There is no degree mode here — convert explicitly with `deg(x)` and `rad(x)` if you need to.
 
 ### One field, fourteen tools
 
-Type an expression into `f(x) =`, then pick the operation:
-
-`d/dx` · `∫` · `lim` · `Σ∞` · `T` · `Σ Π` · `= 0` · `f′=0` · `y′` · `plot`
+Each tool opens with its operation preselected: type `f(x)` and press **Calculate**.
 
 ---
 
 ## 2. Symbolic or numerical?
 
-The tool is explicit about which is which. This distinction matters when reading a result.
+Each tool is explicit about which is which. This distinction matters when reading a result.
 
 | Operation | Method | Marked `≈`? |
 |---|---|---|
@@ -286,6 +286,8 @@ The heat and wave equations along a rod, and Laplace’s and Poisson’s equatio
 
 The stability condition is checked **before** anything is computed, and the tool refuses a step that would make the numbers grow. The two-dimensional route relaxes the grid until the values stop changing, and the field is drawn as a colour map whose colours follow the accent colour you have chosen.
 
+The field is drawn as a bitmap at the canvas resolution, at no more than one pixel per cell, so a dense grid no longer stalls the picture. In a profiling run janky frames fell from 29.91% to 22.22%, the 90th-percentile frame from 34 ms to 22 ms, and the worst frame from 101 ms to 34 ms.
+
 The boundary of the two-dimensional equations is a single expression used on all four sides, so the textbook "hot along the top, cold elsewhere" cannot be written directly.
 
 ## 9. Limitations — read this
@@ -328,7 +330,7 @@ Symbolic root-finding for cubics or quartics; implicit-equation solving; indefin
 
 ## 10. Conventions & Help
 
-The tool's own **Conventions & Help** panel contains the symbol table, the full syntax, a per-operation explanation and worked examples. It sits at the bottom of the screen and is hidden while the tool is expanded to fullscreen, so the plot gets the whole screen.
+Each tool's own **Conventions & Help** panel contains the symbol table, the full syntax, a per-operation explanation and worked examples. It sits at the bottom of the screen, as do the eight analysis panels, and both are hidden while a calculus tool is expanded to fullscreen, so the plot gets the whole screen.
 
 ---
 

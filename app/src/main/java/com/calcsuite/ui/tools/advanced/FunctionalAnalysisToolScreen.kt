@@ -229,14 +229,20 @@ private fun ProjectionSection() {
     val b = parseVector(right)
     if (rows == null || b == null || rows.isEmpty()) {
         InfoNote("Give the points of the data set as rows, and the values on the right as " +
-            "one number per row, to fit a line to them.")
+            "one finite number per row, to fit a line to them. At most " +
+            "${Matrix.MAX_DIM} rows and ${Matrix.MAX_DIM} columns are accepted.")
     } else if (rows.size != b.size) {
         // The data vector holds one value for each row of the matrix, so the
         // two have to agree.
         ErrorNotice("The data has ${rows.size} row(s) but ${b.size} value(s) were given on " +
             "the right; they have to match.")
     } else {
-        val matrix = Matrix(rows.size, rows[0].size)
+        val matrix = Matrix.ofOrNull(rows.size, rows[0].size)
+        if (matrix == null) {
+            ErrorNotice("The data is too large. Use at most ${Matrix.MAX_DIM} rows and " +
+                "${Matrix.MAX_DIM} columns.")
+            return
+        }
         for (i in rows.indices) for (j in rows[0].indices) matrix[i, j] = rows[i][j]
         val fit = LinearAlgebra.leastSquares(matrix, b)
         if (fit != null) {
@@ -293,8 +299,8 @@ private fun OperatorSection() {
     val rows = parseMatrix(matrixText)
     val vector = parseVector(vectorText)
     if (rows == null || rows.isEmpty() || rows.any { it.size != rows[0].size }) {
-        ErrorNotice("The matrix could not be read. Give the rows separated by " +
-            "semicolons and the columns by commas.")
+        ErrorNotice("The matrix could not be read. Give finite numbers, rows separated " +
+            "by semicolons and columns by commas, with at most ${Matrix.MAX_DIM} of each.")
         return
     }
     if (rows.size != rows[0].size) {
@@ -304,7 +310,12 @@ private fun OperatorSection() {
             "${rows.size} by ${rows[0].size}.")
         return
     }
-    val matrix = Matrix(rows.size, rows[0].size)
+    val matrix = Matrix.ofOrNull(rows.size, rows[0].size)
+    if (matrix == null) {
+        ErrorNotice("The matrix is too large. Use at most ${Matrix.MAX_DIM} rows and " +
+            "${Matrix.MAX_DIM} columns.")
+        return
+    }
     for (i in rows.indices) for (j in rows[0].indices) matrix[i, j] = rows[i][j]
 
     val eigen = matrix.eigen()
@@ -439,8 +450,12 @@ private fun ConceptsSection() {
  */
 private fun parseVector(text: String): DoubleArray? {
     val parts = text.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-    if (parts.isEmpty()) return null
-    val values = parts.map { it.toDoubleOrNull() ?: return null }
+    if (parts.isEmpty() || parts.size > Matrix.MAX_DIM) return null
+    val values = parts.map {
+        val value = it.toDoubleOrNull() ?: return null
+        if (!value.isFinite()) return null
+        value
+    }
     return values.toDoubleArray()
 }
 
@@ -466,13 +481,20 @@ private fun parseMatrix(text: String): List<List<Double>>? {
     for (part in text.split(";")) {
         val trimmed = part.trim()
         if (trimmed.isEmpty()) continue
-        val row = trimmed.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            .map { it.toDoubleOrNull() ?: return null }
-        if (row.isEmpty()) return null
+        val cells = trimmed.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (cells.isEmpty()) return null
+        val row = cells.map { cell ->
+            val value = cell.toDoubleOrNull() ?: return null
+            // NaN and infinity must not enter a matrix: they would spread
+            // through every elimination and be shown as a normal answer.
+            if (!value.isFinite()) return null
+            value
+        }
         rows.add(row)
     }
-    if (rows.isEmpty()) return null
+    if (rows.isEmpty() || rows.size > Matrix.MAX_DIM) return null
     val width = rows[0].size
+    if (width !in 1..Matrix.MAX_DIM) return null
     if (rows.any { it.size != width }) return null
     return rows
 }

@@ -6,6 +6,47 @@ This project uses a plain, human-written changelog. **Version 1.0.0 was the firs
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for the version number.
 
+## [3.1.0] — 2026-11-25
+
+A release that adds a true-black theme, brings the written analysis to the algebra and calculus tools, turns settings into a hub of four pages, and looks for an update when the app starts. Expanding the calculator is now a short animation rather than a jump, and the partial-differential-equation picture is drawn with far less stutter. `versionName = 3.1.0`, `versionCode = 8`, `minSdk 26`, `targetSdk 36`. The app offers **66 tools across 9 categories**.
+
+The release APK was built and verified: versionName 3.1.0, versionCode 8, signed with the same key as 3.0.3 (certificate 55071A…), so it installs over 3.0.3 with settings and history intact.
+
+### Added
+
+- **Amoled, a fourth theme.** Alongside System, Light and Dark there is now **Amoled**, with a true-black `#000000` background. Dynamic colour is set aside in this theme, because a wallpaper-derived palette would lift the background away from black, and the system bars are dark to match. The app's own first composed frame is black. The one exception, in the platform's own starting window, is set out under *Known limitation* below.
+- **Eight analysis panels in 17 tools.** Every one of the **17 tools** that explain their working — the **8 algebra tools** and the **9 calculus tools** — now presents eight panels of analysis alongside the answer. The panels are drawn from the calculation the tool actually ran, so the text belongs to the problem in front of you rather than being a generic description. Fullscreen views keep the graph as the main event: the panels are hidden while expanded and return when the view is restored.
+- **A settings hub of four pages.** Settings no longer opens as one long scroll. It now opens on a hub with four pages, each with a leading icon, and the system Back button returns to the hub. The existing options, dialogs and the About screen keep their behaviour; only the way they are reached has changed.
+- **An update check on start.** Once onboarding is finished, the app looks for a newer release when it starts. The check is throttled to at most once every three hours, waits for a connection, and falls back to the cached release notes when the phone is offline. A newer version produces a popup with the notes and a **Download & install now** button; **Never show again** suppresses that popup for that version alone. Installing is left to Android, which asks you to confirm.
+
+### Changed
+
+- **Expanding and collapsing the calculator is animated.** The `=` button now grows the calculator over 200 ms and shrinks it again over the same interval, with the keypad and the result cross-fading rather than jumping. The geometry is preserved across cycles: the bottom edge of `=` sits at **1631 ↔ 2421 on the Poco X4 GT** and **1501 ↔ 2322 on the API 36 emulator**, and a result such as `15` survives two full cycles. The graph grows with the view, from **660 → 968 px** on the Poco and **630 → 939 px** on the emulator.
+- **Settings are split into pages.** The single scrolling list has been replaced by the four-page hub described above, with the same settings reachable in fewer scrolls and a clear way back.
+- **The PDE field is drawn more smoothly.** On the same emulator, following the same procedure, janky frames fell from **29.91% to 22.22%**, the 90th-percentile frame from **34 ms to 22 ms**, and the worst frame from **101 ms to 34 ms**. The numerical output is unchanged: the rendering work was cut down, not the mathematics.
+
+### Fixed
+
+- **Seventy-seven findings were fixed across ten engine packages.** Most were in validation, error messages and boundary handling — inputs that were accepted when they should have been refused, refused when they should have been accepted, or described with the wrong message. The visible corrections include the final payment of a loan, absolute-value inequalities, systems reported as consistent when they are not, the verdict on the harmonic series, Euler and Heun stepping, complex roots and residues, a crash in the resistor colour bands, the square root in Ohm's law, cancellation in Heron's formula, and the checks on Fourier coefficients. They are summarised here rather than listed one by one; the point is that the engines now agree with the examples they are given.
+
+### Security
+
+- The update path was hardened: the download filename and path are validated, release links must use **https** and point at **GitHub**, redirects are checked against the expected host, responses are capped at **2 MiB of JSON** and **512 MiB of APK**, and digests are limited to a **SHA-256/SHA-512** whitelist.
+- DataStore is excluded from Android backup. History, currency and circuit parsing are bounded, with depth and overflow guards and rejection of non-finite numbers.
+- Provider errors are redacted and log ids sanitised, so a key or a token cannot be written out with an error. **No secret is logged.**
+- Network access is used for currency rates, the optional AI provider and the GitHub update check. The requested permissions are `INTERNET`, `ACCESS_NETWORK_STATE` and `REQUEST_INSTALL_PACKAGES`.
+
+### Known limitation
+
+On a stock Android phone with the system in light mode, the platform's pre-app starting window is white for about **1.2 s** before the Amoled UI appears; MIUI launches dark. This is outside the app's own window: the app's first composed frame is already black. A fully dark launch from the first pixel is therefore not claimed.
+
+### Verification
+
+- **1779 JVM unit tests, 0 failures.**
+- Android Lint: **0 errors, 35 warnings, 8 hints**.
+- `assembleDebug` and the signed release APK were both verified (versionCode 8, certificate 55071A…).
+- Device checks on a **Poco X4 GT (Android 14)** and an **API 36 emulator**: the four themes, the expand/collapse geometry and surviving value, the analysis panels in the 17 tools, the four settings pages, the start-up update popup and its per-version suppression, and the PDE field measurement quoted above.
+
 ## [3.0.3] — 2026-10-22
 
 A small release that makes the palette of parts shorter: **the card of each part is now as tall as the symbol and the name need**, instead of standing a band of empty space below the name. `versionName = 3.0.3`, `versionCode = 7`, `minSdk 26`, `targetSdk 36`.
@@ -412,6 +453,7 @@ Documented in full in [ROADMAP.md](ROADMAP.md) and [docs/CALCULUS_GUIDE.md](docs
 - `assembleDebug` and the signed release build both succeed.
 - On-device checks covering onboarding (first launch, navigation, skip, finish, restart persistence), the separator setting (all five styles, live update, persistence), portrait lock across 13 destinations, light and dark themes, and 14 assertions on the two calculus fixes.
 
+[3.1.0]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.1.0
 [3.0.3]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.3
 [3.0.2]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.2
 [3.0.1]: https://github.com/JuggyBob/CalculatorSuiteAndroid/releases/tag/v3.0.1

@@ -141,6 +141,8 @@ object ElectricalExtras {
         Band("Green", multiplier = 5),
         Band("Blue", multiplier = 6),
         Band("Violet", multiplier = 7),
+        Band("Grey", multiplier = 8),
+        Band("White", multiplier = 9),
     )
 
     /** The colours that say how much the value may differ. */
@@ -253,14 +255,16 @@ object ElectricalExtras {
             multiplier--
         }
         val rounded = value.setScale(0, java.math.RoundingMode.HALF_UP)
-        if (rounded < BigDecimal.TEN) {
-            return err(
-                ErrorKind.InvalidInput,
-                "That value cannot be written with the standard bands.",
-            )
+        // Rounding 99.5 (or more) up gives 100, which has three digits. Carry
+        // it into the multiplier so that the two digit bands stay in range.
+        val digits = if (rounded >= BigDecimal("100")) {
+            multiplier++
+            BigDecimal.TEN
+        } else {
+            rounded
         }
-        val first = (rounded.toInt() / 10)
-        val second = (rounded.toInt() % 10)
+        val first = (digits.toInt() / 10)
+        val second = (digits.toInt() % 10)
         val multiplierBand = multiplierBands.firstOrNull { it.multiplier == multiplier }
             ?: return err(
                 ErrorKind.InvalidInput,
@@ -332,6 +336,9 @@ object ElectricalExtras {
         if (voltage.signum() < 0) {
             return err(ErrorKind.InvalidInput, "The voltage cannot be negative.")
         }
+        if (resistance != null && resistance.signum() <= 0) {
+            return err(ErrorKind.InvalidInput, "The resistance must be greater than zero.")
+        }
         val c = capacitance.toDouble()
         val v = voltage.toDouble()
         val charge = c * v
@@ -364,7 +371,7 @@ object ElectricalExtras {
         val checks = mutableListOf<ExplanationStep>()
         var timeConstant: Double? = null
 
-        if (resistance != null && resistance.signum() > 0) {
+        if (resistance != null) {
             val r = resistance.toDouble()
             timeConstant = r * c
             steps.add(
@@ -429,7 +436,11 @@ object ElectricalExtras {
         }
         val r = resistance.toDouble()
         val second = reactancePart.toDouble()
-        val isCapacitive = kind == "capacitor"
+        val isCapacitive = when (kind) {
+            "capacitor" -> true
+            "inductor" -> false
+            else -> return err(ErrorKind.InvalidInput, "The kind of circuit must be RC or RL.")
+        }
         val tau = if (isCapacitive) r * second else second / r
         val symbol = if (isCapacitive) "C" else "L"
         val unit = if (isCapacitive) "F" else "H"
@@ -524,6 +535,12 @@ object ElectricalExtras {
         if (resistance.signum() <= 0) {
             return err(ErrorKind.InvalidInput, "The resistance must be greater than zero.")
         }
+        if (inductance != null && inductance.signum() < 0) {
+            return err(ErrorKind.InvalidInput, "The inductance cannot be negative.")
+        }
+        if (capacitance != null && capacitance.signum() <= 0) {
+            return err(ErrorKind.InvalidInput, "The capacitance must be greater than zero.")
+        }
         val f = frequency.toDouble()
         val v = rmsVoltage.toDouble()
         val r = resistance.toDouble()
@@ -531,7 +548,7 @@ object ElectricalExtras {
         val c = capacitance?.toDouble()
         val omega = 2 * PI * f
         val reactanceInductive = if (l != null) omega * l else 0.0
-        val reactanceCapacitive = if (c != null && c > 0) 1.0 / (omega * c) else 0.0
+        val reactanceCapacitive = if (c != null) 1.0 / (omega * c) else 0.0
         val reactance = reactanceInductive - reactanceCapacitive
         val impedance = sqrt(r * r + reactance * reactance)
         val current = if (impedance == 0.0) 0.0 else v / impedance
@@ -567,7 +584,7 @@ object ElectricalExtras {
             )
             rows.add("Inductive reactance" to "${CircuitExplainer.number(reactanceInductive)} Ω")
         }
-        if (c != null && c > 0) {
+        if (c != null) {
             steps.add(
                 ExplanationStep(
                     title = "The capacitive reactance",

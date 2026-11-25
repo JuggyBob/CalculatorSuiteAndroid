@@ -136,6 +136,13 @@ data class NumericalResult(
     val errorIndicator: String?,
     /** A comparison against a known solution, when one is available. */
     val comparison: String?,
+    /**
+     * Why the stepping stopped before reaching [to], or null on success.
+     *
+     * The points stored alongside a failure are always finite: an overflowing
+     * x or y is never appended to the result.
+     */
+    val failure: String? = null,
 )
 
 /** The numerical methods the tool can run. */

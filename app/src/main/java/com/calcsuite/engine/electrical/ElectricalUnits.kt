@@ -69,7 +69,6 @@ object ElectricalUnits {
         if (value.signum() == 0) return "0 ${unit.symbol}"
         val magnitude = value.abs()
         val chosen = prefixes
-            .filter { it.exponent <= 3 }
             .lastOrNull { magnitude.scaleByPowerOfTen(-it.exponent) >= BigDecimal.ONE }
             ?: prefixes[0]
         val scaled = value.scaleByPowerOfTen(-chosen.exponent).setScale(precision, RoundingMode.HALF_UP)

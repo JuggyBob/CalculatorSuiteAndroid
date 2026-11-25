@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.calcsuite.core.CalcResult
 import com.calcsuite.core.Num
 import com.calcsuite.engine.algebra.AverageEngine
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.PlainField
@@ -311,6 +312,13 @@ fun AverageToolScreen(args: ToolArgs) {
         )
 
         InfoNote("Separate numbers with commas, semicolons or new lines. Spaces inside a number are treated as digit grouping (1 234 = 1234).")
+
+        ExplanationCards(
+            AlgebraExplanationsBasic.averageExplanation(
+                modeName = mode.name,
+                steps = outcome.steps,
+            ),
+        )
     }
 }
 

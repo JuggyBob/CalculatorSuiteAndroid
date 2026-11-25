@@ -51,6 +51,20 @@ object PrimeEngine {
     /** Numbers with more digits than this are only tested, never factored. */
     const val MAX_FACTOR_DIGITS = 27
 
+    /**
+     * Numbers with more digits than this are not tested at all: above the
+     * deterministic bound each candidate costs 40 Miller-Rabin modular
+     * exponentiations, and the neighbour searches run this on every candidate.
+     */
+    const val MAX_PRIME_DIGITS = 40
+    private val MAX_PRIME_VALUE: BigInteger = BigInteger.TEN.pow(MAX_PRIME_DIGITS).subtract(ONE)
+
+    private fun exceedsPrimeLimit(n: BigInteger): Boolean = n.abs() > MAX_PRIME_VALUE
+
+    /** Bounds on Pollard's rho so a stubborn semiprime cannot hang the tool. */
+    private const val RHO_ITERATIONS_PER_BASE = 250_000
+    private const val RHO_BASE_ATTEMPTS = 16
+
     private val SMALL_PRIMES: List<BigInteger> = run {
         val limit = 1000
         val composite = BooleanArray(limit + 1)
@@ -88,6 +102,14 @@ object PrimeEngine {
     // ------------------------------------------------------------- primality
 
     fun isPrime(n: BigInteger): PrimeCheck {
+        if (exceedsPrimeLimit(n)) {
+            return PrimeCheck(
+                n = n,
+                isPrime = false,
+                proven = false,
+                explanation = "This number has more than $MAX_PRIME_DIGITS digits, so its primality cannot be tested here",
+            )
+        }
         if (n < TWO) {
             val explanation = when {
                 n.signum() < 0 -> "Negative numbers are not prime; a prime is greater than 1"
@@ -137,6 +159,20 @@ object PrimeEngine {
         }
     }
 
+    /**
+     * [isPrime] with an explicit [ErrorKind.Unavailable] for inputs beyond the
+     * digit cap, for callers that need the shared result shape.
+     */
+    fun isPrimeResult(n: BigInteger): CalcResult<PrimeCheck> {
+        if (exceedsPrimeLimit(n)) {
+            return err(
+                ErrorKind.Unavailable,
+                "Primality testing is limited to $MAX_PRIME_DIGITS-digit numbers",
+            )
+        }
+        return ok(isPrime(n))
+    }
+
     private fun isProbablePrime(n: BigInteger, rounds: Int, bases: List<BigInteger>): Boolean {
         if (n < TWO) return false
         if (n == TWO || n == THREE) return true
@@ -173,13 +209,20 @@ object PrimeEngine {
         if (n == ONE) return ok(emptyList())
         if (n.toString().length > MAX_FACTOR_DIGITS) {
             if (isPrime(n).isPrime) return ok(listOf(n))
-            return err(
-                ErrorKind.Unavailable,
-                "This number is too large to factor quickly; the prime test is still exact",
-            )
+            val message = if (exceedsPrimeLimit(n)) {
+                "This number is too large to factor or test primality here"
+            } else {
+                "This number is too large to factor quickly; primality can still be tested"
+            }
+            return err(ErrorKind.Unavailable, message)
         }
         val factors = ArrayList<BigInteger>()
-        factorInto(n, factors)
+        if (!factorInto(n, factors)) {
+            return err(
+                ErrorKind.Unavailable,
+                "This number could not be factored quickly; primality can still be tested",
+            )
+        }
         factors.sort()
         var product = ONE
         for (factor in factors) product = product.multiply(factor)
@@ -214,11 +257,12 @@ object PrimeEngine {
         return ok(out)
     }
 
-    private fun factorInto(n: BigInteger, out: MutableList<BigInteger>) {
-        if (n == ONE) return
+    /** Returns false when Pollard's rho gives up, so callers never hang. */
+    private fun factorInto(n: BigInteger, out: MutableList<BigInteger>): Boolean {
+        if (n == ONE) return true
         if (isPrime(n).isPrime) {
             out.add(n)
-            return
+            return true
         }
         var remaining = n
         for (prime in SMALL_PRIMES) {
@@ -226,52 +270,69 @@ object PrimeEngine {
                 out.add(prime)
                 remaining = remaining.divide(prime)
             }
-            if (remaining == ONE) return
+            if (remaining == ONE) return true
         }
-        if (remaining == ONE) return
+        if (remaining == ONE) return true
         if (isPrime(remaining).isPrime) {
             out.add(remaining)
-            return
+            return true
         }
-        val divisor = pollardRho(remaining)
-        factorInto(divisor, out)
-        factorInto(remaining.divide(divisor), out)
+        val divisor = pollardRho(remaining) ?: return false
+        return factorInto(divisor, out) && factorInto(remaining.divide(divisor), out)
     }
 
-    /** Pollard's rho with Floyd cycle detection; deterministic c = 1, 2, 3, … */
-    private fun pollardRho(n: BigInteger): BigInteger {
+    /**
+     * Pollard's rho with Floyd cycle detection; deterministic c = 1, 2, 3, …
+     * Returns null when no factor was found within the bounded effort.
+     */
+    private fun pollardRho(n: BigInteger): BigInteger? {
         if (n.mod(TWO).signum() == 0) return TWO
         if (n.mod(THREE).signum() == 0) return THREE
         var c = ONE
-        while (true) {
+        repeat(RHO_BASE_ATTEMPTS) {
             var x = TWO
             var y = TWO
             var divisor = ONE
-            while (divisor == ONE) {
+            var iterations = 0
+            while (divisor == ONE && iterations < RHO_ITERATIONS_PER_BASE) {
                 x = x.multiply(x).add(c).mod(n)
                 y = y.multiply(y).add(c).mod(n)
                 y = y.multiply(y).add(c).mod(n)
                 divisor = x.subtract(y).abs().gcd(n)
+                iterations++
             }
-            if (divisor != n) return divisor
+            if (divisor != ONE && divisor != n) return divisor
             c = c.add(ONE)
         }
+        return null
     }
 
     // ------------------------------------------------------------- neighbours
 
     /** Smallest prime strictly greater than [n]. */
     fun nextPrime(n: BigInteger): CalcResult<BigInteger> {
+        if (exceedsPrimeLimit(n)) {
+            return err(
+                ErrorKind.Unavailable,
+                "Prime search is limited to $MAX_PRIME_DIGITS-digit numbers",
+            )
+        }
         var candidate = n.add(ONE)
         if (candidate <= TWO) return ok(TWO)
         if (!candidate.testBit(0)) candidate = candidate.add(ONE)
-        while (!isPrime(candidate).isPrime) candidate = candidate.add(TWO)
-        return ok(candidate)
+        while (candidate <= MAX_PRIME_VALUE) {
+            if (isPrime(candidate).isPrime) return ok(candidate)
+            candidate = candidate.add(TWO)
+        }
+        return err(
+            ErrorKind.Unavailable,
+            "The next prime is beyond the $MAX_PRIME_DIGITS-digit search limit",
+        )
     }
 
     /** Largest prime strictly smaller than [n], or null when n ≤ 2. */
     fun previousPrime(n: BigInteger): BigInteger? {
-        if (n <= TWO) return null
+        if (exceedsPrimeLimit(n) || n <= TWO) return null
         var candidate = n.subtract(ONE)
         if (candidate == TWO) return TWO
         if (!candidate.testBit(0)) candidate = candidate.subtract(ONE)
@@ -280,5 +341,16 @@ object PrimeEngine {
             candidate = candidate.subtract(TWO)
         }
         return null
+    }
+
+    /** [previousPrime] with an explicit [ErrorKind.Unavailable] beyond the cap. */
+    fun previousPrimeResult(n: BigInteger): CalcResult<BigInteger?> {
+        if (exceedsPrimeLimit(n)) {
+            return err(
+                ErrorKind.Unavailable,
+                "Prime search is limited to $MAX_PRIME_DIGITS-digit numbers",
+            )
+        }
+        return ok(previousPrime(n))
     }
 }

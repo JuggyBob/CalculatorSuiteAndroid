@@ -8,6 +8,7 @@ import com.calcsuite.engine.calculus.Evaluator
 import com.calcsuite.engine.calculus.IntegrationEngine
 import com.calcsuite.engine.calculus.Node
 import com.calcsuite.engine.calculus.NodePrinter
+import com.calcsuite.engine.calculus.TOO_DEEP_MESSAGE
 import kotlin.math.abs
 import kotlin.math.exp
 
@@ -52,7 +53,13 @@ data class OdeRequest(
 object OdeSolver {
 
     /** Solves the request. */
-    fun solve(request: OdeRequest): OdeResult {
+    fun solve(request: OdeRequest): OdeResult = try {
+        solveImpl(request)
+    } catch (e: StackOverflowError) {
+        OdeResult.Invalid(TOO_DEEP_MESSAGE)
+    }
+
+    private fun solveImpl(request: OdeRequest): OdeResult {
         val parsed = OdeParser.parse(request.equation)
         val ode = when (parsed) {
             is CalcResult.Ok -> parsed.value
@@ -636,10 +643,13 @@ object OdeSolver {
         if (settings.to <= settings.from) {
             return OdeResult.Invalid("The end of the interval must be greater than its start.")
         }
-        val steps = ((settings.to - settings.from) / settings.step).toInt()
-        if (steps > NumericalOdeSolver.MAX_STEPS) {
+        // Check the real starting point, not just settings.from: the initial
+        // condition may lie far outside the requested interval.
+        val needed = (settings.to - x0) / settings.step
+        if (!needed.isFinite() || needed <= 0.0 || needed > NumericalOdeSolver.MAX_STEPS) {
+            val count = if (needed.isFinite()) needed.toLong().toString() else "an excessive number of"
             return OdeResult.Invalid(
-                "That would take $steps steps, which is more than the tool will run. " +
+                "That would take $count steps, which is more than the tool will run. " +
                     "Use a larger step or a shorter interval.",
             )
         }
@@ -655,6 +665,9 @@ object OdeSolver {
             step = settings.step,
             knownSolution = known,
         )
+        // An overflowing step is an invalid problem, not a solved one. The
+        // solver keeps only finite points in this shape (legacy RK4 wording).
+        numerical.failure?.let { return OdeResult.Invalid(it) }
 
         val stepsText = mutableListOf<String>()
         stepsText.addAll(numerical.steps)

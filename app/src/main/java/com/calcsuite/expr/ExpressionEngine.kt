@@ -29,14 +29,30 @@ object ExpressionEngine {
             ExpressionParser(input).parse()
         } catch (e: ExprParseException) {
             return err(ErrorKind.Syntax, e.message ?: "Invalid expression")
+        } catch (_: StackOverflowError) {
+            // Depth limits normally catch this first; keep a final net so a
+            // pathological input can never take down the app.
+            return err(ErrorKind.Overflow, "Expression is too deeply nested")
         }
-        return try {
-            ok(Evaluator(angleMode).eval(expr))
-        } catch (e: EvalException) {
-            err(e.kind, e.message ?: "Cannot evaluate expression")
-        } catch (_: ArithmeticException) {
-            err(ErrorKind.Overflow, "The result is too large to compute")
-        }
+        return evaluate(expr, angleMode)
+    }
+
+    /**
+     * Evaluates an already parsed expression. The optional depth override is
+     * for advanced callers that build ASTs themselves.
+     */
+    internal fun evaluate(
+        expr: Expr,
+        angleMode: AngleMode = AngleMode.DEG,
+        maxDepth: Int = EvalLimits.MAX_DEPTH,
+    ): CalcResult<EvalValue> = try {
+        ok(Evaluator(angleMode, maxDepth).eval(expr))
+    } catch (e: EvalException) {
+        err(e.kind, e.message ?: "Cannot evaluate expression")
+    } catch (_: ArithmeticException) {
+        err(ErrorKind.Overflow, "The result is too large to compute")
+    } catch (_: StackOverflowError) {
+        err(ErrorKind.Overflow, "Expression is too deeply nested")
     }
 
     /** Expression source for display of a stored history entry. */

@@ -116,6 +116,10 @@ object DateMathEngine {
             d to clampedNow
         } catch (_: DateTimeException) {
             return err(ErrorKind.InvalidInput, "The requested shift is out of range")
+        } catch (_: ArithmeticException) {
+            // java.time uses Math.addExact/multiplyExact for day/week/hour arithmetic;
+            // extreme Long shifts overflow and throw ArithmeticException rather than DateTimeException.
+            return err(ErrorKind.InvalidInput, "The requested shift is out of range")
         }
 
         val (calendar, clamped) = result

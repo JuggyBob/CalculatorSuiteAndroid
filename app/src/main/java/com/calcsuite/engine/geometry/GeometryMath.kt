@@ -41,7 +41,9 @@ internal object GeometryMath {
         var guess = if (asDouble.isFinite() && asDouble > 0.0) {
             BigDecimal.valueOf(kotlin.math.sqrt(asDouble))
         } else {
-            BigDecimal.ONE.scaleByPowerOfTen(value.precision() - value.scale())
+            // Outside the double range a single power of ten is a poor starting
+            // point: halve the decimal exponent so Newton starts near the root.
+            BigDecimal.ONE.scaleByPowerOfTen((value.precision() - value.scale()) / 2)
         }
         if (guess.signum() <= 0) guess = BigDecimal.ONE
         repeat(100) {
@@ -60,6 +62,22 @@ internal object GeometryMath {
     /** √(a² + b²). */
     fun hypot(a: BigDecimal, b: BigDecimal): BigDecimal =
         sqrt(a.multiply(a, CTX).add(b.multiply(b, CTX), CTX))
+
+    /**
+     * Heron's product s(s−a)(s−b)(s−c), computed at twice the working precision.
+     * Rounding the semi-perimeter to [CTX] first loses most of the significant
+     * digits of (s − c) for a nearly degenerate triangle; the wider intermediate
+     * context keeps the area accurate without changing ordinary triangles.
+     */
+    fun heronRadicand(a: BigDecimal, b: BigDecimal, c: BigDecimal): BigDecimal {
+        val wide = MathContext(CTX.precision * 2, CTX.roundingMode)
+        val semiperimeter = a.add(b, wide).add(c, wide).divide(TWO, wide)
+        return semiperimeter
+            .multiply(semiperimeter.subtract(a, wide), wide)
+            .multiply(semiperimeter.subtract(b, wide), wide)
+            .multiply(semiperimeter.subtract(c, wide), wide)
+            .round(CTX)
+    }
 
     // ---------------------------------------------------------- forward trig
 

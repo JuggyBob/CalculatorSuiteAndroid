@@ -140,17 +140,19 @@ class MeasureAndTopologyTest {
     }
 
     @Test fun aFiniteSpaceHasItsOpenSets() {
-        // The three-point space with the smallest neighbourhoods {a}, {a, b} and
-        // {b, c} has the open sets ∅, {a}, {b}, {a, b}, {b, c} and the whole
-        // space.
+        // The three-point space with the smallest neighbourhoods {a}, {a, b}
+        // and {b, c} has five open sets: ∅, {a}, {a, b}, {b, c} and the whole
+        // space. {b} is not one: no union of those neighbourhoods isolates b.
         val space = FiniteSpace(
             points = listOf("a", "b", "c"),
             neighbourhoods = listOf(listOf(0), listOf(0, 1), listOf(1, 2)),
         )
         val open = space.openSets()
+        assertEquals(5, open.size)
         assertTrue("the empty set is open", open.any { it.isEmpty() })
         assertTrue("the whole space is open", open.any { it.size == 3 })
         assertTrue("the smallest neighbourhood is open", open.any { it == setOf(0) })
+        assertTrue("b alone is not open", open.none { it == setOf(1) })
     }
 
     @Test fun aFiniteSpaceCanBeDisconnected() {

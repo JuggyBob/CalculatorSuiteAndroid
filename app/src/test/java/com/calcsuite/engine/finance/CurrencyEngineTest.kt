@@ -11,6 +11,7 @@ import org.junit.Test
 import java.math.BigDecimal
 import java.math.MathContext
 import java.math.RoundingMode
+import java.util.Locale
 import kotlin.math.abs
 
 class CurrencyEngineTest {
@@ -256,6 +257,28 @@ class CurrencyEngineTest {
         assertEquals("USD", CurrencyCatalog.byCode("usd")?.code)
         assertEquals("EUR", CurrencyCatalog.byCode(" eur ")?.code)
         assertEquals(null, CurrencyCatalog.byCode("XXX"))
+    }
+
+    @Test
+    fun catalogLookupIsLocaleIndependent() {
+        val original = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale("tr", "TR"))
+            // Turkish uppercases 'i' to 'İ'; ISO code lookup must not depend
+            // on the device locale.
+            assertEquals("ISK", CurrencyCatalog.byCode("isk")?.code)
+            assertEquals("ISK", CurrencyCatalog.byCode(" iSk ")?.code)
+            assertEquals("USD", CurrencyCatalog.byCode("usd")?.code)
+            // ISK has 0 minor units, so 1.005 rounds to 1; EUR has 2.
+            val isk = CurrencyEngine.roundToMinorUnits(BigDecimal("1.005"), "isk")
+            assertTrue(isk is CalcResult.Ok)
+            assertMoney("1", (isk as CalcResult.Ok<BigDecimal>).value)
+            val eur = CurrencyEngine.roundToMinorUnits(BigDecimal("1.005"), "eur")
+            assertTrue(eur is CalcResult.Ok)
+            assertMoney("1.01", (eur as CalcResult.Ok<BigDecimal>).value)
+        } finally {
+            Locale.setDefault(original)
+        }
     }
 
     @Test

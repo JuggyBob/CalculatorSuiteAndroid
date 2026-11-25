@@ -123,8 +123,11 @@ object TransferEngine {
     /** Seconds to move [sizeBytes] over a link of [rateBitsPerSecond]. */
     fun transferTime(sizeBytes: BigDecimal, rateBitsPerSecond: BigDecimal): CalcResult<BigDecimal> {
         if (sizeBytes.signum() < 0) return err(ErrorKind.Domain, "File size must not be negative")
-        if (rateBitsPerSecond.signum() <= 0) {
+        if (rateBitsPerSecond.signum() == 0) {
             return err(ErrorKind.DivisionByZero, "Transfer rate must be greater than zero")
+        }
+        if (rateBitsPerSecond.signum() < 0) {
+            return err(ErrorKind.Domain, "Transfer rate must be greater than zero")
         }
         val bits = sizeBytes.multiply(bd("8"), UnitFamily.CTX)
         return ok(bits.divide(rateBitsPerSecond, UnitFamily.CTX))
@@ -152,8 +155,11 @@ object TransferEngine {
     /** Bits per second needed to move [sizeBytes] in [durationSeconds]. */
     fun requiredRate(sizeBytes: BigDecimal, durationSeconds: BigDecimal): CalcResult<BigDecimal> {
         if (sizeBytes.signum() < 0) return err(ErrorKind.Domain, "File size must not be negative")
-        if (durationSeconds.signum() <= 0) {
+        if (durationSeconds.signum() == 0) {
             return err(ErrorKind.DivisionByZero, "Duration must be greater than zero")
+        }
+        if (durationSeconds.signum() < 0) {
+            return err(ErrorKind.Domain, "Duration must be greater than zero")
         }
         return ok(sizeBytes.multiply(bd("8"), UnitFamily.CTX).divide(durationSeconds, UnitFamily.CTX))
     }

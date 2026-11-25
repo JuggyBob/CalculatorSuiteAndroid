@@ -340,6 +340,17 @@ object DcSolver {
         if (n == 0) return DoubleArray(0)
         val a = Array(n) { matrix[it].copyOf() }
         val b = right.copyOf()
+        // Scale each row to a comparable size first. A row of small
+        // conductances can otherwise look singular beside a source's
+        // constraint row, even when the circuit has a perfectly good answer.
+        for (row in 0 until n) {
+            var scale = 0.0
+            for (value in a[row]) scale = maxOf(scale, kotlin.math.abs(value))
+            if (scale > 0.0 && scale.isFinite() && scale != 1.0) {
+                for (k in 0 until n) a[row][k] /= scale
+                b[row] /= scale
+            }
+        }
         for (column in 0 until n) {
             // The pivot is the largest entry in the column, so that the
             // arithmetic stays as exact as it can.

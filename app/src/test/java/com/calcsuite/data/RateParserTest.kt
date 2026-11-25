@@ -120,4 +120,54 @@ class RateParserTest {
         assertTrue(snap.isStale(now + RatesSnapshot.STALE_AFTER_MS + 1))
         assertTrue(!snap.isStale(now + 60_000))
     }
+
+    // ------------------------------------------------------------------ bounds
+
+    private fun code(index: Int): String =
+        "${('A'.code + index / 26).toChar()}${('A'.code + index % 26).toChar()}X"
+
+    @Test fun rateCountIsCappedAtThreeHundred() {
+        val rates = (0 until 400).joinToString(",") { "\"${code(it)}\":1.0" }
+        val snap = snapshot("""{"result":"success","base_code":"USD","rates":{$rates}}""")
+        assertEquals(RateLimits.MAX_RATES, snap.rates.size)
+    }
+
+    @Test fun invalidRateCodesAreIgnored() {
+        val snap = snapshot(
+            """{"result":"success","base_code":"USD","rates":{"EUR":0.92,"eur":1.2,"US":1.3,"ABCD":1.4,"U5D":1.5}}""",
+        )
+        assertEquals(setOf("EUR"), snap.rates.keys)
+    }
+
+    @Test fun invalidBaseFallsBackToUsd() {
+        assertEquals(
+            "USD",
+            snapshot("""{"result":"success","base_code":"usd","rates":{"EUR":0.92}}""").base,
+        )
+        assertEquals(
+            "USD",
+            snapshot("""{"result":"success","base_code":"US","rates":{"EUR":0.92}}""").base,
+        )
+    }
+
+    @Test fun implausibleProviderTimestampsFallBackToTheFetchTime() {
+        val early = snapshot(
+            """{"result":"success","rates":{"EUR":0.92},"time_last_update_unix":1}""",
+        )
+        assertEquals(now, early.providerUpdatedAtMillis)
+        val future = snapshot(
+            """{"result":"success","rates":{"EUR":0.92},"time_last_update_unix":4102444800}""",
+        )
+        assertEquals(now, future.providerUpdatedAtMillis)
+        val skew = now / 1000L + 3600L
+        val accepted = snapshot(
+            """{"result":"success","rates":{"EUR":0.92},"time_last_update_unix":$skew}""",
+        )
+        assertEquals(skew * 1000L, accepted.providerUpdatedAtMillis)
+    }
+
+    @Test fun implausibleFetchTimeIsSanitised() {
+        val snap = (RateParser.parse(validJson, 0L) as CalcResult.Ok).value
+        assertEquals(RateLimits.saneFetchedSeconds(0L) * 1000L, snap.fetchedAtMillis)
+    }
 }

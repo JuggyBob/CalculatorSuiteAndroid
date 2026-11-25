@@ -4,6 +4,7 @@ import com.calcsuite.core.CalcResult
 import com.calcsuite.core.ErrorKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
@@ -323,6 +324,23 @@ class InterestEngineTest {
         assertTrue(fractional != null)
         assertEquals(true, fractional!!.second)
         assertNear(1.0488088482, fractional.first, 1e-9, "sqrt(1.1) via the double fallback")
+    }
+
+    @Test
+    fun extremePowersReturnNullInsteadOfThrowing() {
+        assertNull(InterestEngine.decimalPow(BigDecimal.ZERO, BigDecimal("-1")))
+        assertNull(InterestEngine.decimalPow(BigDecimal("1.1"), BigDecimal("1e100000")))
+        assertNull(InterestEngine.decimalPow(BigDecimal("1e1000000000"), BigDecimal("1e1000000000")))
+    }
+
+    @Test
+    fun extremeDurationReturnsAnErrorInsteadOfThrowing() {
+        val result = InterestEngine.compound(
+            BigDecimal("100"),
+            BigDecimal("10"),
+            BigDecimal("1e100000"),
+        )
+        assertEquals(ErrorKind.Overflow, errorKind(result))
     }
 
     @Test

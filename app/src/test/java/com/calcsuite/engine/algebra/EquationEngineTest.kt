@@ -210,4 +210,27 @@ class EquationEngineTest {
         )
         assertEquals(SystemKind.Inconsistent, solved.kind)
     }
+
+    @Test
+    fun dividingByZeroIsADivisionErrorNotJustSyntax() {
+        assertEquals(ErrorKind.DivisionByZero, kind(EquationEngine.parseExpression("1/0")))
+    }
+
+    @Test
+    fun anOverflowingExponentIsRejected() {
+        // toInt() used to wrap 4294967296 to 0, silently turning this into x^0.
+        val result = EquationEngine.parseExpression("x^4294967296")
+        assertEquals(ErrorKind.Syntax, kind(result))
+        assertTrue(message(result).contains("exponents"))
+    }
+
+    @Test
+    fun tinyIrrationalRootsKeepThirtyFourDigits() {
+        val root = BigDecimal("1.414213562373095048801688724209698E-30")
+        val value = root.multiply(root)
+        val solved = okValue(EquationEngine.solveQuadratic(BigDecimal.ONE, BigDecimal.ZERO, value.negate()))
+        assertEquals(2, solved.realRoots.size)
+        assertEquals("negative root lost digits", 0, solved.realRoots[0].compareTo(root.negate()))
+        assertEquals("positive root lost digits", 0, solved.realRoots[1].compareTo(root))
+    }
 }

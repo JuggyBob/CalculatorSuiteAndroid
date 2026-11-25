@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import com.calcsuite.core.CalcResult
 import com.calcsuite.core.Num
 import com.calcsuite.engine.algebra.GcfLcmEngine
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.PlainField
@@ -117,5 +118,7 @@ fun GcfLcmToolScreen(args: ToolArgs) {
             ),
         )
         InfoNote("Exact integer arithmetic (BigInteger): results stay exact for arbitrarily large inputs.")
+
+        ExplanationCards(AlgebraExplanationsNumber.gcfLcmExplanation(report))
     }
 }

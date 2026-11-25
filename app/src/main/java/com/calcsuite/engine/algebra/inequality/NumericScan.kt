@@ -32,16 +32,20 @@ object NumericEval {
             val base = eval(expr.a, variables)
             val exponent = eval(expr.b, variables)
             if (base.isNaN() || exponent.isNaN()) Double.NaN
+            else if (base == 0.0 && exponent < 0.0) Double.NaN
             else if (base < 0 && exponent != Math.floor(exponent)) Double.NaN
-            else base.pow(exponent)
+            else finite(base.pow(exponent))
         }
         is IExpr.Call -> call(expr, variables)
     }
 
+    /** Infinity is not a value: turn overflow into an undefined point. */
+    private fun finite(value: Double): Double = if (value.isFinite()) value else Double.NaN
+
     private fun call(expr: IExpr.Call, variables: Map<String, Double>): Double {
         val args = expr.args.map { eval(it, variables) }
         if (args.any { it.isNaN() }) return Double.NaN
-        return when (expr.name) {
+        return finite(when (expr.name) {
             "abs" -> abs(args[0])
             "sqrt" -> if (args[0] < 0) Double.NaN else sqrt(args[0])
             "cbrt" -> Math.cbrt(args[0])
@@ -65,7 +69,7 @@ object NumericEval {
                 else (2..n.toInt()).fold(1.0) { acc, i -> acc * i }
             }
             else -> Double.NaN
-        }
+        })
     }
 }
 
@@ -100,7 +104,9 @@ class NumericScan(
             value < 0 -> -1
             else -> 0
         }
-        val accepted = when (op) {
+        // NaN means "no value here", not zero. Treating it as zero used to make
+        // ≤ and ≥ accept whole intervals outside the expression's domain.
+        val accepted = if (value.isNaN()) false else when (op) {
             CompareOp.LT -> sign < 0
             CompareOp.GT -> sign > 0
             CompareOp.LE -> sign <= 0

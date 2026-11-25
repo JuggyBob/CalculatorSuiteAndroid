@@ -168,4 +168,25 @@ class CircuitValidatorTest {
             assertTrue("there is a suggestion", !assessment.suggestion.isNullOrBlank())
         }
     }
+
+    @Test fun anOversizedCircuitIsInvalidBeforeItIsBuilt() {
+        val parts = (0..DcSolver.MAX_COMPONENTS).map {
+            component("R$it", ComponentKind.RESISTOR, resistance = "100")
+        }
+        val byParts = CircuitValidator.assess(Circuit(components = parts))
+        assertEquals(CircuitState.INVALID, byParts.state)
+        assertTrue("the part limit is named: ${byParts.message}", byParts.message!!.contains("parts"))
+        assertTrue("the part limit has a suggestion", !byParts.suggestion.isNullOrBlank())
+
+        val wires = (0..CircuitCodec.MAX_WIRES).map { wire("w$it", "R1", 0, "R1", 1) }
+        val byWires = CircuitValidator.assess(
+            Circuit(
+                components = listOf(component("R1", ComponentKind.RESISTOR, resistance = "100")),
+                wires = wires,
+            ),
+        )
+        assertEquals(CircuitState.INVALID, byWires.state)
+        assertTrue("the wire limit is named: ${byWires.message}", byWires.message!!.contains("wires"))
+        assertTrue("the wire limit has a suggestion", !byWires.suggestion.isNullOrBlank())
+    }
 }

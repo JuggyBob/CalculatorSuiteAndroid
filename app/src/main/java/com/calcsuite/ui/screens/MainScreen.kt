@@ -1,5 +1,12 @@
 package com.calcsuite.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,104 +69,145 @@ fun MainScreen(
     var scientific by remember { mutableStateOf(false) }
     var expanded by rememberSaveable { mutableStateOf(false) }
 
+    // Hoisted out of the conditional modifier: the very same ScrollState is
+    // reused when the scrollable wrapper switches off and on, so a fullscreen
+    // cycle cannot reset the scroll position.
+    val scrollState = rememberScrollState()
+
+    // Only the two spacers change size. The calculator panel is never scaled,
+    // translated or given an animated height — it keeps the discrete weight()
+    // flip, so the keys land exactly where the layout places them.
+    val topSpacer by animateDpAsState(
+        targetValue = if (expanded) 0.dp else 6.dp,
+        animationSpec = tween(200),
+        label = "topSpacer",
+    )
+    val bottomSpacer by animateDpAsState(
+        targetValue = if (expanded) 0.dp else 20.dp,
+        animationSpec = tween(200),
+        label = "bottomSpacer",
+    )
+    val topEnter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(200)) +
+        fadeIn(animationSpec = tween(200))
+    val topExit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(200)) +
+        fadeOut(animationSpec = tween(200))
+    val bodyEnter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200))
+    val bodyExit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(200))
+
     Column(
         Modifier
             .fillMaxSize()
-            .then(if (expanded) Modifier else Modifier.verticalScroll(rememberScrollState()))
+            .then(if (expanded) Modifier else Modifier.verticalScroll(scrollState))
             .padding(horizontal = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (!expanded) {
-            Spacer(Modifier.height(6.dp))
+        // Both top bars share one Column slot, so a bar that has animated down
+        // to zero height cannot leave a spare gap above the calculator. The
+        // 10 dp gaps are explicit for the same reason.
+        Box {
+            this@Column.AnimatedVisibility(visible = !expanded, enter = topEnter, exit = topExit) {
+                Column {
+                    Spacer(Modifier.height(topSpacer))
+                    Spacer(Modifier.height(10.dp))
 
-            // ------------------------------------------------------------- header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Calc Suite",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        // The count comes from the registry, so it can never
-                        // drift out of step with the tools that exist.
-                        "${ToolRegistry.all.size} tools · works offline",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onOpenHistory) {
-                    Icon(Icons.Filled.History, contentDescription = "History")
-                }
-                IconButton(onClick = onOpenAi) {
-                    Icon(
-                        Icons.Filled.Psychology,
-                        contentDescription = "Solve a problem from a picture",
-                    )
-                }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                }
-                IconButton(onClick = { expanded = true }) {
-                    Icon(
-                        Icons.Filled.Fullscreen,
-                        contentDescription = "Expand calculator",
-                    )
+                    // --------------------------------------------------------- header
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Calc Suite",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                // The count comes from the registry, so it can never
+                                // drift out of step with the tools that exist.
+                                "${ToolRegistry.all.size} tools · works offline",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = onOpenHistory) {
+                            Icon(Icons.Filled.History, contentDescription = "History")
+                        }
+                        IconButton(onClick = onOpenAi) {
+                            Icon(
+                                Icons.Filled.Psychology,
+                                contentDescription = "Solve a problem from a picture",
+                            )
+                        }
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                        }
+                        // Disabled while this bar is leaving, so the incoming
+                        // restore control is the only expand/collapse button
+                        // that can be tapped during the cross-fade.
+                        IconButton(onClick = { expanded = true }, enabled = !expanded) {
+                            Icon(
+                                Icons.Filled.Fullscreen,
+                                contentDescription = "Expand calculator",
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    // ----------------------------------------------------------- search
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickableRow(onOpenSearch),
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Text(
+                                "Search tools — try “hex”, “fuel economy”, “tip”",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
-
-            // --------------------------------------------------------------- search
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickableRow(onOpenSearch),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
+            this@Column.AnimatedVisibility(visible = expanded, enter = topEnter, exit = topExit) {
+                // A compact bar keeps the restore control reachable while expanded.
                 Row(
-                    Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Icon(
-                        Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
                     Text(
-                        "Search tools — try “hex”, “fuel economy”, “tip”",
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Calculator",
+                        style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
                     )
-                }
-            }
-        } else {
-            // A compact bar keeps the restore control reachable while expanded.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    "Calculator",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onOpenHistory) {
-                    Icon(
-                        Icons.Filled.History,
-                        contentDescription = "History",
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                IconButton(onClick = { expanded = false }) {
-                    Icon(Icons.Filled.FullscreenExit, contentDescription = "Collapse calculator")
+                    IconButton(onClick = onOpenHistory) {
+                        Icon(
+                            Icons.Filled.History,
+                            contentDescription = "History",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    // The outgoing collapse button is disabled during collapse.
+                    IconButton(onClick = { expanded = false }, enabled = expanded) {
+                        Icon(Icons.Filled.FullscreenExit, contentDescription = "Collapse calculator")
+                    }
                 }
             }
         }
+
+        Spacer(Modifier.height(10.dp))
 
         // ----------------------------------------------------------- calculator
         CalculatorPanel(
@@ -171,84 +219,97 @@ fun MainScreen(
             modifier = if (expanded) Modifier.weight(1f) else Modifier,
         )
 
-        if (!expanded) {
-            // ------------------------------------------------------------ favourites
-            val favoriteTools = remember(favorites) {
-                ToolRegistry.all.filter { it.id in favorites }
-            }
-            if (favoriteTools.isNotEmpty()) {
-                ToolStrip(
-                    title = "Favourites",
-                    tools = favoriteTools,
-                    onOpenTool = onOpenTool,
-                    leadingIcon = Icons.Filled.Star,
-                )
-            }
+        // The menu below the calculator cross-fades in step with the bars
+        // above it. Its own leading gap lives inside the AnimatedVisibility so
+        // that, once shrunk away, it adds no gap to the expanded layout.
+        AnimatedVisibility(visible = !expanded, enter = bodyEnter, exit = bodyExit) {
+            Column {
+                Spacer(Modifier.height(10.dp))
 
-            val recentTools = remember(recents, favorites) {
-                // The list is keyed by the tool id, so the same tool must not
-                // appear twice even if the stored list still holds an old id.
-                recents.mapNotNull { ToolRegistry.byId(it) }
-                    .distinctBy { it.id }
-                    .filter { it.id !in favorites }
-            }
-            if (recentTools.isNotEmpty()) {
-                ToolStrip(
-                    title = "Recently used",
-                    tools = recentTools,
-                    onOpenTool = onOpenTool,
-                )
-            }
-
-            // ----------------------------------------------------------- categories
-            Text(
-                "Categories",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ToolCategory.entries.chunked(2).forEach { rowCategories ->
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    rowCategories.forEach { category ->
-                        CategoryCard(
-                            category = category,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onOpenCategory(category) },
-                        )
-                    }
-                    if (rowCategories.size == 1) Spacer(Modifier.weight(1f))
+                // ------------------------------------------------------------ favourites
+                val favoriteTools = remember(favorites) {
+                    ToolRegistry.all.filter { it.id in favorites }
                 }
-            }
+                if (favoriteTools.isNotEmpty()) {
+                    ToolStrip(
+                        title = "Favourites",
+                        tools = favoriteTools,
+                        onOpenTool = onOpenTool,
+                        leadingIcon = Icons.Filled.Star,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
 
-            // ---------------------------------------------------------- scientific
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickableRow(onOpenScientific),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-            ) {
-                Row(
-                    Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text("fx", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    Column(Modifier.weight(1f)) {
-                        Text("Scientific calculator", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "Trigonometry, logarithms, powers, factorials, memory",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                val recentTools = remember(recents, favorites) {
+                    // The list is keyed by the tool id, so the same tool must not
+                    // appear twice even if the stored list still holds an old id.
+                    recents.mapNotNull { ToolRegistry.byId(it) }
+                        .distinctBy { it.id }
+                        .filter { it.id !in favorites }
+                }
+                if (recentTools.isNotEmpty()) {
+                    ToolStrip(
+                        title = "Recently used",
+                        tools = recentTools,
+                        onOpenTool = onOpenTool,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                // ----------------------------------------------------------- categories
+                Text(
+                    "Categories",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                ToolCategory.entries.chunked(2).forEachIndexed { index, rowCategories ->
+                    if (index > 0) Spacer(Modifier.height(10.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        rowCategories.forEach { category ->
+                            CategoryCard(
+                                category = category,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onOpenCategory(category) },
+                            )
+                        }
+                        if (rowCategories.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
+
+                Spacer(Modifier.height(10.dp))
+
+                // ---------------------------------------------------------- scientific
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickableRow(onOpenScientific),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Row(
+                        Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("fx", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f)) {
+                            Text("Scientific calculator", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Trigonometry, logarithms, powers, factorials, memory",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(bottomSpacer))
             }
-
-
-            Spacer(Modifier.height(20.dp))
         }
     }
 }

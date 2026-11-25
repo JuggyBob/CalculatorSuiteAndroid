@@ -46,6 +46,7 @@ import com.calcsuite.engine.calculus.SeriesResult
 import com.calcsuite.ui.components.ErrorNotice
 import com.calcsuite.ui.components.clickableRow
 import com.calcsuite.ui.components.ExpandablePanel
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.NumberField
@@ -160,6 +161,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 onVariable = { variable = it },
                 onSecondVariable = { secondVariable = it },
                 onRecord = args.onRecord,
+                expanded = expanded,
             )
 
             CalcOperation.INTEGRAL -> IntegralPanel(
@@ -170,6 +172,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 onLower = { lowerLimit = it },
                 onUpper = { upperLimit = it },
                 onRecord = args.onRecord,
+                expanded = expanded,
             )
 
             CalcOperation.LIMIT -> LimitPanel(
@@ -180,6 +183,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 onPoint = { atPoint = it },
                 onSide = { side = it },
                 onRecord = args.onRecord,
+                expanded = expanded,
             )
 
             CalcOperation.SERIES -> SeriesPanel(
@@ -190,6 +194,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 onStart = { seriesStart = it },
                 onEnd = { seriesEnd = it },
                 onRecord = args.onRecord,
+                expanded = expanded,
             )
 
             CalcOperation.TAYLOR -> TaylorPanel(
@@ -199,6 +204,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 order = order,
                 onCentre = { centre = it },
                 onOrder = { order = it },
+                expanded = expanded,
             )
 
             CalcOperation.SUM -> SumProductPanel(
@@ -209,6 +215,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 onStart = { seriesStart = it },
                 onEnd = { seriesEnd = it },
                 onRecord = args.onRecord,
+                expanded = expanded,
             )
 
             CalcOperation.EQUATION -> RootsPanel(
@@ -218,6 +225,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 onLower = { lowerLimit = it },
                 onUpper = { upperLimit = it },
                 onRecord = args.onRecord,
+                expanded = expanded,
             )
 
             CalcOperation.EXTREMA -> ExtremaPanel(
@@ -227,6 +235,7 @@ fun CalculusToolScreen(args: ToolArgs, tool: CalculusTool) {
                 onLower = { lowerLimit = it },
                 onUpper = { upperLimit = it },
                 onRecord = args.onRecord,
+                expanded = expanded,
             )
 
             // The differential equations have a screen of their own, with the
@@ -288,6 +297,7 @@ private fun DerivativePanel(
     onVariable: (String) -> Unit,
     onSecondVariable: (String) -> Unit,
     onRecord: HistoryRecorder,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "f′(x) = lim(h→0) (f(x+h) − f(x)) ÷ h  =  d/dx f(x)",
@@ -397,6 +407,9 @@ private fun DerivativePanel(
                     "∂f/∂y = 3x^2·y^2 and ∂²f/∂y∂x = 6x·y^2.",
             )
         }
+        if (!expanded) {
+            ExplanationCards(derivativeExplanation(expression, derivative, variable))
+        }
     }
 }
 
@@ -411,6 +424,7 @@ private fun IntegralPanel(
     onLower: (String) -> Unit,
     onUpper: (String) -> Unit,
     onRecord: HistoryRecorder,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "∫ f(x) dx = F(x) + C   where F′(x) = f(x)      ∫ₐᵇ f(x) dx = F(b) − F(a)",
@@ -465,6 +479,9 @@ private fun IntegralPanel(
         copyValue = definiteResult?.value,
     )
     definiteResult?.let { StepsCard(steps = it.steps, title = "How this was computed") }
+    if (!expanded) {
+        ExplanationCards(integralExplanation(expression, definiteResult, lowerLimit, upperLimit))
+    }
 }
 
 // ---------------------------------------------------------------------- limit
@@ -478,6 +495,7 @@ private fun LimitPanel(
     onPoint: (String) -> Unit,
     onSide: (String) -> Unit,
     onRecord: HistoryRecorder,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "lim($variable→a) f($variable) = the value f approaches as $variable gets close to a",
@@ -527,6 +545,9 @@ private fun LimitPanel(
         copyValue = result?.value,
     )
     result?.let { StepsCard(steps = it.steps, title = "How this was computed") }
+    if (!expanded) {
+        ExplanationCards(limitExplanation(expression, result, variable, point))
+    }
 }
 
 // --------------------------------------------------------------------- series
@@ -540,6 +561,7 @@ private fun SeriesPanel(
     onStart: (String) -> Unit,
     onEnd: (String) -> Unit,
     onRecord: HistoryRecorder,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "∑ₖ₌₁^∞ r^k converges ⇔ |r| < 1, summing to 1 ÷ (1 − r)      ∑ₖ₌₁^∞ 1/k^2 = π^2 ÷ 6",
@@ -583,6 +605,9 @@ private fun SeriesPanel(
         ResultRow("∑ from 1 to ∞ of 1/k", "Diverges (harmonic)")
         ResultRow("∑ from 0 to ∞ of 1", "Diverges (terms do not approach zero)")
     }
+    if (!expanded) {
+        ExplanationCards(seriesExplanation(expression, result, variable, start, end))
+    }
 }
 
 // --------------------------------------------------------------------- Taylor
@@ -595,6 +620,7 @@ private fun TaylorPanel(
     order: String,
     onCentre: (String) -> Unit,
     onOrder: (String) -> Unit,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "f(x) = f(a) + f′(a)(x−a) + f″(a)/2! (x−a)^2 + f‴(a)/3! (x−a)^3 + …",
@@ -622,6 +648,9 @@ private fun TaylorPanel(
         caption = "e^x about 0: 1 + x + x^2/2! + x^3/3! + x^4/4! + …",
     )
     result?.let { StepsCard(steps = it.steps, title = "Terms") }
+    if (!expanded) {
+        ExplanationCards(taylorExplanation(expression, result, variable, centre, order))
+    }
 }
 
 // ------------------------------------------------------------------ sum / Π
@@ -635,6 +664,7 @@ private fun SumProductPanel(
     onStart: (String) -> Unit,
     onEnd: (String) -> Unit,
     onRecord: HistoryRecorder,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "∑ from k=a to b of g(k)      ∏ from k=a to b of g(k)",
@@ -703,6 +733,9 @@ private fun SumProductPanel(
         ResultRow("∏ from 1 to 5 of k", "120  (that is 5!)")
         ResultRow("∑ from 0 to 20 of 0.5^k", NodePrinter.format(2.0 - 1.0 / 1048576.0))
     }
+    if (!expanded) {
+        ExplanationCards(sumProductExplanation(expression, sumResult, productResult, variable, start, end))
+    }
 }
 
 // --------------------------------------------------------------------- roots
@@ -715,6 +748,7 @@ private fun RootsPanel(
     onLower: (String) -> Unit,
     onUpper: (String) -> Unit,
     onRecord: HistoryRecorder,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "Solve f(x) = 0 on [a, b]",
@@ -757,6 +791,9 @@ private fun RootsPanel(
         )
         ResultRow("x^3 - x = 0", "-1, 0, 1")
     }
+    if (!expanded) {
+        ExplanationCards(rootsExplanation(expression, result, lowerLimit, upperLimit))
+    }
 }
 
 // -------------------------------------------------------------------- extrema
@@ -769,6 +806,7 @@ private fun ExtremaPanel(
     onLower: (String) -> Unit,
     onUpper: (String) -> Unit,
     onRecord: HistoryRecorder,
+    expanded: Boolean,
 ) {
     FormulaCard(
         formula = "Extrema: solve f′(x) = 0, then classify with f″(x)",
@@ -803,6 +841,9 @@ private fun ExtremaPanel(
                         ) },
     )
     result?.let { StepsCard(steps = it.steps, title = "How this was computed") }
+    if (!expanded) {
+        ExplanationCards(extremaExplanation(expression, result, lowerLimit, upperLimit))
+    }
 }
 
 // ----------------------------------------------------------------------- ODE
@@ -931,6 +972,9 @@ private fun GraphPanel(
         ErrorNotice("Enter a function to plot.")
     } else if (areaFrom != null) {
         ResultRow("f($lowerLimit)", NodePrinter.format(Evaluator.eval(node, mapOf("x" to areaFrom)).valueOrNull() ?: Double.NaN))
+    }
+    if (!expanded) {
+        ExplanationCards(graphExplanation(expression, node, derivativeNode, lowerLimit, upperLimit))
     }
 }
 

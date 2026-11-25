@@ -503,10 +503,19 @@ object ElectricalCalculators {
         val r1 = firstResistance.toDouble()
         val r2 = secondResistance.toDouble()
         val itotal = totalCurrent.toDouble()
-        val equivalent = r1 * r2 / (r1 + r2)
+        if (!r1.isFinite() || !r2.isFinite() || !itotal.isFinite()) {
+            return err(ErrorKind.InvalidInput, "The values must be finite numbers.")
+        }
+        val g1 = 1.0 / r1
+        val g2 = 1.0 / r2
+        if (!g1.isFinite() || !g2.isFinite()) {
+            return err(ErrorKind.InvalidInput, "The values must be finite numbers.")
+        }
+        val conductance = g1 + g2
+        val equivalent = 1.0 / conductance
         // The smaller resistance takes the larger share of the current.
-        val i1 = itotal * r2 / (r1 + r2)
-        val i2 = itotal * r1 / (r1 + r2)
+        val i1 = itotal * g1 / conductance
+        val i2 = itotal * g2 / conductance
 
         val steps = listOf(
             ExplanationStep(

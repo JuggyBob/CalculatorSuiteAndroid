@@ -216,6 +216,35 @@ class LoanEngineTest {
     }
 
     @Test
+    fun longTermRoundedDownPaymentEndsAtContractualTerm() {
+        // 10 000 at 5% over 100 years: the exact payment (41.95229…) rounds
+        // down to 41.95, so a residue builds up over the term. The final
+        // instalment must absorb it instead of pushing payoff past period 1200.
+        val result = ok(
+            LoanEngine.compute(
+                LoanEngine.LoanInput(
+                    principal = BigDecimal("10000"),
+                    annualRatePct = BigDecimal("5"),
+                    numberOfPayments = 1200,
+                    paymentsPerYear = 12,
+                    includeSchedule = true,
+                ),
+            ),
+        )
+        assertMoney("41.95", result.scheduledPayment)
+        assertEquals(1200, result.contractualPayments)
+        assertEquals(1200, result.payoffPeriods)
+        assertEquals(1200, result.schedule.size)
+        assertFalse(result.scheduleTruncated)
+        assertMoney("124.61", result.schedule.last().payment, "final instalment")
+        assertMoney("0.00", result.schedule.last().balance, "final balance")
+        val principalSum = result.schedule.fold(BigDecimal.ZERO) { acc, row -> acc.add(row.principal) }
+        assertMoney("10000.00", principalSum, "sum of principal parts")
+        assertMoney("50422.66", result.totalPaid)
+        assertMoney("40422.66", result.totalInterest)
+    }
+
+    @Test
     fun negativePrincipalRejected() {
         val result = LoanEngine.compute(
             LoanEngine.LoanInput(
@@ -272,5 +301,30 @@ class LoanEngineTest {
         assertEquals("30 years", LoanEngine.payoffLabel(360, 12))
         assertEquals("3 years 11 months", LoanEngine.payoffLabel(47, 12))
         assertEquals("1 month", LoanEngine.payoffLabel(1, 12))
+    }
+
+    @Test
+    fun payoffLabelWithZeroPaymentsPerYearDoesNotThrow() {
+        assertEquals("Unavailable", LoanEngine.payoffLabel(60, 0))
+        assertEquals("Unavailable", LoanEngine.payoffLabel(60, -12))
+        assertEquals("Unavailable", LoanEngine.payoffLabel(-1, 12))
+    }
+
+    @Test
+    fun payoffLabelHandlesVeryLongTermsWithoutNarrowingToInt() {
+        assertTrue(LoanEngine.payoffLabel(Int.MAX_VALUE, 1).endsWith("years"))
+    }
+
+    @Test
+    fun zeroPaymentsPerYearIsRejectedByCompute() {
+        val result = LoanEngine.compute(
+            LoanEngine.LoanInput(
+                principal = BigDecimal("1000"),
+                annualRatePct = BigDecimal.ZERO,
+                numberOfPayments = 12,
+                paymentsPerYear = 0,
+            ),
+        )
+        assertEquals(ErrorKind.InvalidInput, errorKind(result))
     }
 }

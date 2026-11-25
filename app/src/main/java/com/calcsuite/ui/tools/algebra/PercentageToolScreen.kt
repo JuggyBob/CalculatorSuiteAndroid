@@ -18,6 +18,7 @@ import com.calcsuite.core.CalcResult
 import com.calcsuite.core.Num
 import com.calcsuite.engine.algebra.AverageEngine
 import com.calcsuite.engine.algebra.PercentageEngine
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.NumberField
@@ -488,6 +489,13 @@ fun PercentageToolScreen(args: ToolArgs) {
             formula = outcome.formula,
             explanation = outcome.explanation,
             variables = outcome.variables,
+        )
+
+        ExplanationCards(
+            AlgebraExplanationsBasic.percentageExplanation(
+                modeName = mode.name,
+                steps = outcome.steps,
+            ),
         )
     }
 }

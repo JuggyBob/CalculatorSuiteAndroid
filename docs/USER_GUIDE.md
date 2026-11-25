@@ -24,7 +24,7 @@ How Calculator Suite is put together, what to type, what the messages mean, and 
 The first time you open the app you get four welcome pages:
 
 1. **Welcome** — what the app is
-2. **Organised** — the eight categories and how many tools each holds
+2. **Organised** — the nine categories and how many tools each holds
 3. **Mathematics** — the calculus workbench
 4. **Make it yours** — the settings
 
@@ -42,7 +42,7 @@ From top to bottom:
 | **History icon** | Your saved calculations |
 | **Brain icon** | The AI problem solver — read a mathematical problem from a picture |
 | **Gear icon** | Settings |
-| **Fullscreen icon** | Expand the keypad to fill the screen; tap again to restore |
+| **Fullscreen icon** | Expand the keypad to fill the screen over 200 ms; tap again to restore. The `=` key keeps its position and the display keeps its value |
 | **Search field** | Tap and type keywords |
 | **DEG** | The current angle unit — tap to cycle DEG → RAD → GRAD |
 | **Σ / fx** | Toggle the live preview of the current expression |
@@ -50,7 +50,7 @@ From top to bottom:
 | **MC MR M+ M−** | Memory: clear, recall, add, subtract |
 | **Keypad** | Digits, operators, `%`, `±`, `C`, backspace, `=` |
 | **Recently used** | The last tools you opened, if any |
-| **Categories** | The eight category cards |
+| **Categories** | The nine category cards |
 
 The result previews live as you type. Press `=` to commit it to history.
 
@@ -173,6 +173,8 @@ Two interaction patterns:
 
 Results can be **copied** at full precision or **saved** to history from the result card.
 
+- **Analysis panels.** Eight expandable panels — Definition, Formula, Conditions, Method, Step-by-step work, Interpretation, Verification and Limitations — appear across **17 tools**: eight in Algebra (Percentage, Average, Proportion, Ratio, GCF & LCM, Combinations, Prime checker, Number generator) and nine in Calculus (Derivatives, Integrals, Limits, Taylor & Maclaurin, Summations & Products, Infinite Series, Roots, Extrema & Optimization, Function Graphing). In the calculus tools the panels are hidden in fullscreen, so the plot gets the whole screen.
+
 ### The circuit builder
 
 **Electrical Circuits** (in *Other*) has two halves, and the builder is the one that is new.
@@ -200,7 +202,7 @@ The **Calculators** tab beside the builder holds eleven calculations that need n
 
 ## 7. Settings
 
-Open with the gear icon on the main screen.
+Open with the gear icon on the main screen. Settings is a hub of four pages, each with a leading icon: **Appearance**, **Calculation**, **History and data** and **About CalcSuite**.
 
 ### Appearance
 
@@ -212,8 +214,10 @@ The choice is kept between restarts.
 
 | Setting | Options |
 |---|---|
-| Theme | System, Light, Dark |
+| Theme | System, Light, Dark, Amoled |
 | Use system colours | Follows the Android 12+ wallpaper palette |
+
+**Amoled** is true black: it ignores the device's dynamic colour palette and keeps the system bars dark. The other three follow the system, a fixed light theme or a fixed dark theme.
 
 ### Calculation
 
@@ -233,35 +237,31 @@ The choice is kept between restarts.
 
 The setting is **display-only**. Parsing never consults it — `1,234.56` and `1 234,56` are both always accepted, whatever you choose — so you can never change how a typed expression is understood by changing a display preference. A live preview line under the control shows exactly what the current setting produces.
 
-**The one ambiguous case:** if you pick a separator that is the *same character* as your locale's decimal mark (a period, in a region where the decimal mark is also a period), then a displayed decimal such as `1.234.56` cannot be typed back in unambiguously. The app rejects that rather than guessing, and Settings warns you when you make that combination.
+**The one ambiguous case:** if you pick a separator that is the *same character* as your locale's decimal mark (a period, in a region where the decimal mark is also a period), then a displayed decimal such as `1.234.56` cannot be typed back in unambiguously. Settings warns you when you make that combination, but it keeps your choice; genuinely ambiguous typed input is still refused rather than guessed at.
 
 ### Updates
 
-The **Updates** card checks whether a newer version of the app has been published.
+On start, after onboarding, the app checks the project's GitHub release page for a newer version, at most once every three hours. If there is no connection, it falls back to the release details cached on the device.
 
-**Check for updates** asks the project's GitHub release page for the newest published release and compares its version with the one that is installed. The card then says which of the two is newer, and nothing is downloaded until you ask for it.
+When a newer version is found, a popup shows that release's notes with **Download & install now** and **Never show again**. Download and install happen only when you ask: the file is fetched inside the app, the progress is shown, and the file is only kept when the download is complete. It is then handed to Android's own installer, which asks you to confirm — the app never installs anything by itself. **Never show again** hides the notes for that version only; a later version prompts again. You can dismiss the popup, or run a check by hand from the **Check for updates** row on the About CalcSuite page.
 
-If a newer version is available, **Download the update** fetches it inside the app. The progress is shown, and the file is only kept when the download is complete. When it has arrived, **Install the update** hands the file to Android's own installer, which asks you to confirm. The app never installs anything by itself.
-
-The file is checked before it is offered: when the release publishes a digest, the download is checked against it, and the package name, the version code and the signing certificate have to match the app that is installed. A file that does not match is refused, and the card says why.
+The file is checked before it is offered: when the release publishes a digest, the download is checked against it, and the package name, the version code and the signing certificate have to match the app that is installed. A file that does not match is refused, and the app says why.
 
 The first time, the phone asks whether this app may install packages; that is Android's own question, and the answer is yours.
 
-### About
+### About CalcSuite
 
-**About Calc Suite** shows the version that is installed, the newest published release with the day it was published, and the notes of that release under **What's new**.
+The **About CalcSuite** row opens the About page, which carries the update card and the **Check for updates** row. Its **About Calc Suite → Open** button shows a dialog with the installed version, the newest published release with the day it was published, and the notes of that release under **What's new**.
 
 The notes are read from the release itself, so they always say what the release says. With no connection, the notes of the last release that was read on the device are shown instead, and the dialog says that this is what they are.
 
 **Release page** opens the release on GitHub in the browser of the phone.
 
-### History
+### History and data
 
-Shows how many calculations are saved, with a **Clear all history** button and a confirmation dialog.
+**History** shows how many calculations are saved, with a **Clear all history** button and a confirmation dialog.
 
-### Data sources
-
-A note explaining that currency conversion uses daily reference rates from a public provider, cached on the device, and that reference rates differ from what banks actually charge. Everything else runs entirely on the device.
+**Data sources** notes that currency conversion uses daily reference rates from a public provider, cached on the device, and that reference rates differ from what banks actually charge. The optional AI problem solver sends a picture to the provider you choose, and the GitHub update check contacts the release page. Everything else runs entirely on the device.
 
 ## 8. History and favourites
 
@@ -304,7 +304,7 @@ The feature is off until you turn it on. Open the brain icon, then the **gear ic
 
 The **model name** is used exactly as you type it, so a model released today can be used today without waiting for an app update.
 
-> **The model must be one that reads pictures.** If the model you chose cannot read images, the request is refused and the app says so. It never moves you to a different model on its own, and it never makes a request you did not ask for.
+> **The model must be one that reads pictures.** If the model you chose cannot read images, the request is refused and the app says so. It never moves you to a different model on its own, and it never makes an AI request you did not ask for.
 
 ### Using it
 
@@ -372,7 +372,7 @@ Open **Percentage** from Algebra, keep the **Percent of** mode, enter `15` and `
 
 ### "What's the derivative of x²+3x?"
 
-**Calculus**, leave the default expression, and the `d/dx` operation is already selected. It reports `2x + 3` and cross-checks it numerically at a point you choose. See the [Calculus guide](CALCULUS_GUIDE.md).
+**Derivatives**, leave the default expression, and the `d/dx` operation is already selected. It reports `2x + 3` and cross-checks it numerically at a point you choose. See the [Calculus guide](CALCULUS_GUIDE.md).
 
 ### "What is the current through this resistor?"
 
@@ -390,8 +390,10 @@ Open **Electrical Circuits**, choose *Examples* and pick **Two resistors in seri
 
 - **The app is portrait-only.** It will not rotate. This is deliberate, so no screen or dialog can be caught mid-rotation.
 - **System bars are hidden.** Swipe from the screen edge to bring them back temporarily.
-- **Everything is local except currency rates.** No analytics, no ads, no account, no tracking. See [PRIVACY.md](../PRIVACY.md).
+- **Your calculations stay on the device.** The only network paths are currency rates, the optional AI problem solver (only when you use it), and the GitHub update check. No analytics, no ads, no account, no tracking. See [PRIVACY.md](../PRIVACY.md).
 - **Reference rates are not bank rates.** The currency tool shows reference mid-market rates. Your bank, card issuer or exchange service will differ by fees and spread.
 - **Some tools are approximations, and say so.** Notably: the ellipse perimeter uses Ramanujan's second approximation; body fat uses the US Navy circumference method; caloric burn uses MET values; the fuel constant for one imperial mpg is a 34-digit reciprocal. Each is documented in [Features & tools](FEATURES_AND_TOOLS.md).
 - **The prime checker is exact up to 3.3 × 10²⁴.** Above that it reports a *strong probable prime*, which is not a proof, and the app labels it accordingly.
 - **Not every tool does everything its name suggests.** Where a catalogue description overstates the implementation, it is listed in [ROADMAP.md](../ROADMAP.md) rather than hidden.
+- **With Amoled, the splash screen can still flash white.** On stock Android with a light system theme the splash is white for about 1.2 seconds before the Amoled UI appears; on MIUI it follows the dark system theme.
+- **Never show again is per version.** Choosing it on an update popup hides that version's notes only; the next version prompts again.

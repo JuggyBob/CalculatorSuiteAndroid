@@ -100,6 +100,9 @@ object TipEngine {
 
         val shares = split(settledTotal, input.people)
         val tipShares = split(tip, input.people)
+        if (shares.isEmpty() || tipShares.isEmpty()) {
+            return err(ErrorKind.Overflow, "The bill total is too large to split")
+        }
         return ok(
             TipResult(
                 tipBase = tipBase,
@@ -114,20 +117,35 @@ object TipEngine {
         )
     }
 
-    /** Applies a [RoundingOption] to a total. `null` step means cents only. */
-    fun applyRounding(total: BigDecimal, option: RoundingOption): BigDecimal {
+    /**
+     * Applies a [RoundingOption] to a total. `null` step means cents only.
+     * Internal: no caller outside this package needs it. Falls back to plain
+     * cent rounding rather than letting an arithmetic exception escape.
+     */
+    internal fun applyRounding(total: BigDecimal, option: RoundingOption): BigDecimal {
         val step = option.step ?: return total.setScale(2, RoundingMode.HALF_UP)
-        return total.divide(step, 0, RoundingMode.HALF_UP).multiply(step).setScale(2, RoundingMode.HALF_UP)
+        if (step.signum() <= 0) return total.setScale(2, RoundingMode.HALF_UP)
+        return try {
+            total.divide(step, 0, RoundingMode.HALF_UP).multiply(step).setScale(2, RoundingMode.HALF_UP)
+        } catch (_: ArithmeticException) {
+            total.setScale(2, RoundingMode.HALF_UP)
+        }
     }
 
     /**
      * Largest-remainder split of [total] into [people] whole-cent shares.
      * The first `totalCents mod people` shares receive one extra cent.
+     * Internal: used by [calculate] and its tests only. Invalid inputs and
+     * unexpected arithmetic failures yield an empty list instead of throwing.
      */
-    fun split(total: BigDecimal, people: Int): List<BigDecimal> {
-        require(people >= 1) { "people must be at least 1" }
-        val totalCents = total.movePointRight(2).setScale(0, RoundingMode.HALF_UP).toBigIntegerExact()
-        return splitCents(totalCents, people).map { cents -> BigDecimal(cents).movePointLeft(2) }
+    internal fun split(total: BigDecimal, people: Int): List<BigDecimal> {
+        if (people !in 1..MAX_PEOPLE) return emptyList()
+        return try {
+            val totalCents = total.movePointRight(2).setScale(0, RoundingMode.HALF_UP).toBigIntegerExact()
+            splitCents(totalCents, people).map { cents -> BigDecimal(cents).movePointLeft(2) }
+        } catch (_: ArithmeticException) {
+            emptyList()
+        }
     }
 
     private fun splitCents(totalCents: BigInteger, people: Int): List<BigInteger> {

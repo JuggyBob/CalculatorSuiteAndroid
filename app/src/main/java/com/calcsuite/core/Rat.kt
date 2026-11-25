@@ -25,8 +25,21 @@ class Rat private constructor(val num: BigInteger, val den: BigInteger) : Compar
         val ONE = Rat(BigInteger.ONE, BigInteger.ONE)
         val TWO = Rat(BigInteger.valueOf(2), BigInteger.ONE)
 
-        /** Builds a reduced fraction. A zero denominator is a programming error. */
-        fun of(num: BigInteger, den: BigInteger): Rat {            require(den.signum() != 0) { "A rational number cannot have a zero denominator" }
+        /** Largest decimal scale accepted by [ofDecimal], matching `Num`. */
+        const val MAX_DECIMAL_SCALE = 10_000
+
+        /**
+         * Builds a reduced fraction. A zero denominator is a programming error:
+         * callers handling user input should use [ofOrNull], which reports it
+         * as a null result instead of throwing.
+         */
+        fun of(num: BigInteger, den: BigInteger): Rat {
+            return ofOrNull(num, den) ?: throw IllegalArgumentException("A rational number cannot have a zero denominator")
+        }
+
+        /** Null-safe form of [of]: returns null for a zero denominator. */
+        fun ofOrNull(num: BigInteger, den: BigInteger): Rat? {
+            if (den.signum() == 0) return null
             if (num.signum() == 0) return ZERO
             var n = num
             var d = den
@@ -47,15 +60,32 @@ class Rat private constructor(val num: BigInteger, val den: BigInteger) : Compar
         fun of(num: Long, den: Long = 1L): Rat =
             of(BigInteger.valueOf(num), BigInteger.valueOf(den))
 
-        /** A rational built from a decimal literal, which is exact by construction. */
-        fun ofDecimal(text: String): Rat {
-            val d = BigDecimal(text)
+        /**
+         * A rational built from a decimal literal, which is exact by
+         * construction. Malformed or out-of-range text maps to [ZERO] so this
+         * primitive never throws; use [ofDecimalOrNull] when the caller needs
+         * to distinguish an invalid literal from a real zero.
+         */
+        fun ofDecimal(text: String): Rat = ofDecimalOrNull(text) ?: ZERO
+
+        /**
+         * Null-safe form of [ofDecimal]. Returns null for malformed text and
+         * for a scale outside ±[MAX_DECIMAL_SCALE], which would otherwise try
+         * to allocate an unbounded power of ten.
+         */
+        fun ofDecimalOrNull(text: String): Rat? {
+            val d = try {
+                BigDecimal(text)
+            } catch (_: NumberFormatException) {
+                return null
+            }
+            if (d.scale() > MAX_DECIMAL_SCALE || d.scale() < -MAX_DECIMAL_SCALE) return null
             // A literal in scientific notation has a negative scale, which means
             // the value is a whole number times a power of ten.
             return if (d.scale() >= 0) {
-                of(d.unscaledValue(), BigInteger.TEN.pow(d.scale()))
+                ofOrNull(d.unscaledValue(), BigInteger.TEN.pow(d.scale()))
             } else {
-                of(d.unscaledValue().multiply(BigInteger.TEN.pow(-d.scale())), BigInteger.ONE)
+                ofOrNull(d.unscaledValue().multiply(BigInteger.TEN.pow(-d.scale())), BigInteger.ONE)
             }
         }
 
@@ -77,10 +107,16 @@ class Rat private constructor(val num: BigInteger, val den: BigInteger) : Compar
     operator fun times(other: Rat): Rat =
         of(num.multiply(other.num), den.multiply(other.den))
 
-    operator fun div(other: Rat): Rat {
-        require(other.num.signum() != 0) { "Division by zero" }
-        return of(num.multiply(other.den), den.multiply(other.num))
-    }
+    /**
+     * Exact division. A zero divisor is a programming error; callers handling
+     * user input should use [divOrNull].
+     */
+    operator fun div(other: Rat): Rat = divOrNull(other) ?: throw IllegalArgumentException("Division by zero")
+
+    /** Null-safe form of [div]: returns null when [other] is zero. */
+    fun divOrNull(other: Rat): Rat? =
+        if (other.num.signum() == 0) null
+        else of(num.multiply(other.den), den.multiply(other.num))
 
     operator fun unaryMinus(): Rat = Rat(num.negate(), den)
 

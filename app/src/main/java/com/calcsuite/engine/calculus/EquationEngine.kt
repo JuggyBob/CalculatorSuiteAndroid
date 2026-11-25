@@ -13,9 +13,9 @@ object EquationEngine {
 
     /**
      * Finds roots of f(x) = 0 on [from, to] by scanning for sign changes and
-     * refining with bisection (guaranteed convergence), plus a Newton polish.
+     * refining each bracket with bisection (guaranteed convergence).
      */
-    fun solveRoots(expr: String, fromText: String, toText: String, samples: Int = 2000): CalcResult<RootResult> {
+    fun solveRoots(expr: String, fromText: String, toText: String, samples: Int = 2000): CalcResult<RootResult> = guarded {
         val node = parseOrErr(expr)
         if (node is CalcResult.Err) return node
         val n = (node as CalcResult.Ok).value
@@ -46,7 +46,7 @@ object EquationEngine {
                 NodePrinter.print(n), uniq,
                 listOf(
                     "Scanned [${NodePrinter.format(from)}, ${NodePrinter.format(to)}] for sign changes of ${NodePrinter.print(n)} = 0.",
-                    "Each bracket is refined by bisection, then polished with Newton's method.",
+                    "Each bracket is refined by bisection.",
                     if (uniq.isEmpty()) "No root was found in this interval — try a wider range." else "Found ${uniq.size} root(s).",
                 ),
             ),
@@ -69,7 +69,7 @@ object EquationEngine {
     }
 
     /** Local extrema via f'(x) = 0, classified by the second derivative. */
-    fun extrema(expr: String, fromText: String, toText: String): CalcResult<ExtremaResult> {
+    fun extrema(expr: String, fromText: String, toText: String): CalcResult<ExtremaResult> = guarded {
         val node = parseOrErr(expr)
         if (node is CalcResult.Err) return node
         val n = (node as CalcResult.Ok).value
@@ -122,7 +122,7 @@ object EquationEngine {
         y0Text: String,
         stepsText: String,
         stepText: String,
-    ): CalcResult<OdeResult> {
+    ): CalcResult<OdeResult> = guarded {
         val node = parseOrErr(odeText)
         if (node is CalcResult.Err) return node
         val g = (node as CalcResult.Ok).value
@@ -144,6 +144,9 @@ object EquationEngine {
             val k4 = f(x + h, y + h * k3) ?: return err(ErrorKind.Domain, "The solution left the defined region")
             y += h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
             x += h
+            if (!y.isFinite() || !x.isFinite()) {
+                return err(ErrorKind.Overflow, "The numerical solution is not representable")
+            }
             points.add(Triple(x, y, it + 1))
         }
         return ok(

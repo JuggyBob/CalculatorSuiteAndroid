@@ -16,6 +16,21 @@ object CircuitCodec {
     /** The version of the format this writes. */
     const val VERSION = 1
 
+    /** The largest circuit this format will read, matching the solver's limit. */
+    const val MAX_COMPONENTS = DcSolver.MAX_COMPONENTS
+
+    /** The largest number of wires this format will read. */
+    const val MAX_WIRES = 800
+
+    /** The largest absolute scale of a number this format will read. */
+    private const val MAX_ABS_SCALE = 10_000
+
+    /** The largest number of significant digits of a number this format will read. */
+    private const val MAX_PRECISION = 10_000
+
+    /** The longest numeric field accepted, long enough for the limits above. */
+    private const val MAX_NUMBER_LENGTH = 20_100
+
     private const val FIELD = '|'
     private const val ESCAPE = '\\'
 
@@ -32,11 +47,11 @@ object CircuitCodec {
                     component.x.toString(),
                     component.y.toString(),
                     component.rotation.toString(),
-                    component.resistance?.toPlainString().orEmpty(),
-                    component.voltage?.toPlainString().orEmpty(),
-                    component.current?.toPlainString().orEmpty(),
+                    component.resistance?.forStorage().orEmpty(),
+                    component.voltage?.forStorage().orEmpty(),
+                    component.current?.forStorage().orEmpty(),
                     component.switchClosed.toString(),
-                    component.powerRating?.toPlainString().orEmpty(),
+                    component.powerRating?.forStorage().orEmpty(),
                 ).joinToString(FIELD.toString()) { escape(it) },
             )
         }
@@ -71,9 +86,21 @@ object CircuitCodec {
             val parts = split(line)
             when (parts.firstOrNull()) {
                 "c" -> {
+                    if (components.size >= MAX_COMPONENTS) return null
                     if (parts.size < 12) return null
                     val kind = ComponentKind.entries.firstOrNull { it.name == parts[2] }
                         ?: return null
+                    // A blank field is a part that has not been valued yet
+                    // and is read back as null. A non-blank field that is not
+                    // a sane number is a damaged save: refuse it all rather
+                    // than quietly turning the value into null.
+                    val resistance = parts[7].decodeNumberField()
+                    val voltage = parts[8].decodeNumberField()
+                    val current = parts[9].decodeNumberField()
+                    val rating = parts[11].decodeNumberField()
+                    if (!resistance.valid || !voltage.valid || !current.valid || !rating.valid) {
+                        return null
+                    }
                     val component = CircuitComponent(
                         id = parts[1],
                         kind = kind,
@@ -81,15 +108,16 @@ object CircuitCodec {
                         x = parts[4].toDoubleOrNull() ?: return null,
                         y = parts[5].toDoubleOrNull() ?: return null,
                         rotation = parts[6].toIntOrNull() ?: 0,
-                        resistance = parts[7].toBigDecimalOrNull(),
-                        voltage = parts[8].toBigDecimalOrNull(),
-                        current = parts[9].toBigDecimalOrNull(),
+                        resistance = resistance.value,
+                        voltage = voltage.value,
+                        current = current.value,
                         switchClosed = parts[10].toBooleanStrictOrNull() ?: true,
-                        powerRating = parts[11].toBigDecimalOrNull(),
+                        powerRating = rating.value,
                     )
                     components.add(component)
                 }
                 "w" -> {
+                    if (wires.size >= MAX_WIRES) return null
                     if (parts.size < 6) return null
                     val from = parts[3].toIntOrNull() ?: return null
                     val to = parts[5].toIntOrNull() ?: return null
@@ -201,11 +229,49 @@ object CircuitCodec {
         return parts
     }
 
-    /** A number, or nothing when the text is not one. */
-    private fun String.toBigDecimalOrNull(): BigDecimal? =
-        if (isBlank()) null else try {
+    /**
+     * A number written for saving.
+     *
+     * Plain decimal notation keeps ordinary values readable and round-trips
+     * them exactly. A value with an extreme scale would take an enormous
+     * amount of memory to write out in full, so those values are written in
+     * scientific notation instead. The reader rejects them in any case.
+     */
+    private fun BigDecimal.forStorage(): String =
+        if (scale() in -MAX_ABS_SCALE..MAX_ABS_SCALE &&
+            precision() <= MAX_PRECISION &&
+            toDouble().isFinite()
+        ) {
+            toPlainString()
+        } else {
+            toString()
+        }
+
+    /**
+     * One numeric field of a saved part.
+     *
+     * A blank field is legitimate: a part can be put on the canvas before it
+     * has a value, and the writer stores that as an empty field. Bad text or
+     * an out-of-range number is not legitimate and has to fail the whole
+     * save, so it is told apart from a blank field here.
+     */
+    private data class NumberField(val value: BigDecimal?, val valid: Boolean)
+
+    /** Reads one numeric field, never downgrading a hostile value to null. */
+    private fun String.decodeNumberField(): NumberField {
+        if (isBlank()) return NumberField(null, true)
+        if (length > MAX_NUMBER_LENGTH) return NumberField(null, false)
+        val value = try {
             BigDecimal(this)
         } catch (_: NumberFormatException) {
-            null
+            return NumberField(null, false)
         }
+        // A tiny string such as 1E+1000000000 would make toPlainString try
+        // to write a billion characters, so extreme scales, long numbers and
+        // magnitudes the solver cannot use are all refused.
+        if (value.scale() !in -MAX_ABS_SCALE..MAX_ABS_SCALE) return NumberField(null, false)
+        if (value.precision() > MAX_PRECISION) return NumberField(null, false)
+        if (!value.toDouble().isFinite()) return NumberField(null, false)
+        return NumberField(value, true)
+    }
 }

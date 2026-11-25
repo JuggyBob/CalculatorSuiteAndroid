@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
@@ -18,20 +19,23 @@ class CircuitRepository(context: Context) {
 
     private val store = context.appDataStore
 
-    /** The circuit saved for a tool, read back. */
-    fun circuit(toolId: String): Flow<String?> = store.data.map { prefs ->
-        prefs[circuitKey(toolId)]
+    /** The circuit saved for a tool, read back. An invalid id has no circuit. */
+    fun circuit(toolId: String): Flow<String?> {
+        if (!CircuitLimits.isValidToolId(toolId)) return flowOf(null)
+        return store.data.map { prefs -> prefs[circuitKey(toolId)] }
     }
 
-    /** Saves the circuit of a tool. */
-    suspend fun save(toolId: String, encoded: String) = store.edit { prefs ->
-        prefs[circuitKey(toolId)] = encoded
+    /** Saves the circuit of a tool; invalid ids and oversized text are ignored. */
+    suspend fun save(toolId: String, encoded: String) {
+        if (!CircuitLimits.isValidToolId(toolId) || !CircuitLimits.encodedWithinLimit(encoded)) return
+        store.edit { prefs -> prefs[circuitKey(toolId)] = encoded }
     }
 
     /** Forgets the circuit of a tool. */
-    suspend fun clear(toolId: String) = store.edit { prefs ->
-        prefs.remove(circuitKey(toolId))
+    suspend fun clear(toolId: String) {
+        if (!CircuitLimits.isValidToolId(toolId)) return
+        store.edit { prefs -> prefs.remove(circuitKey(toolId)) }
     }
 
-    private fun circuitKey(toolId: String) = stringPreferencesKey("circuit_$toolId")
+    private fun circuitKey(toolId: String) = stringPreferencesKey(CircuitLimits.circuitKey(toolId))
 }

@@ -71,9 +71,7 @@ object ShapeEngine {
         ShapeKind.SQUARE -> listOf(ShapeField("side", "Side s"))
         ShapeKind.RECTANGLE -> listOf(ShapeField("width", "Width w"), ShapeField("height", "Height h"))
         ShapeKind.TRIANGLE -> listOf(
-            ShapeField("base", "Base b"), ShapeField("height", "Height h"),
             ShapeField("sideA", "Side a"), ShapeField("sideB", "Side b"), ShapeField("sideC", "Side c"),
-            ShapeField("angle", "Included angle C"),
         )
         ShapeKind.EQUILATERAL_TRIANGLE -> listOf(ShapeField("side", "Side s"))
         ShapeKind.PARALLELOGRAM -> listOf(
@@ -82,7 +80,6 @@ object ShapeEngine {
         )
         ShapeKind.RHOMBUS -> listOf(
             ShapeField("diagP", "Diagonal p"), ShapeField("diagQ", "Diagonal q"),
-            ShapeField("side", "Side a"), ShapeField("angle", "Angle θ"),
         )
         ShapeKind.TRAPEZOID -> listOf(
             ShapeField("baseA", "Base a"), ShapeField("baseB", "Base b"), ShapeField("height", "Height h"),
@@ -195,10 +192,7 @@ object ShapeEngine {
         }
         val perimeter = sumAB.add(c, CTX)
         val semi = perimeter.divide(TWO, CTX)
-        val radicand = semi
-            .multiply(semi.subtract(a, CTX), CTX)
-            .multiply(semi.subtract(b, CTX), CTX)
-            .multiply(semi.subtract(c, CTX), CTX)
+        val radicand = GeometryMath.heronRadicand(a, b, c)
         val area = GeometryMath.sqrt(radicand)
         val angleA = angleOpposite(a, b, c)
         val angleB = angleOpposite(b, a, c)
@@ -462,6 +456,20 @@ object ShapeEngine {
         requirePositive(height, "Height")?.let { return it }
         if (leg1 != null) requirePositive(leg1, "Leg 1")?.let { return it }
         if (leg2 != null) requirePositive(leg2, "Leg 2")?.let { return it }
+        // A leg spans the full height between the parallel bases, so it can
+        // never be shorter than the height itself.
+        if (leg1 != null && leg1.compareTo(height) < 0) {
+            return err(
+                ErrorKind.Inconsistent,
+                "Leg 1 (${n(leg1)}) cannot be shorter than the height (${n(height)})",
+            )
+        }
+        if (leg2 != null && leg2.compareTo(height) < 0) {
+            return err(
+                ErrorKind.Inconsistent,
+                "Leg 2 (${n(leg2)}) cannot be shorter than the height (${n(height)})",
+            )
+        }
         val area = baseA.add(baseB, CTX).divide(TWO, CTX).multiply(height, CTX)
         val midline = baseA.add(baseB, CTX).divide(TWO, CTX)
         val quantities = mutableListOf("Midline (unit)" to midline)

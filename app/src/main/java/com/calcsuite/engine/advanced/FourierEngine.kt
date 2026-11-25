@@ -21,6 +21,25 @@ import kotlin.math.sqrt
  */
 object FourierEngine {
 
+    /**
+     * The largest number of harmonics accepted by [series].
+     *
+     * Each harmonic needs two numerical integrals, so an unbounded count can
+     * run for a very long time. 256 still resolves a great deal of detail and
+     * keeps the work under a few hundred thousand integrand evaluations per
+     * coefficient (the panel count is capped separately in [integrate]).
+     */
+    const val MAX_HARMONICS = 256
+
+    /**
+     * The largest list of samples accepted by the discrete transforms.
+     *
+     * The direct transform is quadratic, so 4096 samples are about 16 million
+     * operations at worst — a little slow but bounded. The fast transform is
+     * much cheaper and has the same cap for a uniform limit.
+     */
+    const val MAX_SAMPLES = 4096
+
     /** The coefficients of a real Fourier series. */
     data class Series(
         /** The constant term `a₀`, so the series starts with `a₀/2`. */
@@ -87,8 +106,10 @@ object FourierEngine {
         harmonics: Int,
         from: Double = 0.0,
     ): Series? {
-        if (period <= 0.0 || harmonics < 0) return null
+        if (!period.isFinite() || !from.isFinite()) return null
+        if (period <= 0.0 || harmonics < 0 || harmonics > MAX_HARMONICS) return null
         val to = from + period
+        if (!to.isFinite()) return null
         val n = harmonics
         // Enough panels to resolve the highest harmonic that is kept.
         val panels = (64 * maxOf(1, n)).coerceAtMost(20000)
@@ -96,7 +117,9 @@ object FourierEngine {
         // The constant term is the average of the function over the period,
         // and it is wanted even when no harmonics are kept.
         val mean = integrate(function, variable, from, to, 64) ?: return null
+        if (!mean.isFinite()) return null
         val a0 = 2.0 * mean / period
+        if (!a0.isFinite()) return null
 
         val cosines = mutableListOf<Double>()
         val sines = mutableListOf<Double>()
@@ -106,8 +129,12 @@ object FourierEngine {
             val sinTerm = Node.Fun("sin", listOf(Node.Mul(Node.Num(w), Node.Var(variable))))
             val cosIntegral = integrate(Node.Mul(function, cosTerm), variable, from, to, panels) ?: return null
             val sinIntegral = integrate(Node.Mul(function, sinTerm), variable, from, to, panels) ?: return null
-            cosines.add(2.0 * cosIntegral / period)
-            sines.add(2.0 * sinIntegral / period)
+            if (!cosIntegral.isFinite() || !sinIntegral.isFinite()) return null
+            val cosine = 2.0 * cosIntegral / period
+            val sine = 2.0 * sinIntegral / period
+            if (!cosine.isFinite() || !sine.isFinite()) return null
+            cosines.add(cosine)
+            sines.add(sine)
         }
         return Series(
             a0 = a0,
@@ -140,36 +167,66 @@ object FourierEngine {
         val count = panels.coerceIn(64, 20000)
         if (count % 2 == 1) return null
         val h = (hi - lo) / count
+        if (!h.isFinite()) return null
         var total = 0.0
         for (i in 0..count) {
             val x = lo + h * i
             val value = Evaluator.eval(function, mapOf(variable to x)).valueOrNull() ?: return null
+            if (!value.isFinite()) return null
             val weight = when {
                 i == 0 || i == count -> 1.0
                 i % 2 == 1 -> 4.0
                 else -> 2.0
             }
-            total += weight * value
+            val contribution = weight * value
+            if (!contribution.isFinite()) return null
+            total += contribution
+            // A finite but huge integrand can overflow the running sum long
+            // before any single value is non-finite. Stop there rather than
+            // letting an infinity reach the coefficients as a valid answer.
+            if (!total.isFinite()) return null
         }
-        return total * h / 3
+        val result = total * h / 3
+        return if (result.isFinite()) result else null
     }
 
     /**
      * The root-mean-square error between a function and its truncated series,
      * measured over one period.
+     *
+     * The value is infinite when no usable comparison can be made: a series
+     * whose approximation is not finite has no measurable error, and reporting
+     * zero for it would be misleading.
      */
-    fun rmsError(function: Node, variable: String, series: Series, samples: Int = 200): Double {
+    fun rmsError(function: Node, variable: String, series: Series, samples: Int = 200): Double =
+        rmsErrorOrNull(function, variable, series, samples) ?: Double.POSITIVE_INFINITY
+
+    /**
+     * The root-mean-square error, or null when the approximation cannot be
+     * compared with the function at any sampled point.
+     */
+    fun rmsErrorOrNull(
+        function: Node,
+        variable: String,
+        series: Series,
+        samples: Int = 200,
+    ): Double? {
+        if (samples < 1 || !series.period.isFinite() || series.period <= 0.0) return null
         var sum = 0.0
         var count = 0
         val step = series.period / samples
         for (i in 0 until samples) {
             val x = series.from + step * (i + 0.5)
             val exact = Evaluator.eval(function, mapOf(variable to x)).valueOrNull() ?: continue
-            val difference = exact - series.evaluate(x)
-            sum += difference * difference
+            val approximate = series.evaluate(x)
+            if (!exact.isFinite() || !approximate.isFinite()) continue
+            val squared = (exact - approximate).let { it * it }
+            if (!squared.isFinite()) continue
+            sum += squared
+            if (!sum.isFinite()) return null
             count++
         }
-        if (count == 0) return 0.0
+        if (count == 0) return null
         return sqrt(sum / count)
     }
 
@@ -210,9 +267,27 @@ object FourierEngine {
      * the same to working precision.
      */
     fun transform(samples: DoubleArray, interval: Double = 1.0): Transform {
+        if (samples.size < 2) {
+            throw IllegalArgumentException("a transform needs at least two samples")
+        }
+        return transformOrNull(samples, interval) ?: throw IllegalArgumentException(
+            "the transform needs finite samples and at most $MAX_SAMPLES of them",
+        )
+    }
+
+    /**
+     * The discrete transform, or null when the input cannot be used.
+     *
+     * This is the shape callers should use for user data: an over-long list,
+     * a non-finite sample or a non-finite interval is reported as null rather
+     * than as an exception. [transform] keeps the throwing shape for callers
+     * that already expect a value.
+     */
+    fun transformOrNull(samples: DoubleArray, interval: Double = 1.0): Transform? {
         val n = samples.size
-        require(n >= 2) { "a transform needs at least two samples" }
-        val values = if (n > 1 && (n and (n - 1)) == 0) fft(samples) else dft(samples)
+        if (n < 2 || n > MAX_SAMPLES) return null
+        if (!interval.isFinite() || samples.any { !it.isFinite() }) return null
+        val values = if ((n and (n - 1)) == 0) fftUnchecked(samples) else dftUnchecked(samples)
         val bins = (0 until n).map { k ->
             val magnitude = values[k].modulus
             val phase = values[k].argument
@@ -227,7 +302,18 @@ object FourierEngine {
     }
 
     /** The direct discrete Fourier transform, `O(n²)`. */
-    fun dft(samples: DoubleArray): List<ComplexNum> {
+    fun dft(samples: DoubleArray): List<ComplexNum> =
+        dftOrNull(samples) ?: throw IllegalArgumentException(
+            "the transform needs finite samples and at most $MAX_SAMPLES of them",
+        )
+
+    /** The direct transform, or null for an over-long or non-finite input. */
+    fun dftOrNull(samples: DoubleArray): List<ComplexNum>? {
+        if (samples.size > MAX_SAMPLES || samples.any { !it.isFinite() }) return null
+        return dftUnchecked(samples)
+    }
+
+    private fun dftUnchecked(samples: DoubleArray): List<ComplexNum> {
         val n = samples.size
         val out = ArrayList<ComplexNum>(n)
         for (k in 0 until n) {
@@ -248,11 +334,21 @@ object FourierEngine {
      *
      * The number of samples has to be a power of two.
      */
-    fun fft(samples: DoubleArray): List<ComplexNum> {
+    fun fft(samples: DoubleArray): List<ComplexNum> =
+        fftOrNull(samples) ?: throw IllegalArgumentException(
+            "the fast transform needs a power of two samples",
+        )
+
+    /** The fast transform, or null when the input cannot be used. */
+    fun fftOrNull(samples: DoubleArray): List<ComplexNum>? {
         val n = samples.size
-        require(n > 0 && (n and (n - 1)) == 0) {
-            "the fast transform needs a power of two samples"
-        }
+        if (n < 1 || n > MAX_SAMPLES || (n and (n - 1)) != 0) return null
+        if (samples.any { !it.isFinite() }) return null
+        return fftUnchecked(samples)
+    }
+
+    private fun fftUnchecked(samples: DoubleArray): List<ComplexNum> {
+        val n = samples.size
         val values = ArrayList<ComplexNum>(n)
         for (j in 0 until n) {
             values.add(ComplexNum(samples[j], 0.0))
@@ -295,7 +391,19 @@ object FourierEngine {
      * The inverse discrete Fourier transform, which turns the bins back into
      * samples.
      */
-    fun inverseTransform(values: List<ComplexNum>): DoubleArray {
+    fun inverseTransform(values: List<ComplexNum>): DoubleArray =
+        inverseTransformOrNull(values) ?: throw IllegalArgumentException(
+            "the inverse transform needs finite values and at most $MAX_SAMPLES of them",
+        )
+
+    /** The inverse transform, or null for an over-long or non-finite input. */
+    fun inverseTransformOrNull(values: List<ComplexNum>): DoubleArray? {
+        if (values.size > MAX_SAMPLES) return null
+        if (values.any { !it.re.isFinite() || !it.im.isFinite() }) return null
+        return inverseUnchecked(values)
+    }
+
+    private fun inverseUnchecked(values: List<ComplexNum>): DoubleArray {
         val n = values.size
         val out = DoubleArray(n)
         for (j in 0 until n) {

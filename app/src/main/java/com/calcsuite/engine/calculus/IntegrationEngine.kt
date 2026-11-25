@@ -13,7 +13,11 @@ import kotlin.math.abs
  */
 object IntegrationEngine {
 
-    fun definite(expr: String, varName: String, aText: String, bText: String): CalcResult<IntegrationResult> {
+    fun definite(expr: String, varName: String, aText: String, bText: String): CalcResult<IntegrationResult> =
+        definite(expr, varName, aText, bText, 24)
+
+    /** Same as [definite], with an explicit refinement limit for callers that need one. */
+    fun definite(expr: String, varName: String, aText: String, bText: String, maxDepth: Int): CalcResult<IntegrationResult> = guarded {
         val node = when (val p = CalculusParser.parse(expr)) {
             is CalcResult.Err -> return err(p.error.kind, p.error.message)
             is CalcResult.Ok -> p.value
@@ -25,27 +29,37 @@ object IntegrationEngine {
 
         val sign = if (b > a) 1.0 else -1.0
         val (lo, hi) = if (b > a) a to b else b to a
-        val value = adaptiveSimpson(node, varName.lowercase(), lo, hi)
+        val outcome = adaptiveSimpsonDetailed(node, varName.lowercase(), lo, hi, maxDepth)
+        val value = outcome.value
         if (value == null) {
             return err(ErrorKind.Domain, "The integrand has a singularity inside the interval, or is not defined there")
         }
+        val caveat = !outcome.converged
         val signed = sign * value
+        if (!signed.isFinite()) {
+            return err(ErrorKind.Overflow, "The integral is not representable")
+        }
         return ok(
             IntegrationResult(
                 expression = NodePrinter.print(node),
                 value = NodePrinter.format(signed),
-                method = "Definite (adaptive Simpson)",
+                method = if (caveat) "Definite (adaptive Simpson — not fully converged)" else "Definite (adaptive Simpson)",
                 exact = false,
                 steps = listOf(
                     "∫ from ${NodePrinter.format(a)} to ${NodePrinter.format(b)} of ${NodePrinter.print(node)} d$varName",
                     "The interval is integrated numerically with adaptive Simpson refinement.",
+                    if (caveat) {
+                        "The refinement depth limit was reached before the error target was met; this value is an estimate only."
+                    } else {
+                        "The refinement met the error target."
+                    },
                     "Result ≈ ${NodePrinter.format(signed)}",
                 ),
             ),
         )
     }
 
-    fun indefinite(expr: String, varName: String): CalcResult<IntegrationResult> {
+    fun indefinite(expr: String, varName: String): CalcResult<IntegrationResult> = guarded {
         val node = when (val p = CalculusParser.parse(expr)) {
             is CalcResult.Err -> return err(p.error.kind, p.error.message)
             is CalcResult.Ok -> p.value
@@ -170,30 +184,53 @@ object IntegrationEngine {
             (DifferentiationEngine.differentiate(n, v) as? CalcResult.Ok)?.value ?: Node.Num(1.0)
         )
 
-    /** Adaptive Simpson integration; returns null if the integrand is undefined. */
-    fun adaptiveSimpson(node: Node, v: String, lo: Double, hi: Double, maxDepth: Int = 24): Double? {
+    /** What an adaptive Simpson run produced, and whether it met the error target. */
+    data class SimpsonOutcome(val value: Double?, val converged: Boolean)
+
+    /** Adaptive Simpson integration, including whether refinement converged. */
+    fun adaptiveSimpsonDetailed(node: Node, v: String, lo: Double, hi: Double, maxDepth: Int = 24): SimpsonOutcome =
+        try {
+            simpsonDetailed(node, v, lo, hi, maxDepth)
+        } catch (e: StackOverflowError) {
+            SimpsonOutcome(null, false)
+        }
+
+    private fun simpsonDetailed(node: Node, v: String, lo: Double, hi: Double, maxDepth: Int): SimpsonOutcome {
         val f = { x: Double -> Evaluator.eval(node, mapOf(v to x)).valueOrNull() }
-        val fLo = f(lo) ?: return null
-        val fHi = f(hi) ?: return null
-        val fMid = f((lo + hi) / 2) ?: return null
+        val fLo = f(lo) ?: return SimpsonOutcome(null, false)
+        val fHi = f(hi) ?: return SimpsonOutcome(null, false)
+        val fMid = f((lo + hi) / 2) ?: return SimpsonOutcome(null, false)
         val whole = simpson(fLo, fMid, fHi, hi - lo)
-        return refine(f, lo, hi, whole, 0, maxDepth)
+        val refined = refine(f, lo, hi, whole, 0, maxDepth)
+        return SimpsonOutcome(refined.value, refined.converged)
     }
 
-    private fun refine(f: (Double) -> Double?, lo: Double, hi: Double, whole: Double, depth: Int, maxDepth: Int): Double? {
-        if (depth >= maxDepth) return whole
+    /** Adaptive Simpson integration; returns null if the integrand is undefined. */
+    fun adaptiveSimpson(node: Node, v: String, lo: Double, hi: Double, maxDepth: Int = 24): Double? =
+        adaptiveSimpsonDetailed(node, v, lo, hi, maxDepth).value
+
+    private data class RefineOutcome(val value: Double?, val converged: Boolean)
+
+    private fun refine(f: (Double) -> Double?, lo: Double, hi: Double, whole: Double, depth: Int, maxDepth: Int): RefineOutcome {
+        // Hitting the depth limit means the error target was not reached: the
+        // coarse value is still returned, but marked as not converged.
+        if (depth >= maxDepth) return RefineOutcome(whole, false)
         val mid = (lo + hi) / 2
-        val fLo = f(lo) ?: return null
-        val fHi = f(hi) ?: return null
+        val fLo = f(lo) ?: return RefineOutcome(null, false)
+        val fHi = f(hi) ?: return RefineOutcome(null, false)
         val lm = f((lo + mid) / 2); val mm = f(mid); val rm = f((mid + hi) / 2)
-        if (lm == null || mm == null || rm == null) return whole
+        // A singularity found only during refinement is a real failure: do not
+        // present the coarse estimate from before refinement as the answer.
+        if (lm == null || mm == null || rm == null) return RefineOutcome(null, false)
         val left = simpson(fLo, lm, mm, mid - lo)
         val right = simpson(mm, rm, fHi, hi - mid)
         val sum = left + right
-        if (abs(sum - whole) < 1e-13 * maxOf(1.0, abs(sum))) return sum
+        if (abs(sum - whole) < 1e-13 * maxOf(1.0, abs(sum))) return RefineOutcome(sum, true)
         val l = refine(f, lo, mid, left, depth + 1, maxDepth)
+        val lv = l.value ?: return RefineOutcome(null, false)
         val r = refine(f, mid, hi, right, depth + 1, maxDepth)
-        return (l ?: sum) + (r ?: sum)
+        val rv = r.value ?: return RefineOutcome(null, false)
+        return RefineOutcome(lv + rv, l.converged && r.converged)
     }
 
     private fun simpson(a: Double, m: Double, b: Double, h: Double): Double = (h / 6) * (a + 4 * m + b)

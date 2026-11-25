@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
+import java.math.MathContext
 
 class OhmsLawEngineTest {
 
@@ -19,6 +20,12 @@ class OhmsLawEngineTest {
         val result = OhmsLawEngine.solve(known)
         assertTrue("Expected failure, was $result", result is CalcResult.Err)
         return result as CalcResult.Err
+    }
+
+    private fun assertRelativelyClose(actual: BigDecimal, expected: String) {
+        val exp = BigDecimal(expected)
+        val relativeError = actual.subtract(exp).abs().divide(exp.abs(), MathContext(34))
+        assertTrue("Expected $actual close to $exp", relativeError.compareTo(BigDecimal("1e-30")) <= 0)
     }
 
     @Test
@@ -253,5 +260,48 @@ class OhmsLawEngineTest {
         assertTrue(result.assumptions.any { it.contains("No AC impedance") })
         assertTrue(result.assumptions.any { it.contains("temperature") })
         assertTrue(result.notes.any { it.contains("SI base units") })
+    }
+
+    @Test
+    fun sqrtOfVeryLargeProductsDoesNotThrowOrLeakInfinity() {
+        // The resistance/power branch needs sqrt(P*R). P*R = 1e800 overflows a
+        // Double; the old implementation leaked a NumberFormatException here.
+        val result = value(
+            mapOf(
+                Quantity.POWER to BigDecimal("1e400"),
+                Quantity.RESISTANCE to BigDecimal("1e400"),
+            ),
+        )
+        assertRelativelyClose(result.voltage, "1e400")
+        assertRelativelyClose(result.current, "1")
+    }
+
+    @Test
+    fun sqrtOfVerySmallProductsDoesNotUnderflowToZero() {
+        // sqrt(1e-800) must stay a positive 1e-400, not collapse to 0.0.
+        val result = value(
+            mapOf(
+                Quantity.POWER to BigDecimal("1e-400"),
+                Quantity.RESISTANCE to BigDecimal("1e-400"),
+            ),
+        )
+        assertEquals(1, result.voltage.signum())
+        assertRelativelyClose(result.voltage, "1e-400")
+        assertRelativelyClose(result.current, "1")
+    }
+
+    @Test
+    fun sqrtKeepsTheDeclared34DigitPrecision() {
+        // sqrt(2) must not be truncated to Double's ~16 digits.
+        val result = value(
+            mapOf(
+                Quantity.POWER to BigDecimal("1"),
+                Quantity.RESISTANCE to BigDecimal("2"),
+            ),
+        )
+        assertTrue(
+            result.voltage.subtract(BigDecimal("1.4142135623730950488016887242097")).abs()
+                .compareTo(BigDecimal("1e-30")) < 0,
+        )
     }
 }

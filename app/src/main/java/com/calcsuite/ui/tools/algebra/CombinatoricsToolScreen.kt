@@ -22,6 +22,7 @@ import com.calcsuite.core.Num
 import com.calcsuite.engine.algebra.CombinatoricsEngine
 import com.calcsuite.engine.algebra.ProbabilityResult
 import com.calcsuite.engine.algebra.SelectionResult
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
 import com.calcsuite.ui.components.NumberField
@@ -233,5 +234,9 @@ fun CombinatoricsToolScreen(args: ToolArgs) {
         if (selection != null && selection.value.bitLength() > 0 && selection.value < BigInteger.valueOf(10_000L)) {
             InfoNote("Small result: ${selection.value} — compare C and P for the same n and r to see the r! factor.")
         }
+
+        ExplanationCards(
+            AlgebraExplanationsNumber.combinatoricsExplanation(mode.name, selection, probability),
+        )
     }
 }

@@ -7,6 +7,7 @@ import com.calcsuite.core.ok
 import com.calcsuite.engine.calculus.CalculusParser
 import com.calcsuite.engine.calculus.Node
 import com.calcsuite.engine.calculus.NodePrinter
+import com.calcsuite.engine.calculus.TOO_DEEP_MESSAGE
 
 /** Raised while reading a differential equation. */
 class OdeParseException(message: String) : Exception(message)
@@ -34,6 +35,12 @@ object OdeParser {
     /** The prefix used for the derivative placeholders inside the parsed tree. */
     const val DERIVATIVE_PREFIX = "yd"
 
+    /** Above this many characters the regex rewrites and tree walks are refused. */
+    const val MAX_EQUATION_LENGTH = 4_000
+
+    /** Highest derivative order the solver can handle. */
+    const val MAX_DERIVATIVE_ORDER = 10
+
     /** The placeholder for the n-th derivative of y. */
     fun derivativeName(order: Int): String = DERIVATIVE_PREFIX + order
 
@@ -50,10 +57,17 @@ object OdeParser {
         if (trimmed.isEmpty()) {
             return err(ErrorKind.InvalidInput, "Enter a differential equation.")
         }
+        // Check before any regex runs: a huge equation can make repeated
+        // replacement scans needlessly slow.
+        if (trimmed.length > MAX_EQUATION_LENGTH) {
+            return err(ErrorKind.InvalidInput, "The equation is too long")
+        }
         return try {
             ok(parseChecked(trimmed))
         } catch (e: OdeParseException) {
             err(ErrorKind.Syntax, e.message ?: "The equation could not be read.")
+        } catch (e: StackOverflowError) {
+            err(ErrorKind.Syntax, TOO_DEEP_MESSAGE)
         }
     }
 
@@ -101,6 +115,9 @@ object OdeParser {
         }
         val order = coefficients.keys.filter { it >= 1 }.maxOrNull()
             ?: throw OdeParseException("The left-hand side has to contain a derivative of y.")
+        if (order > MAX_DERIVATIVE_ORDER) {
+            throw OdeParseException("The derivative order must not exceed $MAX_DERIVATIVE_ORDER")
+        }
 
         // Move the extra terms across.
         val rhs = if (remainder == null) rightNode else subtractTerms(rightNode, remainder)
@@ -143,15 +160,26 @@ object OdeParser {
      * parser then sees ordinary identifiers.
      */
     fun rewriteDerivatives(text: String): String {
+        if (text.length > MAX_EQUATION_LENGTH) {
+            throw OdeParseException("The equation is too long")
+        }
         var out = FRACTION_DERIVATIVE.replace(text) { match ->
             val first = match.groupValues[1].toIntOrNull() ?: 0
             val second = match.groupValues[3].toIntOrNull() ?: 0
+            val order = maxOf(first, second, 1)
+            if (order > MAX_DERIVATIVE_ORDER) {
+                throw OdeParseException("The derivative order must not exceed $MAX_DERIVATIVE_ORDER")
+            }
             // The whitespace after the denominator is kept, so the space in
             // front of the equals sign survives.
-            derivativeName(maxOf(first, second, 1)) + match.groupValues[2]
+            derivativeName(order) + match.groupValues[2]
         }
         out = PRIME_DERIVATIVE.replace(out) { match ->
-            derivativeName(match.value.count { it == '\'' })
+            val order = match.value.count { it == '\'' }
+            if (order > MAX_DERIVATIVE_ORDER) {
+                throw OdeParseException("The derivative order must not exceed $MAX_DERIVATIVE_ORDER")
+            }
+            derivativeName(order)
         }
         return out
     }
@@ -297,6 +325,9 @@ object OdeParser {
             ?: throw OdeParseException("\"$name\" does not name a derivative of y.")
         if (order < 1) {
             throw OdeParseException("\"$name\" does not name a derivative of y.")
+        }
+        if (order > MAX_DERIVATIVE_ORDER) {
+            throw OdeParseException("The derivative order must not exceed $MAX_DERIVATIVE_ORDER")
         }
         val rest = factors.filter { it !== derivative.first() }
         val coefficient = when (rest.size) {

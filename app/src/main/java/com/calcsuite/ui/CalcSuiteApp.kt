@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -34,8 +35,10 @@ import com.calcsuite.ui.ai.AiSettingsScreen
 import com.calcsuite.ui.ai.AiSolveScreen
 import com.calcsuite.ui.ai.AiViewModel
 import com.calcsuite.ui.theme.Accent
+import com.calcsuite.ui.theme.applyAppNightMode
 import com.calcsuite.ui.theme.CalcSuiteTheme
 import com.calcsuite.ui.theme.ThemeMode
+import com.calcsuite.ui.update.UpdateGate
 import kotlinx.coroutines.launch
 
 val LocalApp = compositionLocalOf<AppContainer> { error("AppContainer is not available") }
@@ -72,6 +75,7 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
         com.calcsuite.ai.AiSettings.DEFAULT,
     )
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val nav = rememberNavController()
 
     fun record(
@@ -128,6 +132,9 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background,
             ) {
+                // One automatic update check per app start. The gate waits for
+                // onboarding itself and draws nothing over the welcome pages.
+                UpdateGate()
                 // First launch: welcome pages instead of the main menu. The main
                 // menu itself is untouched — it appears as soon as onboarding is
                 // finished or skipped, and never again after that.
@@ -191,7 +198,13 @@ fun CalcSuiteApp(container: AppContainer, initialSettings: Settings) {
                         settings = settings,
                         historyCount = history.size,
                         onBack = { nav.popBackStack() },
-                        onSetTheme = { scope.launch { container.settings.setThemeMode(it) } },
+                        onSetTheme = { mode ->
+                            // The app-level night mode decides the system launch
+                            // window on the next cold start; update it on the user's
+                            // selection, not on recomposition.
+                            applyAppNightMode(context, mode)
+                            scope.launch { container.settings.setThemeMode(mode) }
+                        },
                         onSetAngle = { scope.launch { container.settings.setAngleMode(it) } },
                         onSetPrecision = { scope.launch { container.settings.setPrecision(it) } },
                         onSetGrouping = { scope.launch { container.settings.setGrouping(it) } },

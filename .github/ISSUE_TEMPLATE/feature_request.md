@@ -28,7 +28,7 @@ my monthly payment goes to interest" is far more useful than "add a pie chart".
 
 ## Category
 
-<!-- Algebra / Geometry / Converters / Finance / Health / Date & Time / Other / App-wide -->
+<!-- Algebra / Geometry / Converters / Finance / Health / Date & Time / Other / Calculus / Advanced Mathematics / App-wide -->
 
 ## Related tools
 

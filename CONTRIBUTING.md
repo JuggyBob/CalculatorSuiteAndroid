@@ -59,9 +59,10 @@ app/src/main/java/com/calcsuite/
 ├── data/            # tool registry, settings/history repositories, icons
 ├── ui/
 │   ├── components/  # shared Compose widgets (forms, result cards, scaffolding)
-│   ├── screens/     # main menu, search, settings, history, scientific, onboarding
-│   ├── theme/       # colour, type, shape
-│   └── tools/       # one screen per tool, grouped by category
+│   ├── screens/     # main menu, search, settings (a hub plus four pages), history, scientific, onboarding
+│   ├── theme/       # colour, type, shape, the four theme modes and AppNightMode
+│   ├── tools/       # one screen per tool, grouped by category
+│   └── update/      # startup update gate, prompt policy and update UI
 └── MainActivity.kt  # single activity
 ```
 
@@ -147,7 +148,7 @@ Cover every mode, invalid input, and the zero/negative edges. Every bug fix shou
 4. Open the PR against `main` and fill in the template: what changed, why, how you verified it.
 5. Link any related issue with `Fixes #123`.
 
-A PR that changes behaviour should also update the affected documentation in `docs/`. If you change a tool's inputs, modes or errors, update `docs/FEATURES_AND_TOOLS.md` in the same PR.
+A PR that changes behaviour should also update the affected documentation in `docs/`. If you change a tool's inputs, modes or errors, update `docs/FEATURES_AND_TOOLS.md` in the same PR. The same goes for settings and the updater: if you add or change a settings key, a theme mode, an update-check rule or a safe-link rule, update `docs/ARCHITECTURE.md` in the same PR; if a dependency changed, update `docs/DEPENDENCIES.md` too.
 
 ### Adding a new tool
 

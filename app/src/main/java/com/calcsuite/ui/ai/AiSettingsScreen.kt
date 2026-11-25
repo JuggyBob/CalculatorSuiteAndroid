@@ -60,7 +60,10 @@ fun AiSettingsScreen(
     scope: CoroutineScope,
 ) {
     var model by rememberSaveable(settings.model) { mutableStateOf(settings.model) }
-    var apiKey by rememberSaveable { mutableStateOf("") }
+    // The key is a secret: never put it in the saved state (which survives
+    // process death and can be written to disk). It is cleared after saving or
+    // removing it, so a rotation loses nothing the user still needs.
+    var apiKey by remember { mutableStateOf("") }
     var keyShown by remember { mutableStateOf(false) }
     var testing by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }

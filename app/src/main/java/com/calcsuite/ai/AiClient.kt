@@ -304,7 +304,7 @@ class AiClient(
         // The reply does not always carry the status, so the kind of problem
         // is worked out from the words the provider used.
         val status = guessStatus(raw, type)
-        return classify(status = status, message = redact(raw), type = type)
+        return classify(status = status, message = raw, type = type)
     }
 
     /**
@@ -329,29 +329,36 @@ class AiClient(
         }
     }
 
-    /**
-     * The provider's own words, with anything that looks like a key taken
-     * out.
-     *
-     * A provider sometimes repeats the key, or part of it, in its error, and
-     * that must not be shown to the user.
-     */
-    private fun redact(message: String): String {
-        val cleaned = message
-            .replace(Regex("(sk|pk|rk|key|api)[-_][A-Za-z0-9_\\-]{4,}"), "[the key]")
-            .replace(Regex("[A-Za-z0-9_\\-]{28,}"), "[hidden]")
-        return if (cleaned.length > 200) cleaned.take(200) + "…" else cleaned
-    }
-
     companion object {
+        /**
+         * The provider's own words, with anything that looks like a key taken
+         * out.
+         *
+         * A provider sometimes repeats the key, or part of it, in its error,
+         * and that must not be shown to the user. This is pure so it can be
+         * tested on its own, and so both the JSON error path and the raw HTTP
+         * error path use exactly the same rule.
+         */
+        fun redact(message: String): String {
+            val cleaned = message
+                .replace(Regex("(sk|pk|rk|key|api)[-_][A-Za-z0-9_\\-]{4,}"), "[the key]")
+                .replace(Regex("[A-Za-z0-9_\\-]{28,}"), "[hidden]")
+            return if (cleaned.length > 200) cleaned.take(200) + "…" else cleaned
+        }
+
         /**
          * Turns a provider's error into one the app shows.
          *
          * The HTTP status says what kind of problem it is: 401 and 403 mean
          * the key is wrong, 404 means the model is not there, 429 means the
          * quota is spent, and 5xx means the provider is having trouble.
+         *
+         * Any words echoed to the user are redacted first: a 5xx body in
+         * particular used to be shown verbatim, which could leak the key back
+         * to the screen the user is looking at.
          */
         fun classify(status: Int, message: String, type: String = ""): Pair<ErrorKind, String> {
+            val safe = redact(message)
             val text = type.lowercase()
             return when {
                 status == 401 || status == 403 ->
@@ -363,12 +370,12 @@ class AiClient(
                 status == 413 ->
                     ErrorKind.Overflow to "The image is too large for this provider."
                 status >= 500 ->
-                    ErrorKind.Unavailable to "${message.ifBlank { "The provider is having trouble." }}"
+                    ErrorKind.Unavailable to safe.ifBlank { "The provider is having trouble." }
                 status == 400 && text.contains("image") ->
                     ErrorKind.InvalidInput to
                         "This model cannot read images. Choose a model that supports pictures."
                 else ->
-                    ErrorKind.InvalidInput to message.ifBlank { "The provider rejected the request." }
+                    ErrorKind.InvalidInput to safe.ifBlank { "The provider rejected the request." }
             }
         }
     }
@@ -426,7 +433,9 @@ class HttpTransport : AiTransport {
                 if (status in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.let { readAll(it) } ?: ""
             if (status !in 200..299) {
-                val message = extractMessage(text)
+                // Redact before classification: for 5xx the provider's own
+                // words are echoed to the UI, and they can contain the key.
+                val message = AiClient.redact(extractMessage(text))
                 val (kind, shown) = AiClient.classify(status, message)
                 throw AiTransportException(kind, shown)
             }

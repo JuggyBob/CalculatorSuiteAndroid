@@ -102,11 +102,18 @@ class CircuitTopology(private val circuit: Circuit) {
             val parent = mutableMapOf<TerminalRef, TerminalRef>()
 
             fun find(terminal: TerminalRef): TerminalRef {
-                val current = parent.getOrPut(terminal) { terminal }
-                if (current == terminal) return current
-                val root = find(current)
-                parent[terminal] = root
-                return root
+                // Iterative, with path compression: a long chain of wires must
+                // not overflow the stack while its root is being looked up.
+                val path = mutableListOf<TerminalRef>()
+                var current = terminal
+                while (true) {
+                    val next = parent.getOrPut(current) { current }
+                    if (next == current) break
+                    path.add(current)
+                    current = next
+                }
+                for (node in path) parent[node] = current
+                return current
             }
 
             fun join(a: TerminalRef, b: TerminalRef) {

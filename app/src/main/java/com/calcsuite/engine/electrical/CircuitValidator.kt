@@ -58,6 +58,20 @@ object CircuitValidator {
 
     /** The assessment of a circuit. */
     fun assess(circuit: Circuit): CircuitAssessment {
+        // Refuse an oversized circuit before a topology (or any equations) are
+        // built from it, however the circuit was made.
+        if (circuit.components.size > CircuitCodec.MAX_COMPONENTS) {
+            return oversized(
+                "This circuit has more than ${CircuitCodec.MAX_COMPONENTS} parts. " +
+                    "Break it into smaller circuits.",
+            )
+        }
+        if (circuit.wires.size > CircuitCodec.MAX_WIRES) {
+            return oversized(
+                "This circuit has more than ${CircuitCodec.MAX_WIRES} wires. " +
+                    "Break it into smaller circuits.",
+            )
+        }
         if (circuit.components.isEmpty()) {
             return CircuitAssessment(
                 state = CircuitState.EMPTY,
@@ -161,6 +175,13 @@ object CircuitValidator {
             )
         }
     }
+
+    /** The answer for a circuit too big to work out. */
+    private fun oversized(message: String) = CircuitAssessment(
+        state = CircuitState.INVALID,
+        message = message,
+        suggestion = "Break the circuit into smaller circuits.",
+    )
 
     /** What to suggest for a failure. */
     private fun suggestionFor(kind: ErrorKind): String = when (kind) {

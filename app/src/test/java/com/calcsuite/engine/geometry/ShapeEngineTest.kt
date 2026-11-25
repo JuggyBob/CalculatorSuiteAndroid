@@ -374,4 +374,57 @@ class ShapeEngineTest {
             r.quantities.all { it.first.contains("unit") || it.first.contains("°") || it.first.contains("count") },
         )
     }
+
+    @Test fun nearDegenerateTriangleKeepsHeronPrecision() {
+        // 1 + 1 > 2 − 1e−33 by a hair; the true area is √(1e−33), not √2·1e−16.5.
+        val r = okValue(ShapeEngine.triangleThreeSides(bd("1"), bd("1"), bd("1.999999999999999999999999999999999")))
+        assertClose(
+            bd("3.162277660168379331998893544432717e-17"),
+            r.primary!!,
+            1e-9,
+            "area of nearly degenerate triangle",
+        )
+    }
+
+    @Test fun rectangleDiagonalExtremeMagnitudes() {
+        val huge = okValue(ShapeEngine.rectangle(bd("1e400"), bd("1e400")))
+        assertClose(
+            bd("1.414213562373095048801688724209698e400"),
+            quantity(huge, "Diagonal (unit)"),
+            1e-9,
+            "diagonal outside double range",
+        )
+        val tiny = okValue(ShapeEngine.rectangle(bd("1e-400"), bd("1e-400")))
+        val tinyExpected = bd("1.414213562373095048801688724209698e-400")
+        val tinyDiagonal = quantity(tiny, "Diagonal (unit)")
+        val tinyRelative = tinyDiagonal.subtract(tinyExpected).abs().divide(tinyExpected, MathContext(20))
+        assertTrue(
+            "diagonal below double range: expected ≈ $tinyExpected, was $tinyDiagonal",
+            tinyRelative.toDouble() < 1e-9,
+        )
+    }
+
+    @Test fun trapezoidLegShorterThanHeightRejected() {
+        rejected(
+            ShapeEngine.trapezoid(bd("4"), bd("6"), bd("3"), bd("2")),
+            ErrorKind.Inconsistent,
+            "leg 1 shorter than height",
+        )
+        rejected(
+            ShapeEngine.trapezoid(bd("4"), bd("6"), bd("3"), null, bd("2.9")),
+            ErrorKind.Inconsistent,
+            "leg 2 shorter than height",
+        )
+    }
+
+    @Test fun fieldsMatchDefaultModes() {
+        assertEquals(
+            listOf("sideA", "sideB", "sideC"),
+            ShapeEngine.fields(ShapeKind.TRIANGLE).map { it.id },
+        )
+        assertEquals(
+            listOf("diagP", "diagQ"),
+            ShapeEngine.fields(ShapeKind.RHOMBUS).map { it.id },
+        )
+    }
 }

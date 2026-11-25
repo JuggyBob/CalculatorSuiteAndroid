@@ -47,6 +47,9 @@ import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import com.calcsuite.ui.tools.prefill
 
+/** The largest number of harmonics this tool offers; the engine allows more. */
+private const val MAX_TOOL_HARMONICS = 60
+
 /**
  * The Fourier Analysis tool.
  *
@@ -82,6 +85,19 @@ fun FourierToolContent(args: ToolArgs) {
 
     val mode = if (modeName == "Series") "Series" else "Samples"
 
+    // A typed-in harmonic count is clamped to the same range the buttons
+    // offer, so a mistaken 100000 cannot start an unbounded computation.
+    val typedHarmonics = harmonics.trim().toIntOrNull()
+    val harmonicsTooLarge = typedHarmonics != null && typedHarmonics > MAX_TOOL_HARMONICS
+
+    // Read the samples once: values that are not numbers or not finite are
+    // rejected below rather than passed to the engine as zero.
+    val sampleValues = remember(samplesText) {
+        samplesText.split(",").map { it.trim().toDoubleOrNull() ?: 0.0 }
+    }
+    val tooManySamples = sampleValues.size > FourierEngine.MAX_SAMPLES
+    val nonFiniteSamples = sampleValues.any { !it.isFinite() }
+
     val parsed = remember(functionText) {
         when (val result = CalculusParser.parse(functionText)) {
             is CalcResult.Ok -> result.value
@@ -101,7 +117,7 @@ fun FourierToolContent(args: ToolArgs) {
     LaunchedEffect(parsed, period, harmonics, mode) {
         if (mode == "Series" && parsed != null) {
             val p = period.trim().toDoubleOrNull() ?: 0.0
-            val n = harmonics.trim().toIntOrNull() ?: 0
+            val n = (harmonics.trim().toIntOrNull() ?: 0).coerceIn(0, MAX_TOOL_HARMONICS)
             seriesResult = withContext(Dispatchers.Default) {
                 FourierOperations.series(parsed, variable.trim().ifBlank { "x" }, p, n)
             }
@@ -111,12 +127,11 @@ fun FourierToolContent(args: ToolArgs) {
     }
 
     LaunchedEffect(samplesText, interval, mode) {
-        if (mode == "Samples") {
-            val values = samplesText.split(",").map { it.trim().toDoubleOrNull() ?: 0.0 }
+        if (mode == "Samples" && !tooManySamples && !nonFiniteSamples) {
             val step = interval.trim().toDoubleOrNull() ?: 1.0
             transformResult = withContext(Dispatchers.Default) {
-                if (values.size < 2) null
-                else FourierOperations.transform(values.toDoubleArray(), step)
+                if (sampleValues.size < 2) null
+                else FourierOperations.transformOrNull(sampleValues.toDoubleArray(), step)
             }
         } else {
             transformResult = null
@@ -172,6 +187,12 @@ fun FourierToolContent(args: ToolArgs) {
                 integerOnly = true,
             )
             parseError?.let { ErrorNotice(it) }
+            if (harmonicsTooLarge) {
+                ErrorNotice(
+                    "Use at most $MAX_TOOL_HARMONICS harmonics; $typedHarmonics would take " +
+                        "too long to compute.",
+                )
+            }
             InfoNote(
                 "A function has to be periodic for the series to converge to it. A " +
                     "function that is not periodic can still be approximated over one " +
@@ -193,9 +214,19 @@ fun FourierToolContent(args: ToolArgs) {
                 value = interval,
                 onValueChange = { interval = it },
             )
+            if (tooManySamples) {
+                ErrorNotice(
+                    "There are ${sampleValues.size} samples. Use at most " +
+                        "${FourierEngine.MAX_SAMPLES} for the transform.",
+                )
+            }
+            if (nonFiniteSamples) {
+                ErrorNotice("The samples must be finite numbers.")
+            }
             InfoNote(
                 "Give the values in the order they were measured, equally spaced in " +
-                    "time. The length of the record is how much time the samples cover.",
+                    "time. The length of the record is how much time the samples cover. " +
+                    "At most ${FourierEngine.MAX_SAMPLES} samples are accepted.",
             )
         }
     }
@@ -279,11 +310,11 @@ fun FourierToolContent(args: ToolArgs) {
             ) {
                 TextButton(onClick = {
                     val n = (harmonics.trim().toIntOrNull() ?: 3) - 1
-                    harmonics = (n.coerceAtLeast(1)).toString()
+                    harmonics = n.coerceIn(1, MAX_TOOL_HARMONICS).toString()
                 }) { Text("Fewer harmonics") }
                 TextButton(onClick = {
                     val n = (harmonics.trim().toIntOrNull() ?: 3) + 1
-                    harmonics = n.coerceAtMost(60).toString()
+                    harmonics = n.coerceAtMost(MAX_TOOL_HARMONICS).toString()
                 }) { Text("More harmonics") }
             }
             Text(
@@ -298,9 +329,8 @@ fun FourierToolContent(args: ToolArgs) {
 
     if (mode == "Samples") {
         SectionCard(title = "The samples and the spectrum") {
-            val values = samplesText.split(",").map { it.trim().toDoubleOrNull() ?: 0.0 }
             SampleGraph(
-                samples = values.toDoubleArray(),
+                samples = sampleValues.take(FourierEngine.MAX_SAMPLES).toDoubleArray(),
                 transform = transform?.transform,
                 modifier = Modifier.height(240.dp),
             )

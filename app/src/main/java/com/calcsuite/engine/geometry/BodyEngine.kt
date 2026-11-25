@@ -71,11 +71,7 @@ object BodyEngine {
         BodyKind.TRIANGULAR_PRISM -> listOf(
             BodyField("baseEdge", "Base edge a"), BodyField("height", "Height h"),
         )
-        BodyKind.TRIANGULAR_PYRAMID -> listOf(
-            BodyField("a", "Edge a"),
-            BodyField("sideA", "Base side a"), BodyField("sideB", "Base side b"),
-            BodyField("sideC", "Base side c"), BodyField("height", "Height h"),
-        )
+        BodyKind.TRIANGULAR_PYRAMID -> listOf(BodyField("a", "Edge a"))
     }
 
     // -------------------------------------------------------------------- cube
@@ -415,10 +411,7 @@ object BodyEngine {
         }
         val perimeter = sumAB.add(sideC, CTX)
         val semi = perimeter.divide(TWO, CTX)
-        val radicand = semi
-            .multiply(semi.subtract(sideA, CTX), CTX)
-            .multiply(semi.subtract(sideB, CTX), CTX)
-            .multiply(semi.subtract(sideC, CTX), CTX)
+        val radicand = GeometryMath.heronRadicand(sideA, sideB, sideC)
         val base = GeometryMath.sqrt(radicand)
         val volume = base.multiply(height, CTX).divide(THREE, CTX)
         return ok(

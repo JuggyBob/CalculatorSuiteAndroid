@@ -77,10 +77,9 @@ object PolyRoots {
         for (n in numerators) {
             for (d in denominators) {
                 for (sign in intArrayOf(1, -1)) {
-                    val candidate = Rat.of(
-                        BigInteger.valueOf(sign.toLong()) * BigInteger.valueOf(n),
-                        BigInteger.valueOf(d),
-                    )
+                    // Defensive: never build a Rat with a zero denominator,
+                    // even if a future divisor source misbehaves.
+                    val candidate = Rat.ofOrNull(if (sign < 0) n.negate() else n, d) ?: continue
                     if (polynomial.evaluate(candidate).isZero()) return candidate
                 }
             }
@@ -88,20 +87,32 @@ object PolyRoots {
         return null
     }
 
-    private fun divisorsOf(value: BigInteger): List<Long> {
-        if (value.signum() == 0) return listOf(1L)
-        if (value > BigInteger.valueOf(1_000_000L)) return listOf(1L, value.toLong())
+    /** Above this magnitude the divisor scan is deliberately skipped. */
+    private val MAX_DIVISOR_SCAN = BigInteger.valueOf(1_000_000L)
+
+    /**
+     * Divisors of [value], as exact BigIntegers.
+     *
+     * Beyond [MAX_DIVISOR_SCAN] only the trivial divisor 1 is offered: the
+     * rational-root search is a performance optimisation, so skipping huge
+     * candidates is fine. Crucially, no `toLong()` truncation can turn a
+     * coefficient such as 2⁶⁴ into zero and make the candidate throw.
+     */
+    private fun divisorsOf(value: BigInteger): List<BigInteger> {
+        if (value.signum() == 0) return listOf(BigInteger.ONE)
+        val n = value.abs()
+        if (n > MAX_DIVISOR_SCAN) return listOf(BigInteger.ONE)
         val out = sortedSetOf<Long>()
+        val limit = n.toLong() // safe: n ≤ 1,000,000 here
         var d = 1L
-        val n = value.toLong()
-        while (d * d <= n) {
-            if (n % d == 0L) {
+        while (d * d <= limit) {
+            if (n.mod(BigInteger.valueOf(d)).signum() == 0) {
                 out.add(d)
-                out.add(n / d)
+                out.add(n.divide(BigInteger.valueOf(d)).toLong())
             }
             d++
         }
-        return out.toList()
+        return out.map { BigInteger.valueOf(it) }
     }
 
     /** The two roots of a quadratic, real or complex. */
@@ -111,13 +122,17 @@ object PolyRoots {
         val c = quadratic.coeffs[0].toDouble()
         val discriminant = b * b - 4 * a * c
         if (discriminant >= 0) {
+            // The usual form loses the smaller root when b² is much larger
+            // than 4ac; the q form keeps both without cancellation.
             val root = sqrt(discriminant)
-            return listOf(
-                ComplexNum((-b - root) / (2 * a), 0.0),
-                ComplexNum((-b + root) / (2 * a), 0.0),
-            )
+            val q = -0.5 * (b + if (b >= 0) root else -root)
+            if (q == 0.0) {
+                val repeated = -b / (2 * a)
+                return listOf(ComplexNum(repeated, 0.0), ComplexNum(repeated, 0.0))
+            }
+            return listOf(ComplexNum(q / a, 0.0), ComplexNum(c / q, 0.0))
         }
-        val imaginary = sqrt(-discriminant) / (2 * a)
+        val imaginary = sqrt(-discriminant) / (2 * abs(a))
         val real = -b / (2 * a)
         return listOf(ComplexNum(real, imaginary), ComplexNum(real, -imaginary))
     }
@@ -125,9 +140,9 @@ object PolyRoots {
     /**
      * The roots of a polynomial, found numerically.
      *
-     * The Durand–Kerner iteration works on the complex plane, so the complex
-     * roots come out with it; the conjugates are then paired so that each
-     * pair is reported once.
+     * The Durand–Kerner iteration works on the complex plane, so complex roots
+     * come out with it. Every root is reported separately; a conjugate pair is
+     * two entries, and a caller that wants one entry per pair can pair them up.
      */
     fun numericalRoots(polynomial: Poly, iterations: Int = 400): List<ComplexNum> {
         val degree = polynomial.degree
@@ -206,8 +221,8 @@ object PolyRoots {
 
         fun derivative(z: ComplexNum): ComplexNum {
             var acc = ComplexNum(0.0, 0.0)
-            for (i in coefficients.indices.reversed()) {
-                acc = acc * z + ComplexNum(coefficients[i], 0.0)
+            for (i in coefficients.size - 1 downTo 1) {
+                acc = acc * z + ComplexNum(i * coefficients[i], 0.0)
             }
             return acc
         }

@@ -68,3 +68,23 @@ val DarkSurfaceContainer = Color(0xFF1B211E)
 val DarkSurfaceContainerHigh = Color(0xFF252B28)
 val DarkSurfaceContainerHighest = Color(0xFF303633)
 val DarkInverseSurface = Color(0xFFDEE4E0)
+
+// ---- AMOLED ----
+// The background and the surface are true black, so an AMOLED panel can switch
+// those pixels off. The container steps and the outlines stay above black and
+// apart from one another, otherwise cards and dividers would disappear. The
+// text keeps exactly the dark palette's colours.
+val AmoledBackground = Color(0xFF000000)
+val AmoledOnBackground = Color(0xFFDEE4E0)
+val AmoledSurface = Color(0xFF000000)
+val AmoledOnSurface = Color(0xFFDEE4E0)
+val AmoledSurfaceVariant = Color(0xFF202824)
+val AmoledOnSurfaceVariant = Color(0xFFC0C9C3)
+val AmoledOutline = Color(0xFF8A938D)
+val AmoledOutlineVariant = Color(0xFF404943)
+val AmoledSurfaceContainerLowest = Color(0xFF050806)
+val AmoledSurfaceContainerLow = Color(0xFF0A0F0C)
+val AmoledSurfaceContainer = Color(0xFF121815)
+val AmoledSurfaceContainerHigh = Color(0xFF1B211E)
+val AmoledSurfaceContainerHighest = Color(0xFF252B28)
+val AmoledInverseSurface = Color(0xFFDEE4E0)

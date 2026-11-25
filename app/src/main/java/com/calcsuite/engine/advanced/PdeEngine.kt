@@ -33,14 +33,14 @@ enum class PdeKind(
     LAPLACE(
         "Laplace's equation (2D)",
         "Laplace",
-        "uₓₓ + u_yy = 0",
+        "uₓₓ + uᵧᵧ = 0",
         "A steady state with no source. The value at each interior point is " +
             "the average of its four neighbours.",
     ),
     POISSON(
         "Poisson's equation (2D)",
         "Poisson",
-        "uₓₓ + u_yy = f(x, y)",
+        "uₓₓ + uᵧᵧ = f(x, y)",
         "A steady state with a source. The value at each interior point is the " +
             "average of its four neighbours, less the source.",
     ),
@@ -79,6 +79,7 @@ object PdeClassification {
      */
     fun classify(a: Double, b: Double, c: Double): Kind {
         if (a == 0.0 && b == 0.0 && c == 0.0) return Kind.UNKNOWN
+        if (!a.isFinite() || !b.isFinite() || !c.isFinite()) return Kind.UNKNOWN
         val discriminant = b * b - 4 * a * c
         val tolerance = 1e-12 * max(1.0, max(abs(a), max(abs(b), abs(c))))
         return when {
@@ -164,6 +165,31 @@ object PdeEngine {
     const val MAX_TIME_STEPS = 4000
 
     /**
+     * The largest number of sweeps the two-dimensional solver will attempt.
+     */
+    const val MAX_ITERATIONS = 200_000
+
+    /**
+     * A bound on the total work of a two-dimensional solve: interior points
+     * times sweeps, as a Long so the multiplication cannot overflow.
+     *
+     * 40 million keeps the largest grid the tool already offers (400 points,
+     * 200 sweeps = 31.7 million updates) available, while refusing the
+     * pathological 400 × 200 000 request, which would need over 31 billion
+     * updates. The relaxation normally stops early on tolerance anyway.
+     */
+    const val MAX_WORK_2D = 40_000_000L
+
+    /**
+     * A bound on the stored size of a one-dimensional solution:
+     * `(spaceSteps + 1) × (timeSteps + 1)`.
+     *
+     * 200 000 cells is a few megabytes of doubles, enough for every ordinary
+     * run and far below the combination of the two independent maxima.
+     */
+    const val MAX_WORK_1D = 200_000L
+
+    /**
      * Solves the one-dimensional heat or wave equation.
      *
      * @param initial the initial condition, as an expression in `x`.
@@ -191,9 +217,14 @@ object PdeEngine {
         initialVelocity: com.calcsuite.engine.calculus.Node? = null,
     ): PdeSolution1D? {
         if (kind != PdeKind.HEAT && kind != PdeKind.WAVE) return null
+        if (!listOf(length, timeEnd, left, right, alpha, speed).all { it.isFinite() }) return null
         if (length <= 0.0 || timeEnd <= 0.0) return null
+        if (alpha < 0.0 || speed < 0.0) return null
         if (spaceSteps < 2 || spaceSteps > MAX_POINTS) return null
         if (timeSteps < 1 || timeSteps > MAX_TIME_STEPS) return null
+        // One row per time step and one value per space point are all kept,
+        // so bound the product and not just each dimension separately.
+        if ((spaceSteps + 1).toLong() * (timeSteps + 1).toLong() > MAX_WORK_1D) return null
 
         val dx = length / spaceSteps
         val dt = timeEnd / timeSteps
@@ -228,7 +259,11 @@ object PdeEngine {
             explanation = "The wave scheme is stable only when s ≤ 1, so the step in time " +
                 "has to be small enough compared with the step in space."
         }
-        val stable = courant <= limit + 1e-9
+        // A very large diffusivity or speed can make the Courant number
+        // overflow, and a tiny dx can make it infinite. Such a scheme can
+        // never be evaluated, so refuse it before storing any rows.
+        if (!dx.isFinite() || !dt.isFinite() || !courant.isFinite()) return null
+        val stable = abs(courant) <= limit + 1e-9
         steps.add(
             if (stable) {
                 "The stability condition holds: ${formatReal(courant)} ≤ ${formatReal(limit)}."
@@ -244,7 +279,7 @@ object PdeEngine {
         val first = DoubleArray(spaceSteps + 1)
         for (i in 0..spaceSteps) {
             val value = Evaluator.eval(initial, mapOf(variable to x[i])).valueOrNull()
-            first[i] = value ?: 0.0
+            first[i] = if (value != null && value.isFinite()) value else 0.0
         }
         first[0] = left
         first[spaceSteps] = right
@@ -279,10 +314,11 @@ object PdeEngine {
             val velocity = DoubleArray(spaceSteps + 1)
             if (initialVelocity != null) {
                 for (i in 0..spaceSteps) {
-                    velocity[i] = Evaluator.eval(
+                    val value = Evaluator.eval(
                         initialVelocity,
                         mapOf(variable to x[i]),
-                    ).valueOrNull() ?: 0.0
+                    ).valueOrNull()
+                    velocity[i] = if (value != null && value.isFinite()) value else 0.0
                 }
             }
             val s2 = courant * courant
@@ -358,9 +394,14 @@ object PdeEngine {
         tolerance: Double = 1e-8,
     ): PdeSolution2D? {
         if (kind != PdeKind.LAPLACE && kind != PdeKind.POISSON) return null
+        // A zero tolerance means the stopping rule can never fire, so every
+        // permitted sweep would be spent even after the field has settled.
+        if (!size.isFinite() || !tolerance.isFinite() || tolerance <= 0.0) return null
         if (size <= 0.0) return null
         if (gridPoints < 3 || gridPoints > MAX_POINTS) return null
-        if (iterations < 1 || iterations > 200_000) return null
+        if (iterations < 1 || iterations > MAX_ITERATIONS) return null
+        val interior = (gridPoints - 2).toLong()
+        if (interior * interior * iterations.toLong() > MAX_WORK_2D) return null
 
         val n = gridPoints
         val h = size / (n - 1)
@@ -385,8 +426,25 @@ object PdeEngine {
                     val value = Evaluator.eval(
                         boundary,
                         mapOf(xVar to x[j], yVar to y[i]),
-                    ).valueOrNull() ?: 0.0
-                    grid[i][j] = value
+                    ).valueOrNull()
+                    grid[i][j] = if (value != null && value.isFinite()) value else 0.0
+                }
+            }
+        }
+
+        // The source is fixed for the whole relaxation. Evaluate it once on
+        // the grid, so that the inner loop reads a value instead of
+        // interpreting the expression again on every sweep. The fallback for
+        // a value that cannot be read, or that is not finite, stays 0.0.
+        val sourceValues = DoubleArray(n * n)
+        if (source != null) {
+            for (i in 0 until n) {
+                for (j in 0 until n) {
+                    val value = Evaluator.eval(
+                        source,
+                        mapOf(xVar to x[j], yVar to y[i]),
+                    ).valueOrNull()
+                    sourceValues[i * n + j] = if (value != null && value.isFinite()) value else 0.0
                 }
             }
         }
@@ -397,11 +455,7 @@ object PdeEngine {
             largestChange = 0.0
             for (i in 1 until n - 1) {
                 for (j in 1 until n - 1) {
-                    val f = if (source == null) {
-                        0.0
-                    } else {
-                        Evaluator.eval(source, mapOf(xVar to x[j], yVar to y[i])).valueOrNull() ?: 0.0
-                    }
+                    val f = sourceValues[i * n + j]
                     val old = grid[i][j]
                     val updated = (grid[i - 1][j] + grid[i + 1][j] + grid[i][j - 1] + grid[i][j + 1]
                         - h * h * f) / 4.0

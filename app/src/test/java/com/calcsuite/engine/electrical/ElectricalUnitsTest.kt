@@ -81,6 +81,24 @@ class ElectricalUnitsTest {
         )
     }
 
+    @Test fun largeAndSmallValuesUseTheLargeAndSmallPrefixes() {
+        assertEquals(
+            "a megohm is not written as a thousand kilohms",
+            "1 M\u03a9",
+            ElectricalUnits.display(BigDecimal("1000000"), ElectricalUnits.Unit.RESISTANCE),
+        )
+        assertEquals(
+            "a gigohm is written with giga",
+            "1 G\u03a9",
+            ElectricalUnits.display(BigDecimal("1000000000"), ElectricalUnits.Unit.RESISTANCE),
+        )
+        assertEquals(
+            "a microfarad is written with micro",
+            "1 \u00b5F",
+            ElectricalUnits.display(BigDecimal("0.000001"), ElectricalUnits.Unit.CAPACITANCE),
+        )
+    }
+
     @Test fun everyQuantityHasItsSymbol() {
         assertEquals("V", ElectricalUnits.Unit.VOLTAGE.symbol)
         assertEquals("A", ElectricalUnits.Unit.CURRENT.symbol)

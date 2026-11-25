@@ -8,6 +8,7 @@ import org.junit.Test
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.util.Locale
 
 class AgeEngineTest {
 
@@ -121,5 +122,23 @@ class AgeEngineTest {
         assertTrue(bad is CalcResult.Err)
         assertTrue((bad as CalcResult.Err).error.message.contains("24:00"))
         assertTrue(AgeEngine.timeOf(23, 59) is CalcResult.Ok)
+    }
+
+    @Test
+    fun validationMessagesUseAsciiDigitsUnderAnyLocale() {
+        val previous = Locale.getDefault()
+        try {
+            // Formatter localises %d digits (e.g. ar-EG renders Arabic-Indic digits).
+            Locale.setDefault(Locale("ar", "EG"))
+            val date = AgeEngine.dateOf(2023, 2, 30)
+            assertTrue(date is CalcResult.Err)
+            assertTrue((date as CalcResult.Err).error.message.contains("2023-02-30"))
+
+            val time = AgeEngine.timeOf(24, 0, 0)
+            assertTrue(time is CalcResult.Err)
+            assertTrue((time as CalcResult.Err).error.message.contains("24:00:00"))
+        } finally {
+            Locale.setDefault(previous)
+        }
     }
 }

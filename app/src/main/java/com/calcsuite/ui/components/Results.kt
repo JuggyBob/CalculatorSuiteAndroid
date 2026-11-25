@@ -35,13 +35,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.calcsuite.ui.theme.NumberTextStyle
 
+/** Maximum number of steps rendered in one [StepsCard]; the rest are counted. */
+private const val MAX_VISIBLE_STEPS = 200
+
 /** Copies text to the system clipboard and confirms with a toast. */
 @Composable
 fun rememberCopyAction(): (String, String?) -> Unit {
     val context = LocalContext.current
     return remember(context) { { text: String, label: String? ->
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(label ?: "Result", text))
+        // Clipboard metadata is visible to other apps; keep it fixed and never
+        // put a caller-supplied label there. The copied text is unchanged.
+        clipboard.setPrimaryClip(ClipData.newPlainText("Result", text))
         Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
     } }
 }
@@ -245,7 +250,10 @@ fun ResultRow(
     }
 }
 
-/** Step-by-step explanation list. */
+/**
+ * Step-by-step explanation list. At most [MAX_VISIBLE_STEPS] steps are laid
+ * out; any remainder is summarised by a trailing "… (N more)" line.
+ */
 @Composable
 fun StepsCard(
     steps: List<String>,
@@ -259,8 +267,10 @@ fun StepsCard(
     nested: Boolean = false,
 ) {
     if (steps.isEmpty()) return
+    val visible = steps.take(MAX_VISIBLE_STEPS)
+    val hiddenCount = steps.size - visible.size
     val body: @Composable ColumnScope.() -> Unit = {
-        steps.forEachIndexed { index, step ->
+        visible.forEachIndexed { index, step ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     "${index + 1}.",
@@ -274,6 +284,14 @@ fun StepsCard(
                     modifier = Modifier.weight(1f),
                 )
             }
+        }
+        if (hiddenCount > 0) {
+            Text(
+                "… ($hiddenCount more)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 30.dp),
+            )
         }
     }
     if (nested) {

@@ -1,5 +1,6 @@
 package com.calcsuite.engine.algebra.inequality
 
+import com.calcsuite.core.Rat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -176,7 +177,13 @@ class InequalitySolverTest {
     // ------------------------------------------------------------- failures
 
     @Test fun invalidSyntaxIsReported() {
-        assertTrue(failure("2x +").contains("comparison") || failure("2x +").isNotEmpty())
+        // "2x +" ends with a dangling '+', so the parser reports the empty END
+        // token rather than a missing comparison; both are meaningful failures.
+        val message = failure("2x +")
+        assertTrue(
+            "the failure should explain the malformed input: $message",
+            message.contains("comparison") || message == "\"\" is not something this tool understands",
+        )
         assertTrue(failure("2x + 3 <").isNotEmpty())
         assertTrue(failure("<> 3").isNotEmpty())
         assertTrue(failure("").isNotEmpty())
@@ -285,5 +292,44 @@ class InequalitySolverTest {
         val r = solve("(x - 2)/(x + 1) > 0")
         assertTrue(r.steps.joinToString(" "), r.steps.any { it.contains("denominator") })
         assertTrue(r.steps.any { it.contains("undefined") })
+    }
+
+    // ------------------------------------------------------- regression cases
+
+    @Test fun anAlwaysTrueAbsoluteValueGivesTheWholeLine() {
+        assertEquals("(−∞, ∞)", notation("|x| >= 0"))
+        assertEquals("(−∞, ∞)", notation("|x| > -1"))
+    }
+
+    @Test fun anAbsoluteValueEqualityHasTwoSolutions() {
+        assertEquals("[−3, −3] ∪ [3, 3]", notation("|x| = 3"))
+        assertEquals("[0, 0]", notation("|x| = 0"))
+    }
+
+    @Test fun anUndefinedIntervalIsNotAcceptedByANonStrictInequality() {
+        // sqrt(x) exists only for x >= 0; NaN samples must not count as zero.
+        assertEquals("∅", notation("sqrt(x) < 0"))
+        assertEquals("[≈0, ≈0]", notation("sqrt(x) <= 0"))
+        assertEquals("(≈0, ∞)", notation("sqrt(x) > 0"))
+    }
+
+    @Test fun aPowerAboveTheExactLimitIsNotSilentlyTruncated() {
+        val r = solve("x^65 > 0")
+        assertTrue("a truncated exponent would look exact", r.approximate)
+        assertEquals("(≈0, ∞)", r.solution.toIntervalNotation())
+    }
+
+    @Test fun aNegativePowerOfZeroIsUndefinedNotInfinite() {
+        val expr = IExpr.Pow(IExpr.Var("x"), IExpr.Num(Rat.of(-1L)))
+        assertTrue(NumericEval.eval(expr, mapOf("x" to 0.0)).isNaN())
+    }
+
+    @Test fun twoVariableOrIsRejectedRatherThanIntersected() {
+        val result = InequalitySolver.solve("y < x or y > x + 3", InequalityMode.TWO_VARIABLE)
+        assertTrue("an 'or' must not be silently intersected: $result", result is InequalityResult.Failed)
+        assertTrue(
+            "the failure should explain the problem",
+            (result as InequalityResult.Failed).message.contains("or"),
+        )
     }
 }

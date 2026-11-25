@@ -45,6 +45,11 @@ class GitHubReleaseClient(
     private val repository: String = RELEASE_REPOSITORY,
 ) : ReleaseSource {
 
+    /** The largest release JSON this app is willing to read (2 MiB). */
+    companion object {
+        const val MAX_JSON_BYTES = 2 * 1024 * 1024
+    }
+
     override suspend fun latestRelease(): ReleaseInfo = withContext(Dispatchers.IO) {
         val address = ReleaseParser.latestReleaseUrl(owner, repository)
         val connection = (URL(address).openConnection() as HttpURLConnection).apply {
@@ -56,9 +61,14 @@ class GitHubReleaseClient(
         }
         try {
             val status = connection.responseCode
+            // responseCode is what follows redirects; check where we actually
+            // ended up before reading anything from the stream.
+            if (!SafeLinks.isAllowedReleaseHost(connection.url.toString())) {
+                throw ReleaseUnavailableException("The release came from an unexpected address.")
+            }
             val stream: InputStream? =
                 if (status in 200..299) connection.inputStream else connection.errorStream
-            val text = stream?.let { readAll(it) } ?: ""
+            val text = stream?.let { readAll(it, MAX_JSON_BYTES) } ?: ""
             when {
                 status == 404 ->
                     throw ReleaseUnavailableException("There is no published release yet.")
@@ -87,12 +97,18 @@ class GitHubReleaseClient(
         }
     }
 
-    private fun readAll(stream: InputStream): String {
+    /** Reads the reply, refusing a body larger than [limit] bytes. */
+    private fun readAll(stream: InputStream, limit: Int): String {
         val buffer = ByteArrayOutputStream()
         val chunk = ByteArray(8 * 1024)
+        var total = 0
         while (true) {
             val read = stream.read(chunk)
             if (read <= 0) break
+            total += read
+            if (total > limit) {
+                throw ReleaseUnavailableException("The information about the newest release is too large.")
+            }
             buffer.write(chunk, 0, read)
         }
         return buffer.toString(Charsets.UTF_8.name())

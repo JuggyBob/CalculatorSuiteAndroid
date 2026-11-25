@@ -140,4 +140,15 @@ class PrimeEngineTest {
         assertEquals(ErrorKind.Domain, kind(PrimeEngine.factorize(BigInteger.ZERO)))
         assertEquals(ErrorKind.InvalidInput, kind(PrimeEngine.factorize(big("-5"))))
     }
+
+    @Test
+    fun anUnfactorableLargeCompositeDoesNotClaimAnExactPrimeTest() {
+        // Ten to the thirty has 31 digits: above the factoring limit, and the
+        // probabilistic primality test above the proven bound is not a proof.
+        val result = PrimeEngine.factorize(big("1000000000000000000000000000000"))
+        assertEquals(ErrorKind.Unavailable, kind(result))
+        val message = (result as CalcResult.Err).error.message
+        assertTrue("the message must not promise exactness: $message", !message.contains("exact"))
+        assertTrue("the message should mention the primality test: $message", message.contains("primality"))
+    }
 }

@@ -15,8 +15,8 @@ import java.math.BigDecimal
  * ```
  * L/100 km = 100 / (km/L)
  * L/100 km = 62.1371192237334 / (mi/L)          where 62.1371192237334 = 100 / 1.609344
- * L/100 km = 235.2145832942277 / (mpg US)       where 235.2145832942277 = 100 × 3.785411784 / 1.609344
- * L/100 km = 282.4809363277027 / (mpg Imp)      where 282.4809363277027 = 100 × 4.54609 / 1.609344
+ * L/100 km = 235.214583333333… / (mpg US)       where the numerator is 100 × 3.785411784 / 1.609344
+ * L/100 km = 282.480936331822… / (mpg Imp)      where the numerator is 100 × 4.54609 / 1.609344
  * ```
  *
  * The three constants are computed here from the exact unit definitions

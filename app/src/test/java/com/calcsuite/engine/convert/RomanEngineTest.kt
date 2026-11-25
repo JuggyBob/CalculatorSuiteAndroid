@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 private fun expectError(kind: ErrorKind, result: CalcResult<*>, messagePart: String? = null) {
     assertTrue("expected Err but was $result", result is CalcResult.Err)
@@ -72,6 +73,29 @@ class RomanEngineTest {
             val back = RomanEngine.parse(roman).valueOrNull()
             assertEquals("round trip failed at $value ($roman)", value, back)
         }
+    }
+
+    @Test
+    fun overlongInputIsRejected() {
+        expectError(ErrorKind.InvalidInput, RomanEngine.parse("M".repeat(65)), "at most")
+        assertFalse(RomanEngine.isValidRoman("M".repeat(5000)))
+    }
+
+    @Test
+    fun turkishLocaleStillParsesLowercaseNumerals() {
+        val original = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale("tr", "TR"))
+            assertEquals(3, RomanEngine.parse("iii").valueOrNull())
+            assertTrue(RomanEngine.isValidRoman("iii"))
+        } finally {
+            Locale.setDefault(original)
+        }
+    }
+
+    @Test
+    fun mcmxcivStillParsesToNineteenNinetyFour() {
+        assertEquals(1994, RomanEngine.parse("MCMXCIV").valueOrNull())
     }
 
     @Test

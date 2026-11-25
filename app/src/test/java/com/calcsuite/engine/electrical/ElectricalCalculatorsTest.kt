@@ -198,6 +198,33 @@ class ElectricalCalculatorsTest {
         )
     }
 
+    @Test fun aCurrentDividerWithHugeResistancesDoesNotOverflow() {
+        val result = value(
+            ElectricalCalculators.currentDivider(dec("1e308"), dec("1e308"), dec("1")),
+        )
+        assertEquals("the first branch is named", "0.5 A", row(result, "Current in the first branch"))
+        assertEquals("the second branch is named", "0.5 A", row(result, "Current in the second branch"))
+        val equivalentText = row(result, "Combined resistance")!!
+        val equivalent = equivalentText.removeSuffix(" Ω").toDoubleOrNull()
+        assertTrue("the combined resistance is a number: $equivalentText", equivalent != null)
+        assertTrue("the combined resistance is finite: $equivalentText", equivalent!!.isFinite())
+        assertTrue(
+            "the combined resistance is about 5 × 10^307: $equivalentText",
+            equivalent > 4e307,
+        )
+    }
+
+    @Test fun aNetworkRefusesBadResistorValues() {
+        val negative = error(
+            ElectricalCalculators.network(ResistorNetwork.Resistor("R1", dec("-5")), null),
+        )
+        assertTrue("the reason is given: $negative", negative.contains("greater than zero"))
+        val overflowing = error(
+            ElectricalCalculators.network(ResistorNetwork.Resistor("R1", dec("1e400")), null),
+        )
+        assertTrue("the reason is given: $overflowing", overflowing.contains("greater than zero"))
+    }
+
     @Test fun everyCalculatorNamesItsVariables() {
         val result = value(
             ElectricalCalculators.series(listOf("R1" to dec("100")), dec("12")),

@@ -98,11 +98,50 @@ private object TrigTable {
     }
 }
 
-internal class Evaluator(private val angleMode: AngleMode) {
+/** Limits chosen to keep a single evaluation bounded in time and memory. */
+internal object EvalLimits {
+    /** Nested expression nodes. Mirrors the parser's limit. */
+    const val MAX_DEPTH = 256
+
+    /** Largest magnitude of an integer argument, in decimal digits. */
+    const val MAX_INTEGER_DIGITS = 10_000
+
+    /** Largest number of trailing zeroes materialised by `setScale`. */
+    const val MAX_SCALE = 10_000
+
+    /** Accepted range for the `round(x, digits)` second argument. */
+    const val MAX_ROUND_DIGITS = 1_000
+
+    /** Largest `k` in `nCr`/`nPr`; larger values take too long to be useful. */
+    const val MAX_COMBINATION_K = 10_000
+}
+
+internal class Evaluator(
+    private val angleMode: AngleMode,
+    private val maxDepth: Int = EvalLimits.MAX_DEPTH,
+) {
 
     private val ctx = Num.EVAL_CONTEXT
+    private var depth = 0
 
-    fun eval(node: Expr): EvalValue = when (node) {
+    /**
+     * Evaluation recurses once per AST node. Count the frames so a deeply
+     * nested (but syntactically legal) expression fails with a normal error
+     * instead of a [StackOverflowError].
+     */
+    fun eval(node: Expr): EvalValue {
+        if (depth >= maxDepth) {
+            throw EvalException(ErrorKind.Overflow, "Expression nesting is too deep")
+        }
+        depth++
+        return try {
+            evalNode(node)
+        } finally {
+            depth--
+        }
+    }
+
+    private fun evalNode(node: Expr): EvalValue = when (node) {
         is Expr.Num -> EvalValue(node.value, true)
         is Expr.Const -> EvalValue(node.value, true)
         is Expr.Unary -> when (node.op) {
@@ -167,9 +206,14 @@ internal class Evaluator(private val angleMode: AngleMode) {
     private fun power(base: EvalValue, exponent: EvalValue): EvalValue {
         val b = base.value
         val e = exponent.value
-        val isIntegerExponent = e.stripTrailingZeros().scale() <= 0
+        val strippedExponent = e.stripTrailingZeros()
+        val isIntegerExponent = strippedExponent.scale() <= 0
         if (isIntegerExponent) {
-            val ei = e.toBigInteger()
+            // Check the decimal magnitude before materialising a BigInteger:
+            // a value such as 1e999999 has a one-digit unscaled value but
+            // toBigInteger() would allocate a million digits.
+            requireBoundedInteger(strippedExponent, "Exponent is too large")
+            val ei = strippedExponent.toBigInteger()
             if (b.signum() == 0) {
                 return when {
                     ei.signum() == 0 -> throw EvalException(ErrorKind.Domain, "0^0 is undefined")
@@ -202,8 +246,11 @@ internal class Evaluator(private val angleMode: AngleMode) {
     private fun factorial(v: EvalValue): EvalValue {
         val n = v.value.stripTrailingZeros()
         if (n.scale() > 0) throw EvalException(ErrorKind.Domain, "Factorial requires an integer")
+        if (n.signum() < 0) throw EvalException(ErrorKind.Domain, "Factorial requires a non-negative integer")
+        // The bound is checked on the decimal representation first, so a
+        // huge exponent is rejected before toBigInteger() allocates anything.
+        requireBoundedInteger(n, "Factorial larger than 10000! is not supported")
         val ni = n.toBigInteger()
-        if (ni.signum() < 0) throw EvalException(ErrorKind.Domain, "Factorial requires a non-negative integer")
         if (ni > BigInteger.valueOf(10_000)) {
             throw EvalException(ErrorKind.Overflow, "Factorial larger than 10000! is not supported")
         }
@@ -243,7 +290,10 @@ internal class Evaluator(private val angleMode: AngleMode) {
                 }
             }
             "csc" -> {
-                niceOrNull("sin", args[0])?.let { throw EvalException(ErrorKind.Domain, "csc is undefined when sin is zero") }
+                // A non-null table entry means "nice angle", not "zero sine":
+                // only sin = 0 (0°, 180°, …) is excluded.
+                val niceSin = niceOrNull("sin", args[0])
+                if (niceSin?.signum() == 0) throw EvalException(ErrorKind.Domain, "csc is undefined when sin is zero")
                 require(sin(toRadians(d[0])) != 0.0, "csc is undefined when sin is zero")
                 inexact(1.0 / sin(toRadians(d[0])))
             }
@@ -313,10 +363,24 @@ internal class Evaluator(private val angleMode: AngleMode) {
             }
             "abs" -> EvalValue(args[0].value.abs(), args[0].exact)
             "sign" -> EvalValue(BigDecimal(args[0].value.signum()), args[0].exact)
-            "floor" -> EvalValue(args[0].value.setScale(0, RoundingMode.FLOOR), args[0].exact)
-            "ceil" -> EvalValue(args[0].value.setScale(0, RoundingMode.CEILING), args[0].exact)
+            "floor" -> {
+                requireRoundingScaleSafe(args[0].value)
+                EvalValue(args[0].value.setScale(0, RoundingMode.FLOOR), args[0].exact)
+            }
+            "ceil" -> {
+                requireRoundingScaleSafe(args[0].value)
+                EvalValue(args[0].value.setScale(0, RoundingMode.CEILING), args[0].exact)
+            }
             "round" -> {
-                val digits = if (args.size == 2) d[1].roundToLong().toInt() else 0
+                // Validate before toInt(): roundToLong() silently saturates and
+                // toInt() would truncate again, so neither is safe here.
+                val rawDigits = if (args.size == 2) args[1].value.stripTrailingZeros() else BigDecimal.ZERO
+                if (rawDigits.scale() > 0) throw EvalException(ErrorKind.Domain, "round requires an integer number of digits")
+                if (rawDigits.abs() > BigDecimal.valueOf(EvalLimits.MAX_ROUND_DIGITS.toLong())) {
+                    throw EvalException(ErrorKind.Overflow, "round digits must be between −1000 and 1000")
+                }
+                val digits = rawDigits.toInt()
+                requireRoundingScaleSafe(args[0].value)
                 EvalValue(args[0].value.setScale(digits, RoundingMode.HALF_UP), args[0].exact)
             }
             "fact" -> factorial(args[0])
@@ -342,9 +406,30 @@ internal class Evaluator(private val angleMode: AngleMode) {
         }
     }
 
+    /**
+     * Rejects a whole-valued decimal whose magnitude needs more digits than we
+     * are willing to allocate, without constructing a [BigInteger] first.
+     * `BigDecimal("1e999999")` has scale −999999 and precision 1; its decimal
+     * magnitude is `precision − scale` digits.
+     */
+    private fun requireBoundedInteger(value: BigDecimal, message: String) {
+        val magnitudeDigits = value.precision().toLong() - value.scale().toLong()
+        if (magnitudeDigits > EvalLimits.MAX_INTEGER_DIGITS.toLong()) {
+            throw EvalException(ErrorKind.Overflow, message)
+        }
+    }
+
+    /** Rejects values whose trailing zeroes would have to be materialised. */
+    private fun requireRoundingScaleSafe(value: BigDecimal) {
+        if (value.scale() < -EvalLimits.MAX_SCALE) {
+            throw EvalException(ErrorKind.Overflow, "Value is too large to round")
+        }
+    }
+
     private fun requireInteger(v: EvalValue, fn: String): BigInteger {
         val stripped = v.value.stripTrailingZeros()
         if (stripped.scale() > 0) throw EvalException(ErrorKind.Domain, "$fn requires integer arguments")
+        requireBoundedInteger(stripped, "Integer argument is too large")
         return stripped.toBigInteger()
     }
 
@@ -359,6 +444,11 @@ internal class Evaluator(private val angleMode: AngleMode) {
             throw EvalException(ErrorKind.Overflow, "n is too large (limit 1,000,000)")
         }
         val k = if (ordered) r else minOf(r, n.subtract(r))
+        // n alone is not enough: nCr(1000000, 500000) is a 15-character input
+        // with an astronomical result and would run for a very long time.
+        if (k > BigInteger.valueOf(EvalLimits.MAX_COMBINATION_K.toLong())) {
+            throw EvalException(ErrorKind.Overflow, "Too many terms to compute exactly (limit 10000)")
+        }
         var result = BigInteger.ONE
         var i = 0
         val kInt = k.toInt()
@@ -366,6 +456,9 @@ internal class Evaluator(private val angleMode: AngleMode) {
             result = result.multiply(n.subtract(BigInteger.valueOf(i.toLong())))
             i++
             if (!ordered) result = result.divide(BigInteger.valueOf(i.toLong()))
+            if (result.bitLength() > 1_000_000) {
+                throw EvalException(ErrorKind.Overflow, "The result is too large to compute")
+            }
         }
         return EvalValue(BigDecimal(result), nVal.exact && rVal.exact)
     }

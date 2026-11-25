@@ -2,9 +2,11 @@ package com.calcsuite.engine.advanced
 
 import com.calcsuite.core.Poly
 import com.calcsuite.core.Rat
+import com.calcsuite.engine.calculus.ode.ConstantCoefficientSolver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.math.BigInteger
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -81,5 +83,32 @@ class PolyRootsTest {
 
     @Test fun theZeroPolynomialHasNoRoots() {
         assertTrue(PolyRoots.complexRoots(Poly.ZERO).isEmpty())
+    }
+
+    @Test fun aTwoToTheSixtyFourLeadingCoefficientDoesNotThrow() {
+        // Reached through the public ODE path: the old divisor enumeration
+        // truncated 2⁶⁴ to a Long, giving a zero denominator to Rat.of.
+        val huge = Rat.of(BigInteger.valueOf(2).pow(64))
+        val polynomial = Poly.of(listOf(Rat.of(-1L), huge)) // 2⁶⁴·r − 1
+        val roots = ConstantCoefficientSolver.characteristicRoots(polynomial)
+        assertEquals(1, roots.size)
+        assertTrue("the root must be finite", roots[0].real.isFinite())
+        assertEquals(1.0 / huge.toDouble(), roots[0].real, 1e-30)
+        assertEquals(0.0, roots[0].imaginary, 1e-12)
+
+        // The same guard must hold for a negative huge leading coefficient.
+        val negative = Poly.of(listOf(Rat.ONE, Rat.of(BigInteger.valueOf(2).pow(64).negate())))
+        assertEquals(1, ConstantCoefficientSolver.characteristicRoots(negative).size)
+    }
+
+    @Test fun ordinaryRationalRootsWithNegativeCoefficientsAreStillFound() {
+        // −x² + 5x − 6 = −(x − 2)(x − 3).
+        val polynomial = Poly.of(listOf(Rat.of(-6L), Rat.of(5L), Rat.of(-1L)))
+        val roots = ConstantCoefficientSolver.characteristicRoots(polynomial)
+        assertEquals(2, roots.size)
+        val values = roots.map { it.real }.sorted()
+        assertEquals(2.0, values[0], 1e-9)
+        assertEquals(3.0, values[1], 1e-9)
+        assertEquals(1, roots[0].multiplicity)
     }
 }

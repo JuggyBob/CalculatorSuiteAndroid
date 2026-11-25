@@ -38,7 +38,7 @@ object LinearAlgebra {
     /** The angle between two vectors, in radians. */
     fun angle(u: DoubleArray, v: DoubleArray): Double? {
         val denominator = norm(u) * norm(v)
-        if (denominator < 1e-15) return null
+        if (denominator == 0.0 || !denominator.isFinite()) return null
         val cosine = (innerProduct(u, v) / denominator).coerceIn(-1.0, 1.0)
         return Math.acos(cosine)
     }
@@ -50,9 +50,9 @@ object LinearAlgebra {
      * that is closest to `u`.
      */
     fun projectOnto(u: DoubleArray, v: DoubleArray): DoubleArray? {
-        require(u.size == v.size) { "the vectors must have the same length" }
+        if (u.size != v.size) return null
         val denominator = innerProduct(v, v)
-        if (denominator < 1e-15) return null
+        if (denominator == 0.0) return null
         val factor = innerProduct(u, v) / denominator
         return DoubleArray(u.size) { factor * v[it] }
     }
@@ -85,7 +85,7 @@ object LinearAlgebra {
                 for (i in w.indices) w[i] -= factor * u[i]
             }
             val length = norm(w)
-            if (length < 1e-10) continue
+            if (length == 0.0) continue
             for (i in w.indices) w[i] /= length
             out.add(w)
         }
@@ -110,7 +110,7 @@ object LinearAlgebra {
      * makes the residual as small as possible.
      */
     fun leastSquares(A: Matrix, b: DoubleArray): LeastSquaresResult? {
-        require(A.rows == b.size) { "the shapes do not match" }
+        if (A.rows != b.size) return null
         val normal = A.transpose() * A
         val rhs = A.transpose() * b
         val x = normal.solve(rhs) ?: return null

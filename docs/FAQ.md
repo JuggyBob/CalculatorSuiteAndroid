@@ -19,11 +19,11 @@ Because the APK is not from the Play Store, Android shows a "blocked by Play Pro
 Each release includes a `.sha256` file.
 
 ```bash
-sha256sum CalculatorSuite-v3.0.3.apk
-# compare the output with the contents of CalculatorSuite-v3.0.3.apk.sha256
+sha256sum CalculatorSuite-v3.1.0.apk
+# compare the output with the contents of CalculatorSuite-v3.1.0.apk.sha256
 ```
 
-The APK is signed with a release key, so Android also verifies its integrity during installation.
+The APK is signed with a release key, so Android also verifies its integrity during installation. 3.1.0 uses the same signing key as 3.0.3 (certificate 55071A…), so it installs in place over an existing version.
 
 ### Can I install it on more than one device?
 
@@ -39,11 +39,11 @@ No. The package is `com.calcsuite` and it installs alongside anything else.
 
 ### Does it need internet?
 
-Only the **Currency converter** does. Every other tool — all 48 of them — works with no network at all. Currency also works offline once rates have been cached, with a warning if the cache is more than 24 hours old.
+Three things use the network: the **Currency converter**, the optional **AI problem solver** and the **update check**. Every other tool — all 66 of them — works with no network at all. Currency also works offline once rates have been cached, with a warning if the cache is more than 24 hours old.
 
 ### Does it work offline / in aeroplane mode?
 
-Yes, with the two exceptions above — the currency converter, and the AI problem solver if you turn it on. There is no telemetry, no update check and no "are you online?" ping, so every other part of the app behaves identically offline.
+Yes, with the exceptions above — the currency converter, the AI problem solver if you turn it on, and the update check, which is network-aware and falls back to cached release details when you are offline. There is no telemetry and no "are you online?" ping, so every other part of the app behaves identically offline.
 
 ### Why won't my phone rotate?
 
@@ -52,6 +52,10 @@ Because the app is **portrait-locked by design**. No screen, dialog or fullscree
 ### Where did my system bars go?
 
 They are hidden app-wide so the content uses the whole screen. Swipe in from a screen edge to bring them back temporarily.
+
+### Does it have a true-black theme?
+
+Yes. Choose **Settings → Appearance → Theme → Amoled** for a true-black theme — pure black surfaces with the emerald accent — paired with a 200 ms fullscreen animation. One caveat outside the app's control: on stock Android the system splash is light, so you may see a white screen for roughly 1.2 seconds before the Amoled UI appears. On MIUI the splash is dark.
 
 ### What is the difference between `=` and the live preview?
 
@@ -67,7 +71,7 @@ Because the angle unit is **DEG** by default. Tap the `DEG` chip to cycle to RAD
 
 ### Does the AI problem solver need an internet connection?
 
-Only that one feature does, and only once you have turned it on yourself. Everything else — all 66 tools, the keypad, the history, the settings — works in aeroplane mode.
+It does, and only once you have turned it on yourself. It is one of the three network paths, alongside the currency converter and the update check. Everything else — all 66 tools, the keypad, the history, the settings — works in aeroplane mode.
 
 The AI feature needs a connection because the picture is read by the provider you chose. The key is kept by the phone's keystore, encrypted, and the picture goes to that provider and nowhere else.
 
@@ -79,7 +83,7 @@ No. The model has to be one that can **read pictures**. The app cannot tell for 
 
 It reads the problem and works it out with Calculator Suite's own engines, so the working it shows is the app's working and can be checked. It will also tell you when it is **not sure** — if a symbol in the picture could be read in two ways, it says so and asks you which you meant rather than choosing for you. And if the reading is wrong, you can correct the inputs and have the tool run again.
 
-### Does the Calculus tool use degrees?
+### Do the calculus tools use degrees?
 
 No — it always works in **radians**. That is the convention for calculus. Use `deg(x)` and `rad(x)` if you need to convert explicitly.
 
@@ -143,7 +147,7 @@ Yes — it is portrait-only and scales to any screen, but there is no tablet-spe
 
 ### What are the CPU requirements?
 
-Standard Android arm64-v8a. No unusual permissions, no background services and no battery impact beyond normal use.
+Standard Android arm64-v8a or x86_64. Three declared permissions — internet, network state and install packages (only for update confirmation) — no background services and no battery impact beyond normal use.
 
 ### Will it run on a Chromebook?
 
@@ -163,10 +167,11 @@ None. There is no analytics, no advertising, no crash reporting, no tracking and
 
 ### What leaves my phone?
 
-Two things, and only those two:
+Three things, and only those three:
 
 - The **currency converter** makes one request to `open.er-api.com` for reference exchange rates, and sends only the base currency code you picked.
 - The **AI problem solver**, if you have turned it on, sends the picture and a short question to the AI provider **you chose**, along with your API key. Nothing else goes with it — no device identifier, no account, no history. The picture is not stored in your history.
+- The **update check** makes an unauthenticated request to GitHub's public releases API at start after onboarding, at most once every three hours and only when online. It sends no device identifier, no account and no calculation data.
 
 There is no telemetry, no analytics, no crash reporting and no advertising anywhere in the app. The full disclosure, including the ten providers and where each one is contacted, is in [Privacy](../PRIVACY.md).
 
@@ -176,13 +181,13 @@ It is kept by the phone's own **Android keystore**, encrypted with AES/GCM, and 
 
 ### Can I change the colour of the app?
 
-Yes — **Settings → Accent colour**. There are seven presets and a custom colour picker. The accent reaches the buttons, the selection, the icons, the surfaces and the curves in the graphs, while every colour keeps the lightness the app already had, so the contrast is the same whatever you choose. Green is the app's original colour exactly.
+Yes — **Settings → Appearance → Accent colour**. There are seven presets and a custom colour picker. The accent reaches the buttons, the selection, the icons, the surfaces and the curves in the graphs, while every colour keeps the lightness the app already had, so the contrast is the same whatever you choose. Green is the app's original colour exactly.
 
 Only one thing: if you use the Currency converter, the base currency code you select is sent to `open.er-api.com` in the request URL. Nothing else — no device identifier, no analytics parameters, no data about your other calculations.
 
 ### Where is my history stored?
 
-On your device, in the app's private storage, capped at 500 entries. Delete it with **Settings → Clear all history**, or by clearing app storage or uninstalling.
+On your device, in the app's private storage, capped at 500 entries. Delete it with **Settings → History and data → Clear all history**, or by clearing app storage or uninstalling.
 
 ### Is this open source?
 

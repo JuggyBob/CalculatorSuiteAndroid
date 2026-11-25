@@ -26,6 +26,9 @@ object NumericBaseEngine {
     const val MIN_BASE = 2
     const val MAX_BASE = 36
 
+    /** Upper bound on the input text so parsing cannot accumulate an unbounded BigInteger. */
+    const val MAX_INPUT_LENGTH = 4096
+
     /** Widths offered by the fixed-width panel. */
     val WIDTHS: List<Int> = listOf(8, 16, 32, 64)
 
@@ -45,11 +48,15 @@ object NumericBaseEngine {
     /**
      * Parses [text] as a base-[base] integer.
      * Returns [ErrorKind.InvalidInput] with a message naming the invalid
-     * character when a digit does not belong to the base.
+     * character when a digit does not belong to the base. Input longer than
+     * [MAX_INPUT_LENGTH] is rejected before any digit is accumulated.
      */
     fun parse(text: String, base: Int): CalcResult<BigInteger> {
         if (!validBase(base)) {
             return err(ErrorKind.InvalidInput, "Base must be between $MIN_BASE and $MAX_BASE")
+        }
+        if (text.length > MAX_INPUT_LENGTH) {
+            return err(ErrorKind.InvalidInput, "Input is too long (at most $MAX_INPUT_LENGTH characters)")
         }
         var body = text.trim()
         if (body.isEmpty()) return err(ErrorKind.InvalidInput, "Enter a value in base $base")

@@ -88,7 +88,10 @@ object ResistorNetworkReducer {
      */
     private fun reduceOne(network: ResistorNetwork, steps: MutableList<NetworkStep>): Double? =
         when (network) {
-            is ResistorNetwork.Resistor -> network.resistance.toDouble()
+            is ResistorNetwork.Resistor -> {
+                val value = network.resistance.toDouble()
+                if (!value.isFinite() || value <= 0.0) null else value
+            }
             is ResistorNetwork.Series -> reduceGroup(network, steps, series = true)
             is ResistorNetwork.Parallel -> reduceGroup(network, steps, series = false)
         }
@@ -138,6 +141,7 @@ object ResistorNetworkReducer {
                 " = " + CircuitExplainer.number(conductance) + " S, " +
                 "so 1 ÷ that = " + CircuitExplainer.number(result) + " Ω"
         }
+        if (!result.isFinite() || result <= 0.0) return null
         steps.add(
             NetworkStep(
                 kind = if (series) ReductionKind.SERIES else ReductionKind.PARALLEL,

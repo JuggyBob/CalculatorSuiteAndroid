@@ -36,6 +36,8 @@ object Evaluator {
         ok(evalOrThrow(n, env))
     } catch (e: EvalError) {
         err(e.kind, e.message ?: "Could not evaluate the expression")
+    } catch (e: StackOverflowError) {
+        err(ErrorKind.Overflow, TOO_DEEP_MESSAGE)
     }
 
     class EvalError(val kind: ErrorKind, override val message: String) : Exception(message)
@@ -43,75 +45,172 @@ object Evaluator {
     private fun fail(message: String): Nothing = throw EvalError(ErrorKind.Domain, message)
 
     fun evalOrThrow(n: Node, env: Map<String, Double>): Double = when (n) {
-        is Node.Num -> n.value
-        is Node.Var -> env[n.name.lowercase()]
-            ?: throw EvalError(ErrorKind.InvalidInput, "Unknown variable “${n.name}”")
+        is Node.Num -> finiteResult(n.value, "Number")
+        is Node.Var -> finiteResult(
+            env[n.name.lowercase()]
+                ?: throw EvalError(ErrorKind.InvalidInput, "Unknown variable “${n.name}”"),
+            "Value of ${n.name}",
+        )
         is Node.Const -> Constants.value(n.name) ?: fail("Unknown constant “${n.name}”")
-        is Node.Neg -> -evalOrThrow(n.a, env)
-        is Node.Add -> evalOrThrow(n.a, env) + evalOrThrow(n.b, env)
-        is Node.Sub -> evalOrThrow(n.a, env) - evalOrThrow(n.b, env)
-        is Node.Mul -> evalOrThrow(n.a, env) * evalOrThrow(n.b, env)
+        is Node.Neg -> finiteResult(-evalOrThrow(n.a, env), "Negation")
+        is Node.Add -> {
+            val a = evalOrThrow(n.a, env)
+            val b = evalOrThrow(n.b, env)
+            finiteResult(a + b, "Addition")
+        }
+        is Node.Sub -> {
+            val a = evalOrThrow(n.a, env)
+            val b = evalOrThrow(n.b, env)
+            finiteResult(a - b, "Subtraction")
+        }
+        is Node.Mul -> {
+            val a = evalOrThrow(n.a, env)
+            val b = evalOrThrow(n.b, env)
+            finiteResult(a * b, "Multiplication")
+        }
         is Node.Div -> {
             val d = evalOrThrow(n.b, env)
             if (d == 0.0) fail("Division by zero")
-            evalOrThrow(n.a, env) / d
+            finiteResult(evalOrThrow(n.a, env) / d, "Division")
         }
         is Node.Pow -> powOf(evalOrThrow(n.a, env), evalOrThrow(n.b, env))
         is Node.Fun -> callFunction(n, env)
     }
 
+    private fun requireFinite(x: Double, what: String): Double {
+        if (!x.isFinite()) fail("$what requires a finite value")
+        return x
+    }
+
+    private fun finiteResult(x: Double, what: String, kind: ErrorKind = ErrorKind.Overflow): Double {
+        if (!x.isFinite()) throw EvalError(kind, "$what result is not representable")
+        return x
+    }
+
     private fun powOf(base: Double, exp: Double): Double {
+        requireFinite(base, "Power base")
+        requireFinite(exp, "Power exponent")
         if (base < 0 && exp != floor(exp)) {
             // Complex results are outside the numeric scope; report clearly.
             fail("Negative base with a fractional exponent has no real value")
         }
         if (base == 0.0 && exp < 0) fail("Division by zero")
-        return base.pow(exp)
+        return finiteResult(base.pow(exp), "Power")
     }
 
     private fun callFunction(n: Node.Fun, env: Map<String, Double>): Double {
         val args = n.args.map { evalOrThrow(it, env) }
         fun arg(i: Int): Double = args.getOrNull(i) ?: fail("${n.name} needs ${n.args.size} argument(s)")
         return when (n.name) {
-            "sin" -> sin(arg(0))
-            "cos" -> cos(arg(0))
-            "tan" -> tan(arg(0))
-            "csc" -> { val s = sin(arg(0)); if (s == 0.0) fail("cosecant is undefined here"); 1 / s }
-            "sec" -> { val c = cos(arg(0)); if (c == 0.0) fail("secant is undefined here"); 1 / c }
-            "cot" -> { val t = tan(arg(0)); if (t == 0.0) fail("cotangent is undefined here"); 1 / t }
-            "asin" -> asin(arg(0))
-            "acos" -> acos(arg(0))
-            "atan" -> if (args.size == 2) atan2(arg(0), arg(1)) else atan(arg(0))
-            "atan2" -> atan2(arg(0), arg(1))
-            "sinh" -> sinh(arg(0))
-            "cosh" -> cosh(arg(0))
-            "tanh" -> tanh(arg(0))
-            "asinh" -> asinh(arg(0))
-            "acosh" -> acosh(arg(0))
-            "atanh" -> atanh(arg(0))
-            "ln" -> ln(arg(0))
-            "log" -> if (args.size == 2) ln(arg(0)) / ln(arg(1)) else log10(arg(0))
-            "log2" -> log2(arg(0))
-            "exp" -> exp(arg(0))
-            "sqrt" -> sqrt(arg(0))
-            "cbrt" -> cbrt(arg(0))
+            "sin" -> finiteResult(sin(requireFinite(arg(0), "sin")), "sin")
+            "cos" -> finiteResult(cos(requireFinite(arg(0), "cos")), "cos")
+            "tan" -> {
+                val x = requireFinite(arg(0), "tan")
+                // Math.tan returns a huge finite number at a pole, which would
+                // otherwise be shown as an ordinary answer.
+                if (abs(cos(x)) < 1e-15) fail("tan is undefined at this angle")
+                finiteResult(tan(x), "tan")
+            }
+            "csc" -> {
+                val x = requireFinite(arg(0), "csc"); val s = sin(x)
+                if (abs(s) < 1e-15) fail("cosecant is undefined here")
+                finiteResult(1 / s, "csc")
+            }
+            "sec" -> {
+                val x = requireFinite(arg(0), "sec"); val c = cos(x)
+                if (abs(c) < 1e-15) fail("secant is undefined here")
+                finiteResult(1 / c, "sec")
+            }
+            "cot" -> {
+                val x = requireFinite(arg(0), "cot"); val s = sin(x)
+                if (abs(s) < 1e-15) fail("cotangent is undefined here")
+                finiteResult(cos(x) / s, "cot")
+            }
+            "asin" -> {
+                val x = requireFinite(arg(0), "asin")
+                if (x < -1.0 || x > 1.0) fail("asin requires a value between −1 and 1")
+                finiteResult(asin(x), "asin", ErrorKind.Domain)
+            }
+            "acos" -> {
+                val x = requireFinite(arg(0), "acos")
+                if (x < -1.0 || x > 1.0) fail("acos requires a value between −1 and 1")
+                finiteResult(acos(x), "acos", ErrorKind.Domain)
+            }
+            "atan" -> if (args.size == 2) {
+                finiteResult(atan2(requireFinite(arg(0), "atan"), requireFinite(arg(1), "atan")), "atan")
+            } else {
+                finiteResult(atan(requireFinite(arg(0), "atan")), "atan")
+            }
+            "atan2" -> finiteResult(
+                atan2(requireFinite(arg(0), "atan2"), requireFinite(arg(1), "atan2")), "atan2",
+            )
+            "sinh" -> finiteResult(sinh(requireFinite(arg(0), "sinh")), "sinh")
+            "cosh" -> finiteResult(cosh(requireFinite(arg(0), "cosh")), "cosh")
+            "tanh" -> finiteResult(tanh(requireFinite(arg(0), "tanh")), "tanh")
+            "asinh" -> finiteResult(asinh(requireFinite(arg(0), "asinh")), "asinh")
+            "acosh" -> {
+                val x = requireFinite(arg(0), "acosh")
+                if (x < 1.0) fail("acosh requires a value ≥ 1")
+                finiteResult(acosh(x), "acosh", ErrorKind.Domain)
+            }
+            "atanh" -> {
+                val x = requireFinite(arg(0), "atanh")
+                if (x <= -1.0 || x >= 1.0) fail("atanh requires a value between −1 and 1")
+                finiteResult(atanh(x), "atanh", ErrorKind.Domain)
+            }
+            "ln" -> {
+                val x = requireFinite(arg(0), "ln")
+                if (x <= 0.0) fail("ln requires a positive value")
+                finiteResult(ln(x), "ln", ErrorKind.Domain)
+            }
+            "log" -> {
+                val x = requireFinite(arg(0), "log")
+                if (x <= 0.0) fail("log requires a positive value")
+                val value = if (args.size == 2) {
+                    val base = requireFinite(arg(1), "log")
+                    if (base <= 0.0 || base == 1.0) fail("log base must be positive and not equal to 1")
+                    ln(x) / ln(base)
+                } else {
+                    log10(x)
+                }
+                finiteResult(value, "log", ErrorKind.Domain)
+            }
+            "log2" -> {
+                val x = requireFinite(arg(0), "log2")
+                if (x <= 0.0) fail("log2 requires a positive value")
+                finiteResult(log2(x), "log2", ErrorKind.Domain)
+            }
+            "exp" -> finiteResult(exp(requireFinite(arg(0), "exp")), "exp")
+            "sqrt" -> {
+                val x = requireFinite(arg(0), "sqrt")
+                if (x < 0.0) fail("sqrt requires a non-negative value")
+                finiteResult(sqrt(x), "sqrt", ErrorKind.Domain)
+            }
+            "cbrt" -> finiteResult(cbrt(requireFinite(arg(0), "cbrt")), "cbrt")
             "root" -> {
-                val v = arg(0); val k = arg(1)
+                val v = requireFinite(arg(0), "root"); val k = requireFinite(arg(1), "root")
                 if (k == 0.0) fail("Root degree must not be zero")
-                if (v < 0 && k != floor(k)) fail("Negative value with a fractional root has no real result")
-                v.pow(1.0 / k)
+                if (v < 0) {
+                    if (k != floor(k)) fail("Negative value with a fractional root has no real result")
+                    if (floor(k) % 2.0 == 0.0) fail("Even root of a negative value has no real result")
+                    finiteResult(-(-v).pow(1.0 / k), "root", ErrorKind.Domain)
+                } else {
+                    finiteResult(v.pow(1.0 / k), "root", ErrorKind.Domain)
+                }
             }
-            "abs" -> abs(arg(0))
-            "sign" -> sign(arg(0))
-            "floor" -> floor(arg(0))
-            "ceil" -> ceil(arg(0))
+            "abs" -> finiteResult(abs(requireFinite(arg(0), "abs")), "abs")
+            "sign" -> finiteResult(sign(requireFinite(arg(0), "sign")), "sign")
+            "floor" -> requireFinite(floor(requireFinite(arg(0), "floor")), "floor")
+            "ceil" -> requireFinite(ceil(requireFinite(arg(0), "ceil")), "ceil")
             "round" -> {
-                val factor = if (args.size == 2) 10.0.pow(arg(1)) else 1.0
-                roundHalfUp(arg(0) * factor) / factor
+                val x = requireFinite(arg(0), "round")
+                val factor = if (args.size == 2) 10.0.pow(requireFinite(arg(1), "round")) else 1.0
+                if (!factor.isFinite() || factor == 0.0) fail("round supports between -300 and 300 digits")
+                finiteResult(roundHalfUp(x * factor) / factor, "round")
             }
-            "min" -> args.minOrNull() ?: fail("min needs at least one argument")
-            "max" -> args.maxOrNull() ?: fail("max needs at least one argument")
-            "fact" -> factorial(arg(0))
+            "min" -> finiteResult(requireFinite(args.minOrNull() ?: fail("min needs at least one argument"), "min"), "min", ErrorKind.Domain)
+            "max" -> finiteResult(requireFinite(args.maxOrNull() ?: fail("max needs at least one argument"), "max"), "max", ErrorKind.Domain)
+            "fact" -> finiteResult(factorial(arg(0)), "fact")
             else -> fail("Unknown function “${n.name}”")
         }
     }

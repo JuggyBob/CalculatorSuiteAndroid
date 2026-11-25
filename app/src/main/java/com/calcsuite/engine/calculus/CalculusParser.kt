@@ -20,6 +20,14 @@ class CalculusParser(private val text: String) {
 
     private var pos = 0
 
+    /** Nesting of the recursive rules (parentheses, calls, signs and powers). */
+    private var depth = 0
+
+    private fun enterRule() {
+        depth++
+        if (depth > MAX_EXPRESSION_DEPTH) throw ParseError(TOO_DEEP_MESSAGE)
+    }
+
     companion object {
         private val FUNCS = setOf(
             "sin", "cos", "tan", "csc", "sec", "cot",
@@ -29,11 +37,18 @@ class CalculusParser(private val text: String) {
             "abs", "sign", "floor", "ceil", "round", "min", "max",
         )
 
-        fun parse(text: String): CalcResult<Node> =
-        try {
-            parseChecked(text)
-        } catch (e: ParseError) {
-            err(ErrorKind.Syntax, e.message ?: "The expression could not be parsed")
+        fun parse(text: String): CalcResult<Node> = guarded(ErrorKind.Syntax) {
+            when {
+                // A very long flat expression would build a tree that later
+                // walks (printing, simplifying, differentiating) cannot handle.
+                text.length > MAX_EXPRESSION_LENGTH ->
+                    err(ErrorKind.Syntax, "The expression is too long")
+                else -> try {
+                    parseChecked(text)
+                } catch (e: ParseError) {
+                    err(ErrorKind.Syntax, e.message ?: "The expression could not be parsed")
+                }
+            }
         }
 
     private fun parseChecked(text: String): CalcResult<Node> {
@@ -154,14 +169,25 @@ class CalculusParser(private val text: String) {
     private fun parseUnary(): Node? {
         skipSpace()
         if (match("-", "−") != null) {
-            val operand = parseUnary() ?: return null
+            enterRule()
+            val operand = try {
+                parseUnary() ?: return null
+            } finally {
+                depth--
+            }
             return Node.Neg(operand)
         }
         match("+")
         val base = parsePostfix() ?: return null
         skipSpace()
         if (match("^") != null) {
-            val exp = parseFactor() ?: return null
+            // Powers are right-associative, so a long chain recurses here.
+            enterRule()
+            val exp = try {
+                parseFactor() ?: return null
+            } finally {
+                depth--
+            }
             return Node.Pow(base, exp)
         }
         return base
@@ -186,7 +212,12 @@ class CalculusParser(private val text: String) {
         val c = peek()!!
 
         if (match("(") != null) {
-            val inner = parseExpr() ?: throw ParseError("Missing expression inside parentheses")
+            enterRule()
+            val inner = try {
+                parseExpr() ?: throw ParseError("Missing expression inside parentheses")
+            } finally {
+                depth--
+            }
             if (match(")") == null) throw ParseError("Missing closing parenthesis")
             return inner
         }
@@ -211,6 +242,9 @@ class CalculusParser(private val text: String) {
         }
         val s = text.substring(start, pos)
         val v = s.toDoubleOrNull() ?: throw ParseError("“$s” is not a number")
+        // 1e400 parses as Infinity in Kotlin/Java; that must be an input error,
+        // not a number that later prints as “∞”.
+        if (!v.isFinite()) throw ParseError("“$s” is not a finite number")
         return Node.Num(v)
     }
 
@@ -237,18 +271,23 @@ class CalculusParser(private val text: String) {
             if (lower !in FUNCS) throw ParseError("Unknown function “$word”")
             pos++ // consume '('
             val args = mutableListOf<Node>()
-            skipSpace()
-            if (peek() == ')') {
-                pos++
-            } else {
-                while (true) {
-                    val arg = parseExpr() ?: throw ParseError("Missing argument for $word")
-                    args.add(arg)
-                    skipSpace()
-                    if (match(",") != null) continue
-                    if (match(")") != null) break
-                    throw ParseError("Missing closing parenthesis in $word(…)")
+            enterRule()
+            try {
+                skipSpace()
+                if (peek() == ')') {
+                    pos++
+                } else {
+                    while (true) {
+                        val arg = parseExpr() ?: throw ParseError("Missing argument for $word")
+                        args.add(arg)
+                        skipSpace()
+                        if (match(",") != null) continue
+                        if (match(")") != null) break
+                        throw ParseError("Missing closing parenthesis in $word(…)")
+                    }
                 }
+            } finally {
+                depth--
             }
             return Node.Fun(lower, args)
         }

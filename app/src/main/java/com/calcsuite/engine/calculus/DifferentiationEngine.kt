@@ -22,7 +22,7 @@ import kotlin.math.tan
  */
 object DifferentiationEngine {
 
-    fun derivative(expr: String, varName: String = "x"): CalcResult<DerivativeResult> {
+    fun derivative(expr: String, varName: String = "x"): CalcResult<DerivativeResult> = guarded {
         val parsed = CalculusParser.parse(expr)
         if (parsed is CalcResult.Err) return err(parsed.error.kind, parsed.error.message)
         val node = (parsed as CalcResult.Ok).value
@@ -51,8 +51,9 @@ object DifferentiationEngine {
      * exactly zero. Simplifying collapses those to `0` before they can be
      * mistaken for a genuinely undefined derivative.
      */
-    fun differentiate(n: Node, v: String): CalcResult<Node> =
+    fun differentiate(n: Node, v: String): CalcResult<Node> = guarded {
         differentiateRaw(n, v).map { Simplifier.simplify(it) }
+    }
 
     private fun differentiateRaw(n: Node, v: String): CalcResult<Node> {
         return when (n) {
@@ -153,7 +154,12 @@ object DifferentiationEngine {
             else -> null
         }
         if (outer == null) {
-            return ok(Node.Num(Double.NaN)) // signal: not symbolically differentiable
+            // A NaN node used to travel silently through the engine and print as
+            // "undefined". Say so at the point where the derivative is refused.
+            return err(
+                ErrorKind.Domain,
+                "No symbolic derivative is available for ${n.name}",
+            )
         }
         return ok(Node.Mul(outer, dInner))
     }
@@ -205,13 +211,17 @@ object DifferentiationEngine {
         varName: String,
         at: Double,
         h: Double = 1e-6,
-    ): CalcResult<Double> {
+    ): CalcResult<Double> = guarded {
         val plus = Evaluator.eval(node, mapOf(varName.lowercase() to at + h)).valueOrNull()
         val minus = Evaluator.eval(node, mapOf(varName.lowercase() to at - h)).valueOrNull()
         if (plus == null || minus == null) {
             return err(ErrorKind.Domain, "The function is not defined near $varName = ${NodePrinter.format(at)}")
         }
-        return ok((plus - minus) / (2 * h))
+        val derivative = (plus - minus) / (2 * h)
+        if (!derivative.isFinite()) {
+            return err(ErrorKind.Overflow, "The numerical derivative is not representable")
+        }
+        return ok(derivative)
     }
 }
 

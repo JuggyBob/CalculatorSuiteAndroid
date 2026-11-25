@@ -27,6 +27,12 @@ import com.calcsuite.ui.tools.health.HealthTools
 import com.calcsuite.ui.tools.other.OtherTools
 
 /**
+ * Keeps an untrusted tool id from injecting newlines or other control
+ * characters into a log line, and bounds how much of it is logged.
+ */
+private fun sanitisedLogId(id: String): String = id.filter { it.isLetterOrDigit() }.take(64)
+
+/**
  * Host for every tool screen. The mapping below is the single place where a
  * tool id becomes a screen, which keeps navigation, favourites and history
  * consistent across all 48 tools.
@@ -82,7 +88,7 @@ private fun ToolScreenDispatch(args: ToolArgs) {
  */
 @Composable
 fun MissingToolRoute(toolId: String, onBack: () -> Unit) {
-    SideEffect { Log.e("CalcSuiteApp", "No tool is registered for the id '$toolId'") }
+    SideEffect { Log.e("CalcSuiteApp", "No tool is registered for the id '${sanitisedLogId(toolId)}'") }
     ToolScaffold(
         title = "Tool unavailable",
         subtitle = "This calculation was made with a tool that is not in this version",
@@ -115,7 +121,9 @@ fun MissingToolRoute(toolId: String, onBack: () -> Unit) {
  */
 @Composable
 private fun MissingToolScreen(args: ToolArgs) {
-    SideEffect { Log.e("ToolHostScreen", "No screen registered for tool id '${args.tool.id}'") }
+    SideEffect {
+        Log.e("ToolHostScreen", "No screen registered for tool id '${sanitisedLogId(args.tool.id)}'")
+    }
     ToolScaffold(
         title = args.tool.title,
         subtitle = args.tool.description,

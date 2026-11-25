@@ -212,6 +212,10 @@ private fun RealLineSection(args: ToolArgs) {
 private fun FiniteSpaceSection() {
     var spaceText by rememberSaveable { mutableStateOf("a: a; b: a, b; c: b, c") }
     val space = remember(spaceText) { parseFiniteSpace(spaceText) }
+    // Enumerating the topology doubles with every point, so the parser stops
+    // well before the mask could overflow or the screen could hang.
+    val pointCount = spaceText.split(";").count { it.trim().isNotEmpty() }
+    val tooManyPoints = pointCount > FiniteSpace.MAX_POINTS
 
     SectionCard(title = "The space") {
         PlainField(
@@ -223,8 +227,18 @@ private fun FiniteSpaceSection() {
         )
         InfoNote(
             "Give each point, a colon, and the points of its smallest open " +
-                "neighbourhood, separated by semicolons.",
+                "neighbourhood, separated by semicolons. At most " +
+                "${FiniteSpace.MAX_POINTS} points are accepted, because every union of " +
+                "neighbourhoods has to be listed.",
         )
+    }
+
+    if (tooManyPoints) {
+        ErrorNotice(
+            "This space has $pointCount points. Remove ${pointCount - FiniteSpace.MAX_POINTS} " +
+                "so that at most ${FiniteSpace.MAX_POINTS} remain.",
+        )
+        return
     }
 
     if (space == null) {
@@ -561,7 +575,7 @@ private fun parseFiniteSpace(text: String): FiniteSpace? {
         points.add(name)
         groups.add(pieces[1].split(",").map { it.trim() }.filter { it.isNotEmpty() })
     }
-    if (points.isEmpty()) return null
+    if (points.isEmpty() || points.size > FiniteSpace.MAX_POINTS) return null
     val indices = mutableListOf<List<Int>>()
     for (group in groups) {
         val row = mutableListOf<Int>()
@@ -572,5 +586,5 @@ private fun parseFiniteSpace(text: String): FiniteSpace? {
         }
         indices.add(row)
     }
-    return FiniteSpace(points, indices)
+    return FiniteSpace.ofOrNull(points, indices)
 }

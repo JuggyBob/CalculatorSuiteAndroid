@@ -6,6 +6,9 @@ import com.calcsuite.core.err
 import com.calcsuite.core.ok
 import java.math.BigDecimal
 
+/** Deepest expression nesting accepted by the equation parser. */
+private const val MAX_NESTING_DEPTH = 128
+
 /**
  * Solves a system of two equations in two unknowns.
  *
@@ -32,19 +35,33 @@ object SystemSolver {
         method: SystemMethod = SystemMethod.Automatic,
         variableX: String = "x",
         variableY: String = "y",
+    ): CalcResult<SystemAnswer> = try {
+        solveImpl(equation1, equation2, method, variableX, variableY)
+    } catch (_: StackOverflowError) {
+        err(ErrorKind.Syntax, "The equation is nested too deeply")
+    }
+
+    private fun solveImpl(
+        equation1: String,
+        equation2: String,
+        method: SystemMethod,
+        variableX: String,
+        variableY: String,
     ): CalcResult<SystemAnswer> {
-        val first = parseEquation(equation1, variableX, variableY)
-            ?: return err(
+        val first = when (val parsed = parseEquation(equation1, variableX, variableY)) {
+            is CalcResult.Ok -> parsed.value
+            is CalcResult.Err -> return err(
                 ErrorKind.Syntax,
-                "The first equation could not be read" +
-                    (lastParseFailure?.let { ": $it" } ?: "."),
+                "The first equation could not be read: ${parsed.error.message}",
             )
-        val second = parseEquation(equation2, variableX, variableY)
-            ?: return err(
+        }
+        val second = when (val parsed = parseEquation(equation2, variableX, variableY)) {
+            is CalcResult.Ok -> parsed.value
+            is CalcResult.Err -> return err(
                 ErrorKind.Syntax,
-                "The second equation could not be read" +
-                    (lastParseFailure?.let { ": $it" } ?: "."),
+                "The second equation could not be read: ${parsed.error.message}",
             )
+        }
 
 
         val available = availableMethods(first, second)
@@ -148,15 +165,25 @@ object SystemSolver {
         )
         if (determinant.signum() == 0) {
             steps.add("D = 0, so the equations are dependent or contradictory")
-            val consistent = a1.multiply(c2, CTX).compareTo(a2.multiply(c1, CTX)) == 0 &&
-                b1.multiply(c2, CTX).compareTo(b2.multiply(c1, CTX)) == 0
+            // A row with both coefficients zero makes the cross-product test
+            // useless: 0 = 5 can look proportional to any other row. Handle the
+            // degenerate rows the same way the coefficient-based solver does.
+            val row1Zero = a1.signum() == 0 && b1.signum() == 0
+            val row2Zero = a2.signum() == 0 && b2.signum() == 0
+            val consistent = when {
+                row1Zero && row2Zero -> c1.signum() == 0 && c2.signum() == 0
+                row1Zero -> c1.signum() == 0
+                row2Zero -> c2.signum() == 0
+                else -> a1.multiply(c2, CTX).compareTo(a2.multiply(c1, CTX)) == 0 &&
+                    b1.multiply(c2, CTX).compareTo(b2.multiply(c1, CTX)) == 0
+            }
             steps.add(
                 if (consistent) {
                     "The two rows are proportional including the constants, so the " +
                         "equations describe the same line: every point of it is a solution"
                 } else {
-                    "The two rows are proportional but the constants are not, so the " +
-                        "lines are parallel and never meet: there is no solution"
+                    "The equations contradict each other (a zero row with a non-zero " +
+                        "constant, or parallel lines), so there is no solution"
                 },
             )
             return ok(
@@ -334,10 +361,14 @@ object SystemSolver {
                 "Written as a₁$variableX + b₁$variableY = c₁ and a₂$variableX + b₂$variableY = c₂",
             )
             val useY = b1.signum() != 0 && b2.signum() != 0
+            // When neither y coefficient can be used, x is the candidate. A
+            // blank first row has a1 == 0 too, so dividing here would throw.
             val factor = if (useY) {
                 b2.divide(b1, CTX)
-            } else {
+            } else if (a1.signum() != 0) {
                 a2.divide(a1, CTX)
+            } else {
+                BigDecimal.ZERO
             }
             if (factor.signum() == 0) {
                 steps.add("Neither unknown can be cancelled out")
@@ -501,6 +532,28 @@ object SystemSolver {
                 roots = listOf(polynomial.constant.negate().divide(polynomial.x, CTX))
             }
             else -> {
+                if (polynomial.constant.signum() != 0) {
+                    // Every coefficient cancelled but a non-zero constant is
+                    // left: the reduced equation is false for every x.
+                    steps.add(
+                        "Everything cancels except ${plain(polynomial.constant)} = 0, " +
+                            "which is false for every $variableX",
+                    )
+                    return ok(
+                        SystemAnswer(
+                            method = method,
+                            available = available,
+                            outcome = SystemOutcome.NoRealSolution,
+                            solutions = emptyList(),
+                            steps = steps,
+                            verification = emptyList(),
+                            notes = emptyList(),
+                            message = "No solution (inconsistent system)",
+                            equation1 = equation1,
+                            equation2 = equation2,
+                        ),
+                    )
+                }
                 steps.add("Everything cancels, so the equations say the same thing")
                 return ok(
                     SystemAnswer(
@@ -535,8 +588,26 @@ object SystemSolver {
                 ),
             )
         }
-        // The second unknown comes from the equation that is linear in it.
-        val linear = if (first.y.signum() != 0) first else second
+        // The second unknown comes from the equation that is linear in it. If
+        // neither equation mentions it, it is free and must not be divided by.
+        val linear = if (first.y.signum() != 0) first else if (second.y.signum() != 0) second else null
+        if (linear == null) {
+            steps.add("Neither equation contains $variableY, so $variableY is not determined")
+            return ok(
+                SystemAnswer(
+                    method = method,
+                    available = available,
+                    outcome = SystemOutcome.Infinite,
+                    solutions = emptyList(),
+                    steps = steps,
+                    verification = emptyList(),
+                    notes = listOf("Each root of the reduced equation works for every $variableY"),
+                    message = "Infinitely many solutions ($variableY is not determined)",
+                    equation1 = equation1,
+                    equation2 = equation2,
+                ),
+            )
+        }
         val numerator = linear.minus(BivariatePolynomial(y = linear.y)).negate()
         val solutions = mutableListOf<Pair<BigDecimal, BigDecimal>>()
         for (root in roots) {
@@ -610,9 +681,11 @@ object SystemSolver {
         text: String,
         variableX: String,
         variableY: String,
-    ): BivariatePolynomial? {
+    ): CalcResult<BivariatePolynomial> {
         val parts = text.split('=')
-        if (parts.size != 2) return null
+        if (parts.size != 2) {
+            return err(ErrorKind.Syntax, "Include one \"=\" sign")
+        }
         return try {
             val left = BivariateParser(
                 EqLexer.tokenize(parts[0].trim()),
@@ -624,15 +697,13 @@ object SystemSolver {
                 variableX,
                 variableY,
             ).parse()
-            left - right
+            ok(left - right)
         } catch (failure: EqParseException) {
-            lastParseFailure = failure.message
-            null
+            err(ErrorKind.Syntax, failure.message ?: "The equation could not be read")
+        } catch (_: StackOverflowError) {
+            err(ErrorKind.Syntax, "The equation is nested too deeply")
         }
     }
-
-    /** Why the last equation could not be read, for the message. */
-    private var lastParseFailure: String? = null
 
     /** The context the arithmetic is done in. */
     private val CTX = BivariatePolynomial.CTX
@@ -658,6 +729,21 @@ internal class BivariateParser(
     private val variableY: String,
 ) {
     private var position = 0
+
+    /** How many nested expressions are currently being parsed. */
+    private var nestingDepth = 0
+
+    private inline fun <T> deeper(block: () -> T): T {
+        nestingDepth++
+        if (nestingDepth > MAX_NESTING_DEPTH) {
+            throw EqParseException("The equation is nested too deeply")
+        }
+        return try {
+            block()
+        } finally {
+            nestingDepth--
+        }
+    }
 
     private fun peek(): EqToken = tokens[position]
 
@@ -751,10 +837,10 @@ internal class BivariateParser(
                 variableY -> BivariatePolynomial(y = BigDecimal.ONE)
                 else -> throw EqParseException("\"${token.text}\" is not an unknown")
             }
-            is EqToken.Plus -> parseFactor()
-            is EqToken.Minus -> parseFactor().negate()
+            is EqToken.Plus -> deeper { parseFactor() }
+            is EqToken.Minus -> deeper { parseFactor() }.negate()
             is EqToken.LParen -> {
-                val result = parseSum()
+                val result = deeper { parseSum() }
                 if (peek() !is EqToken.RParen) throw EqParseException("A bracket is not closed")
                 advance()
                 result

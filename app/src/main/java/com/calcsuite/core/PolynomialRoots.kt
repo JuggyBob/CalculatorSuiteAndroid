@@ -101,7 +101,9 @@ object PolynomialRoots {
         for (n in numerators) {
             for (d in denominators) {
                 for (sign in intArrayOf(1, -1)) {
-                    val candidate = Rat.of(BigInteger.valueOf(sign.toLong()) * BigInteger.valueOf(n), BigInteger.valueOf(d))
+                    // Defensive: never build a Rat with a zero denominator,
+                    // even if a future divisor source misbehaves.
+                    val candidate = Rat.ofOrNull(if (sign < 0) n.negate() else n, d) ?: continue
                     if (p.evaluate(candidate).isZero()) return candidate
                 }
             }
@@ -127,20 +129,32 @@ object PolynomialRoots {
         return out
     }
 
-    private fun divisorsOf(value: BigInteger): List<Long> {
-        if (value.signum() == 0) return listOf(1L)
+    /** Above this magnitude the divisor scan is deliberately skipped. */
+    private val MAX_DIVISOR_SCAN = BigInteger.valueOf(1_000_000L)
+
+    /**
+     * Divisors of [value], as exact BigIntegers.
+     *
+     * Beyond [MAX_DIVISOR_SCAN] only the trivial divisor `1` is offered: the
+     * rational-root search is a performance optimisation, so skipping huge
+     * candidates is fine. Crucially, no `toLong()` truncation can produce a
+     * zero (or negative) denominator and make `Rat.of` throw.
+     */
+    private fun divisorsOf(value: BigInteger): List<BigInteger> {
+        if (value.signum() == 0) return listOf(BigInteger.ONE)
         val n = value.abs()
-        if (n > BigInteger.valueOf(1_000_000L)) return listOf(1L, n.toLong())
+        if (n > MAX_DIVISOR_SCAN) return listOf(BigInteger.ONE)
         val out = sortedSetOf<Long>()
+        val limit = n.toLong() // safe: n ≤ 1,000,000 here
         var d = 1L
-        while (d * d <= n.toLong()) {
+        while (d * d <= limit) {
             if (n.mod(BigInteger.valueOf(d)).signum() == 0) {
                 out.add(d)
                 out.add(n.divide(BigInteger.valueOf(d)).toLong())
             }
             d++
         }
-        return out.toList()
+        return out.map { BigInteger.valueOf(it) }
     }
 
     // ------------------------------------------------------ quadratic roots
@@ -289,22 +303,28 @@ object PolynomialRoots {
         return (variationsAt(sequence, ra) - variationsAt(sequence, rb)).coerceAtLeast(0)
     }
 
+    /** Maximum number of bisection levels before finishing the interval. */
+    private const val MAX_ISOLATE_DEPTH = 256
+
     private fun isolate(
         sequence: List<Poly>,
         lo: Double,
         hi: Double,
         tolerance: Double,
         out: MutableList<Double>,
+        depth: Int = 0,
     ) {
         val count = countRootsIn(sequence, lo, hi)
         if (count <= 0) return
-        if (hi - lo <= tolerance || count == 1 && hi - lo < 1e-6) {
+        if (hi - lo <= tolerance || depth >= MAX_ISOLATE_DEPTH || count == 1 && hi - lo < 1e-6) {
+            // Bisection always converges, so finishing early here still
+            // produces a root; it only bounds the recursion on extreme inputs.
             out.add(bisect(sequence, lo, hi))
             return
         }
         val mid = (lo + hi) / 2
-        isolate(sequence, lo, mid, tolerance, out)
-        isolate(sequence, mid, hi, tolerance, out)
+        isolate(sequence, lo, mid, tolerance, out, depth + 1)
+        isolate(sequence, mid, hi, tolerance, out, depth + 1)
     }
 
     /** Finds the root inside `(lo, hi]` by bisection on the square-free part. */

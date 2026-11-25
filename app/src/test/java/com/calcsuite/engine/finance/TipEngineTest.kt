@@ -233,6 +233,20 @@ class TipEngineTest {
     }
 
     @Test
+    fun splitWithInvalidPeopleReturnsEmptyInsteadOfThrowing() {
+        assertTrue(TipEngine.split(BigDecimal("10.00"), 0).isEmpty())
+        assertTrue(TipEngine.split(BigDecimal("10.00"), -3).isEmpty())
+        assertTrue(TipEngine.split(BigDecimal("10.00"), TipEngine.MAX_PEOPLE + 1).isEmpty())
+        assertEquals(3, TipEngine.split(BigDecimal("10.00"), 3).size)
+    }
+
+    @Test
+    fun roundingFallsBackToCentsForUnknownOptions() {
+        assertMoney("1.23", TipEngine.applyRounding(BigDecimal("1.234"), TipEngine.RoundingOption.NONE))
+        assertMoney("1.25", TipEngine.applyRounding(BigDecimal("1.234"), TipEngine.RoundingOption.NEAREST_005))
+    }
+
+    @Test
     fun tipSharesAlsoSumExactly() {
         val result = ok(
             TipEngine.calculate(

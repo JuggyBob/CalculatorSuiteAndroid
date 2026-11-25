@@ -11,6 +11,7 @@ import com.calcsuite.engine.calculus.Evaluator
 import com.calcsuite.engine.calculus.IntegrationEngine
 import com.calcsuite.engine.calculus.Node
 import com.calcsuite.engine.calculus.NodePrinter
+import com.calcsuite.engine.calculus.TOO_DEEP_MESSAGE
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.sqrt
@@ -88,6 +89,30 @@ data class PointClassification(
  * still, and the integrals reuse the adaptive Simpson routine.
  */
 object MultivariableEngine {
+
+    /** Evaluations shared by every nested integral in one request. */
+    const val MAX_INTEGRAL_EVALUATIONS = 100_000
+
+    /** Refinement depths: nested integrals get less depth than a single one. */
+    const val MAX_INTEGRATION_DEPTH = 18
+    const val NESTED_INTEGRATION_DEPTH = 12
+    const val INNERMOST_INTEGRATION_DEPTH = 10
+
+    private const val BUDGET_MESSAGE =
+        "The integral needs too many evaluations; try a smoother function or smaller bounds"
+
+    /** Raised when a nested integral has spent the shared evaluation budget. */
+    private class BudgetExceeded : RuntimeException(
+        "The integral needs too many evaluations; try a smoother function or smaller bounds",
+    )
+
+    /** One counter for all the nested Simpson rules of a single request. */
+    private class Budget(var remaining: Int) {
+        fun spend() {
+            if (remaining <= 0) throw BudgetExceeded()
+            remaining--
+        }
+    }
 
     // ------------------------------------------------------------ derivatives
 
@@ -456,6 +481,19 @@ object MultivariableEngine {
         function: Node,
         variables: List<String>,
         bounds: List<DoubleArray>,
+    ): CalcResult<Double> = try {
+        doubleIntegralImpl(function, variables, bounds, Budget(MAX_INTEGRAL_EVALUATIONS))
+    } catch (e: BudgetExceeded) {
+        err(ErrorKind.InvalidInput, BUDGET_MESSAGE)
+    } catch (e: StackOverflowError) {
+        err(ErrorKind.Overflow, TOO_DEEP_MESSAGE)
+    }
+
+    private fun doubleIntegralImpl(
+        function: Node,
+        variables: List<String>,
+        bounds: List<DoubleArray>,
+        budget: Budget,
     ): CalcResult<Double> {
         if (variables.size != 2 || bounds.size != 2) {
             return err(ErrorKind.InvalidInput, "A double integral needs two variables and two pairs of bounds.",
@@ -464,9 +502,8 @@ object MultivariableEngine {
         val x = variables[0]
         val y = variables[1]
         val outer = adaptiveSimpson(
-            { point -> innerIntegral(function, x, y, bounds[1], point) },
-            bounds[0][0],
-            bounds[0][1],
+            { point -> innerIntegral(function, x, y, bounds[1], point, budget) },
+            bounds[0][0], bounds[0][1], MAX_INTEGRATION_DEPTH, budget,
         )
         if (outer == null) {
             return err(ErrorKind.Domain, "The integral could not be evaluated on the whole region; the function " +
@@ -483,11 +520,12 @@ object MultivariableEngine {
         y: String,
         yBounds: DoubleArray,
         at: Double,
+        budget: Budget,
     ): Double? {
         val withX = substitute(function, x, Node.Num(at))
         return adaptiveSimpson(
             { yPoint -> Evaluator.eval(withX, mapOf(y to yPoint)).valueOrNull() },
-            yBounds[0], yBounds[1],
+            yBounds[0], yBounds[1], NESTED_INTEGRATION_DEPTH, budget,
         )
     }
 
@@ -497,18 +535,30 @@ object MultivariableEngine {
      * The engine's own routine works on a tree, which is enough for a single
      * integral. A multiple integral has to integrate a value that is itself
      * the result of an integral, so the rule is repeated here with a
-     * function.
+     * function. Every level drawn from one request draws from the same
+     * [Budget], so a hostile nested integrand cannot grow without limit.
      */
     fun adaptiveSimpson(
         f: (Double) -> Double?,
         lo: Double,
         hi: Double,
-        depth: Int = 18,
-    ): Double? {
-        if (hi < lo) return adaptiveSimpson(f, hi, lo, depth)
-        if (hi == lo) return f(lo) ?: return null
-        val whole = simpson(f, lo, hi) ?: return null
-        return refine(f, lo, hi, whole, depth)
+        depth: Int = MAX_INTEGRATION_DEPTH,
+    ): Double? = try {
+        adaptiveSimpson(f, lo, hi, depth.coerceIn(0, MAX_INTEGRATION_DEPTH), Budget(MAX_INTEGRAL_EVALUATIONS))
+    } catch (e: BudgetExceeded) {
+        null
+    } catch (e: StackOverflowError) {
+        null
+    }
+
+    private fun adaptiveSimpson(f: (Double) -> Double?, lo: Double, hi: Double, depth: Int, budget: Budget): Double? {
+        if (hi < lo) return adaptiveSimpson(f, hi, lo, depth, budget)
+        if (hi == lo) {
+            budget.spend()
+            return f(lo)
+        }
+        val whole = simpson(f, lo, hi, budget) ?: return null
+        return refine(f, lo, hi, whole, depth, budget)
     }
 
     private fun refine(
@@ -517,23 +567,28 @@ object MultivariableEngine {
         hi: Double,
         whole: Double,
         depth: Int,
+        budget: Budget,
     ): Double? {
         val middle = (lo + hi) / 2
-        val left = simpson(f, lo, middle)
-        val right = simpson(f, middle, hi)
-        if (left == null || right == null) return null
+        val left = simpson(f, lo, middle, budget) ?: return null
+        val right = simpson(f, middle, hi, budget) ?: return null
+        if (!left.isFinite() || !right.isFinite()) return null
         val difference = left + right - whole
         if (depth <= 0 || abs(difference) < 1e-12) {
-            return left + right + difference / 15
+            val estimate = left + right + difference / 15
+            return if (estimate.isFinite()) estimate else null
         }
-        val refinedLeft = refine(f, lo, middle, left, depth - 1) ?: return null
-        val refinedRight = refine(f, middle, hi, right, depth - 1) ?: return null
+        val refinedLeft = refine(f, lo, middle, left, depth - 1, budget) ?: return null
+        val refinedRight = refine(f, middle, hi, right, depth - 1, budget) ?: return null
         return refinedLeft + refinedRight
     }
 
-    private fun simpson(f: (Double) -> Double?, lo: Double, hi: Double): Double? {
+    private fun simpson(f: (Double) -> Double?, lo: Double, hi: Double, budget: Budget): Double? {
+        budget.spend()
         val a = f(lo) ?: return null
+        budget.spend()
         val b = f((lo + hi) / 2) ?: return null
+        budget.spend()
         val c = f(hi) ?: return null
         return (hi - lo) / 6 * (a + 4 * b + c)
     }
@@ -545,6 +600,19 @@ object MultivariableEngine {
         function: Node,
         variables: List<String>,
         bounds: List<DoubleArray>,
+    ): CalcResult<Double> = try {
+        tripleIntegralImpl(function, variables, bounds, Budget(MAX_INTEGRAL_EVALUATIONS))
+    } catch (e: BudgetExceeded) {
+        err(ErrorKind.InvalidInput, BUDGET_MESSAGE)
+    } catch (e: StackOverflowError) {
+        err(ErrorKind.Overflow, TOO_DEEP_MESSAGE)
+    }
+
+    private fun tripleIntegralImpl(
+        function: Node,
+        variables: List<String>,
+        bounds: List<DoubleArray>,
+        budget: Budget,
     ): CalcResult<Double> {
         if (variables.size != 3 || bounds.size != 3) {
             return err(ErrorKind.InvalidInput, "A triple integral needs three variables and three pairs of bounds.",
@@ -562,13 +630,13 @@ object MultivariableEngine {
                                 val withZ = substitute(withY, z, Node.Num(zPoint))
                                 Evaluator.eval(withZ, emptyMap()).valueOrNull()
                             },
-                            bounds[2][0], bounds[2][1],
+                            bounds[2][0], bounds[2][1], INNERMOST_INTEGRATION_DEPTH, budget,
                         )
                     },
-                    bounds[1][0], bounds[1][1],
+                    bounds[1][0], bounds[1][1], NESTED_INTEGRATION_DEPTH, budget,
                 )
             },
-            bounds[0][0], bounds[0][1],
+            bounds[0][0], bounds[0][1], MAX_INTEGRATION_DEPTH, budget,
         )
         if (outer == null) {
             return err(ErrorKind.Domain, "The integral could not be evaluated on the whole box.",
@@ -584,6 +652,20 @@ object MultivariableEngine {
      * `√(x′(t)² + y′(t)²)·dt`.
      */
     fun lineIntegral(
+        function: Node,
+        variables: List<String>,
+        curve: List<Node>,
+        from: Double,
+        to: Double,
+    ): CalcResult<Double> = try {
+        lineIntegralImpl(function, variables, curve, from, to)
+    } catch (e: BudgetExceeded) {
+        err(ErrorKind.InvalidInput, BUDGET_MESSAGE)
+    } catch (e: StackOverflowError) {
+        err(ErrorKind.Overflow, TOO_DEEP_MESSAGE)
+    }
+
+    private fun lineIntegralImpl(
         function: Node,
         variables: List<String>,
         curve: List<Node>,
@@ -614,7 +696,7 @@ object MultivariableEngine {
         val integrand = Node.Mul(pulledBack, speed)
         val value = adaptiveSimpson(
             { at -> Evaluator.eval(integrand, mapOf(t to at)).valueOrNull() },
-            from, to,
+            from, to, MAX_INTEGRATION_DEPTH, Budget(MAX_INTEGRAL_EVALUATIONS),
         )
         if (value == null) {
             return err(ErrorKind.Domain, "The integral could not be evaluated along the whole curve.",

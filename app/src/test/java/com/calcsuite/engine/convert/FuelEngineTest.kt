@@ -80,12 +80,26 @@ class FuelEngineTest {
     }
 
     @Test
+    fun fuelConstantsFollowTheDocumentedExactDefinitions() {
+        val us = FuelEngine.convert(BigDecimal.ONE, "mpg_us", "l_100km").valueOrNull()!!
+        val uk = FuelEngine.convert(BigDecimal.ONE, "mpg_uk", "l_100km").valueOrNull()!!
+        assertExact(
+            BigDecimal("378.5411784").divide(BigDecimal("1.609344"), UnitFamily.CTX).toPlainString(),
+            us,
+        )
+        assertExact(
+            BigDecimal("454.609").divide(BigDecimal("1.609344"), UnitFamily.CTX).toPlainString(),
+            uk,
+        )
+    }
+
+    @Test
     fun betterMileageMeansFewerLitresPerHundred() {
         val thirsty = FuelEngine.convert(BigDecimal("20"), "mpg_us", "l_100km").valueOrNull()!!
         val efficient = FuelEngine.convert(BigDecimal("40"), "mpg_us", "l_100km").valueOrNull()!!
         assertTrue(efficient.compareTo(thirsty) < 0)
         assertClose("11.76072916666666666666666666666667", thirsty, "1e-9")
-        assertClose("5.8803645823556945", efficient, "1e-9")
+        assertClose("5.8803645833333333", efficient, "1e-9")
     }
 
     @Test

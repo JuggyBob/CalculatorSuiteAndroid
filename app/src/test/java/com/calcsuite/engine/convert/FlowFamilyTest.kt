@@ -135,6 +135,12 @@ class FlowFamilyTest {
     }
 
     @Test
+    fun negativeFlowRateIsRejectedByVolumeFrom() {
+        val result = FlowTimeEngine.volumeFrom(BigDecimal("-1"), "L_min", BigDecimal("60"))
+        assertEquals(ErrorKind.Domain, (result as CalcResult.Err).error.kind)
+    }
+
+    @Test
     fun unknownFlowUnitIsRejectedByVolumeFrom() {
         assertTrue(FlowTimeEngine.volumeFrom(BigDecimal.ONE, "buckets_s", BigDecimal.ONE) is CalcResult.Err)
     }

@@ -1,5 +1,6 @@
 package com.calcsuite.ui.tools.calculus
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,9 +17,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.calcsuite.core.CalcResult
 import com.calcsuite.engine.advanced.PdeClassification
@@ -44,8 +50,122 @@ import com.calcsuite.ui.components.SegmentedChoice
 import com.calcsuite.ui.components.ToolScaffold
 import com.calcsuite.ui.tools.ToolArgs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.calcsuite.ui.tools.prefill
+import kotlin.math.ceil
+
+/** How long the inputs must stay still before a solve is started. */
+private const val PDE_SOLVE_DEBOUNCE_MS = 250L
+
+/** One immutable request; a newer request cancels the solve of the older one. */
+private data class PdeSolveRequest(
+    val kind: PdeKind,
+    val length: String,
+    val spaceSteps: String,
+    val timeSteps: String,
+    val timeEnd: String,
+    val alpha: String,
+    val speed: String,
+    val leftValue: String,
+    val rightValue: String,
+    val initialText: String,
+    val velocityText: String,
+    val boundaryText: String,
+    val sourceText: String,
+    val gridPoints: String,
+    val iterations: String,
+)
+
+/**
+ * Everything the answer area shows, written together so that a frame can
+ * never mix a new result with an old one.
+ */
+private data class PdeSolveState(
+    val solution1D: PdeSolution1D? = null,
+    val solution2D: PdeSolution2D? = null,
+    val failure: String? = null,
+)
+
+/** Runs one request. Pure Kotlin: it is called on a background dispatcher. */
+private fun solvePde(request: PdeSolveRequest): PdeSolveState = when (request.kind) {
+    PdeKind.HEAT, PdeKind.WAVE -> {
+        val initial = when (val r = CalculusParser.parse(request.initialText)) {
+            is CalcResult.Ok -> r.value
+            is CalcResult.Err -> null
+        }
+        if (initial == null) {
+            PdeSolveState(failure = "The initial condition could not be read.")
+        } else {
+            val velocity = if (request.kind == PdeKind.WAVE) {
+                when (val r = CalculusParser.parse(request.velocityText)) {
+                    is CalcResult.Ok -> r.value
+                    is CalcResult.Err -> null
+                }
+            } else {
+                null
+            }
+            val answer = PdeEngine.solve1D(
+                kind = request.kind,
+                initial = initial,
+                variable = "x",
+                length = request.length.trim().toDoubleOrNull() ?: 1.0,
+                spaceSteps = request.spaceSteps.trim().toIntOrNull() ?: 40,
+                timeSteps = request.timeSteps.trim().toIntOrNull() ?: 200,
+                timeEnd = request.timeEnd.trim().toDoubleOrNull() ?: 0.5,
+                left = request.leftValue.trim().toDoubleOrNull() ?: 0.0,
+                right = request.rightValue.trim().toDoubleOrNull() ?: 0.0,
+                alpha = request.alpha.trim().toDoubleOrNull() ?: 0.1,
+                speed = request.speed.trim().toDoubleOrNull() ?: 1.0,
+                initialVelocity = velocity,
+            )
+            if (answer == null) {
+                PdeSolveState(
+                    failure = "The numbers were not acceptable. Check the length, " +
+                        "the number of steps and the time.",
+                )
+            } else {
+                PdeSolveState(solution1D = answer)
+            }
+        }
+    }
+    PdeKind.LAPLACE, PdeKind.POISSON -> {
+        val boundary = when (val r = CalculusParser.parse(request.boundaryText)) {
+            is CalcResult.Ok -> r.value
+            is CalcResult.Err -> null
+        }
+        if (boundary == null) {
+            PdeSolveState(failure = "The boundary values could not be read.")
+        } else {
+            val source = if (request.kind == PdeKind.POISSON) {
+                when (val r = CalculusParser.parse(request.sourceText)) {
+                    is CalcResult.Ok -> r.value
+                    is CalcResult.Err -> null
+                }
+            } else {
+                null
+            }
+            val answer = PdeEngine.solve2D(
+                kind = request.kind,
+                boundary = boundary,
+                source = source,
+                xVar = "x",
+                yVar = "y",
+                size = request.length.trim().toDoubleOrNull() ?: 1.0,
+                gridPoints = request.gridPoints.trim().toIntOrNull() ?: 30,
+                iterations = request.iterations.trim().toIntOrNull() ?: 500,
+            )
+            if (answer == null) {
+                PdeSolveState(
+                    failure = "The numbers were not acceptable. Check the size of " +
+                        "the square and the number of grid points.",
+                )
+            } else {
+                PdeSolveState(solution2D = answer)
+            }
+        }
+    }
+}
 
 /**
  * The Partial Differential Equations tool.
@@ -183,94 +303,45 @@ fun PdeToolContent(args: ToolArgs) {
         )
     }
 
-    var solution1D by remember { mutableStateOf<PdeSolution1D?>(null) }
-    var solution2D by remember { mutableStateOf<PdeSolution2D?>(null) }
-    var failure by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(
+    // The request is one immutable value. A keystroke makes a new request,
+    // which cancels the effect of the old one before it can publish an
+    // answer. The last completed answer stays on screen while the new solve
+    // is pending.
+    val request = remember(
         kind, length, spaceSteps, timeSteps, timeEnd, alpha, speed, leftValue,
         rightValue, initialText, velocityText, boundaryText, sourceText, gridPoints,
         iterations,
     ) {
-        solution1D = null
-        solution2D = null
-        failure = null
-        withContext(Dispatchers.Default) {
-            when (kind) {
-                PdeKind.HEAT, PdeKind.WAVE -> {
-                    val initial = when (val r = CalculusParser.parse(initialText)) {
-                        is CalcResult.Ok -> r.value
-                        is CalcResult.Err -> null
-                    }
-                    if (initial == null) {
-                        failure = "The initial condition could not be read."
-                    } else {
-                        val velocity = if (kind == PdeKind.WAVE) {
-                            when (val r = CalculusParser.parse(velocityText)) {
-                                is CalcResult.Ok -> r.value
-                                is CalcResult.Err -> null
-                            }
-                        } else {
-                            null
-                        }
-                        val answer = PdeEngine.solve1D(
-                            kind = kind,
-                            initial = initial,
-                            variable = "x",
-                            length = length.trim().toDoubleOrNull() ?: 1.0,
-                            spaceSteps = spaceSteps.trim().toIntOrNull() ?: 40,
-                            timeSteps = timeSteps.trim().toIntOrNull() ?: 200,
-                            timeEnd = timeEnd.trim().toDoubleOrNull() ?: 0.5,
-                            left = leftValue.trim().toDoubleOrNull() ?: 0.0,
-                            right = rightValue.trim().toDoubleOrNull() ?: 0.0,
-                            alpha = alpha.trim().toDoubleOrNull() ?: 0.1,
-                            speed = speed.trim().toDoubleOrNull() ?: 1.0,
-                            initialVelocity = velocity,
-                        )
-                        if (answer == null) {
-                            failure = "The numbers were not acceptable. Check the length, " +
-                                "the number of steps and the time."
-                        } else {
-                            solution1D = answer
-                        }
-                    }
-                }
-                PdeKind.LAPLACE, PdeKind.POISSON -> {
-                    val boundary = when (val r = CalculusParser.parse(boundaryText)) {
-                        is CalcResult.Ok -> r.value
-                        is CalcResult.Err -> null
-                    }
-                    if (boundary == null) {
-                        failure = "The boundary values could not be read."
-                    } else {
-                        val source = if (kind == PdeKind.POISSON) {
-                            when (val r = CalculusParser.parse(sourceText)) {
-                                is CalcResult.Ok -> r.value
-                                is CalcResult.Err -> null
-                            }
-                        } else {
-                            null
-                        }
-                        val answer = PdeEngine.solve2D(
-                            kind = kind,
-                            boundary = boundary,
-                            source = source,
-                            xVar = "x",
-                            yVar = "y",
-                            size = length.trim().toDoubleOrNull() ?: 1.0,
-                            gridPoints = gridPoints.trim().toIntOrNull() ?: 30,
-                            iterations = iterations.trim().toIntOrNull() ?: 500,
-                        )
-                        if (answer == null) {
-                            failure = "The numbers were not acceptable. Check the size of " +
-                                "the square and the number of grid points."
-                        } else {
-                            solution2D = answer
-                        }
-                    }
-                }
-            }
-        }
+        PdeSolveRequest(
+            kind = kind,
+            length = length,
+            spaceSteps = spaceSteps,
+            timeSteps = timeSteps,
+            timeEnd = timeEnd,
+            alpha = alpha,
+            speed = speed,
+            leftValue = leftValue,
+            rightValue = rightValue,
+            initialText = initialText,
+            velocityText = velocityText,
+            boundaryText = boundaryText,
+            sourceText = sourceText,
+            gridPoints = gridPoints,
+            iterations = iterations,
+        )
+    }
+    var state by remember { mutableStateOf(PdeSolveState()) }
+    var recalculating by remember { mutableStateOf(false) }
+
+    LaunchedEffect(request) {
+        recalculating = true
+        delay(PDE_SOLVE_DEBOUNCE_MS)
+        val answered = withContext(Dispatchers.Default) { solvePde(request) }
+        // One atomic write: the whole answer area belongs to this request.
+        // If a newer request arrived, this effect was cancelled and never
+        // reaches this line.
+        state = answered
+        recalculating = false
     }
 
     // ------------------------------------------------------- the inputs
@@ -370,10 +441,18 @@ fun PdeToolContent(args: ToolArgs) {
 
     // ------------------------------------------------------ the answer
 
-    failure?.let { ErrorNotice(it) }
+    state.failure?.let { ErrorNotice(it) }
+    if (recalculating) {
+        Text(
+            "Recalculating…",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 
-    val oneD = solution1D
+    val oneD = state.solution1D
     if (oneD != null) {
+        val oneDValue = remember(oneD) { { row: Int, column: Int -> oneD.values[row][column] } }
         ResultCard(
             label = "The solution",
             value = "u at the last time is " +
@@ -394,7 +473,7 @@ fun PdeToolContent(args: ToolArgs) {
             PdeFieldView(
                 columns = oneD.values.first().size,
                 rows = oneD.values.size,
-                value = { row, column -> oneD.values[row][column] },
+                value = oneDValue,
                 modifier = Modifier.height(260.dp),
             )
             Text(
@@ -433,10 +512,11 @@ fun PdeToolContent(args: ToolArgs) {
         )
     }
 
-    val twoD = solution2D
+    val twoD = state.solution2D
     if (twoD != null) {
-        val range = PdeEngine.valueRange(twoD.values)
-        val flat = PdeEngine.isConstant(twoD.values)
+        val range = remember(twoD.values) { PdeEngine.valueRange(twoD.values) }
+        val flat = remember(twoD.values) { PdeEngine.isConstant(twoD.values) }
+        val twoDValue = remember(twoD) { { row: Int, column: Int -> twoD.values[row][column] } }
         ResultCard(
             label = "The steady state",
             value = "the values run from " + formatReal(range.first) + " to " +
@@ -462,7 +542,7 @@ fun PdeToolContent(args: ToolArgs) {
             PdeFieldView(
                 columns = twoD.x.size,
                 rows = twoD.y.size,
-                value = { row, column -> twoD.values[row][column] },
+                value = twoDValue,
                 modifier = Modifier.height(300.dp),
             )
             Text(
@@ -503,6 +583,11 @@ fun PdeToolContent(args: ToolArgs) {
 
 /**
  * A colour map of a field of values.
+ *
+ * The colours are sampled into a bitmap off the composition thread, with no
+ * more pixels than the canvas has, and the bitmap is then stretched to the
+ * canvas with nearest-neighbour filtering. The old per-cell drawRect loop
+ * could draw over a million rectangles for the largest grid.
  */
 @Composable
 private fun PdeFieldView(
@@ -511,6 +596,58 @@ private fun PdeFieldView(
     value: (Int, Int) -> Double,
     modifier: Modifier = Modifier,
 ) {
+    val accent = MaterialTheme.colorScheme.primary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    val scale = remember(accent, tertiary) { fieldScale(accent, tertiary) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(value, rows, columns, scale, canvasSize) {
+        if (canvasSize.width <= 0 || canvasSize.height <= 0) return@LaunchedEffect
+        // At most one pixel per canvas pixel, and never more than one pixel
+        // per field cell: small fields are simply stretched by the draw call.
+        val pixelWidth = minOf(columns, canvasSize.width)
+        val pixelHeight = minOf(rows, canvasSize.height)
+        val next = withContext(Dispatchers.Default) {
+            val pixels = fieldArgbPixels(rows, columns, value, pixelWidth, pixelHeight, scale)
+            val raw = Bitmap.createBitmap(pixelWidth, pixelHeight, Bitmap.Config.ARGB_8888)
+            raw.setPixels(pixels, 0, pixelWidth, 0, 0, pixelWidth, pixelHeight)
+            raw.asImageBitmap()
+        }
+        bitmap = next
+    }
+
+    val image = bitmap
+    Canvas(modifier.fillMaxWidth().onSizeChanged { canvasSize = it }) {
+        if (image != null && size.width > 0f && size.height > 0f) {
+            drawImage(
+                image = image,
+                dstOffset = IntOffset.Zero,
+                dstSize = IntSize(ceil(size.width).toInt(), ceil(size.height).toInt()),
+                filterQuality = FilterQuality.None,
+            )
+        }
+    }
+}
+
+/**
+ * Samples a field into packed ARGB pixels, row by row from the top of the
+ * picture down. Row 0 of the field is at the bottom, so the top pixel row
+ * reads field row `rows - 1`. Each pixel takes the field cell nearest its
+ * centre. The colour range and the colour maths are exactly the ones the
+ * previous per-cell drawing used.
+ */
+internal fun fieldArgbPixels(
+    rows: Int,
+    columns: Int,
+    value: (Int, Int) -> Double,
+    pixelWidth: Int,
+    pixelHeight: Int,
+    scale: Triple<Color, Color, Color>,
+): IntArray {
+    val pixels = IntArray(maxOf(0, pixelWidth) * maxOf(0, pixelHeight))
+    if (rows <= 0 || columns <= 0 || pixelWidth <= 0 || pixelHeight <= 0) return pixels
+
     var lowest = Double.POSITIVE_INFINITY
     var highest = Double.NEGATIVE_INFINITY
     for (row in 0 until rows) {
@@ -524,23 +661,20 @@ private fun PdeFieldView(
     if (!highest.isFinite()) highest = 1.0
     if (highest - lowest < 1e-12) highest = lowest + 1.0
 
-    val middle = MaterialTheme.colorScheme.primary
-    val scale = fieldScale(middle, MaterialTheme.colorScheme.tertiary)
-    Canvas(modifier.fillMaxWidth()) {
-        val cellWidth = size.width / columns
-        val cellHeight = size.height / rows
-        for (row in 0 until rows) {
-            for (column in 0 until columns) {
-                val v = value(row, column)
-                val t = ((v - lowest) / (highest - lowest)).coerceIn(0.0, 1.0)
-                drawRect(
-                    color = colourFor(t, scale.first, scale.second, scale.third),
-                    topLeft = Offset(column * cellWidth, size.height - (row + 1) * cellHeight),
-                    size = Size(cellWidth + 0.6f, cellHeight + 0.6f),
-                )
-            }
+    val (low, middle, high) = scale
+    for (py in 0 until pixelHeight) {
+        val row = ((pixelHeight - 1 - py + 0.5) * rows / pixelHeight)
+            .toInt().coerceIn(0, rows - 1)
+        val offset = py * pixelWidth
+        for (px in 0 until pixelWidth) {
+            val column = ((px + 0.5) * columns / pixelWidth)
+                .toInt().coerceIn(0, columns - 1)
+            val v = value(row, column)
+            val t = ((v - lowest) / (highest - lowest)).coerceIn(0.0, 1.0)
+            pixels[offset + px] = colourFor(t, low, middle, high).toArgb()
         }
     }
+    return pixels
 }
 
 /**

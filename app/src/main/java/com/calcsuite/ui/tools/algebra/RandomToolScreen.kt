@@ -26,6 +26,7 @@ import com.calcsuite.engine.algebra.DecimalConfig
 import com.calcsuite.engine.algebra.IntegerGeneratorConfig
 import com.calcsuite.engine.algebra.RandomEngine
 import com.calcsuite.engine.algebra.RandomParity
+import com.calcsuite.ui.components.ExplanationCards
 import com.calcsuite.ui.components.ExpandablePanel
 import com.calcsuite.ui.components.FormulaCard
 import com.calcsuite.ui.components.InfoNote
@@ -339,6 +340,16 @@ fun RandomToolScreen(args: ToolArgs) {
             variables = listOf(
                 "seed" to "reproduces the same list for java.util.Random",
                 "secure" to "java.security.SecureRandom, suitable for secrets",
+            ),
+        )
+
+        ExplanationCards(
+            AlgebraExplanationsNumber.randomExplanation(
+                mode = mode.name,
+                generated = generated,
+                notes = generatedNotes,
+                summary = generatedSummary,
+                lastAction = lastAction,
             ),
         )
     }

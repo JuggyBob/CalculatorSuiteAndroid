@@ -163,6 +163,13 @@ fun <T> SegmentedChoice(
 /** A labelled option for dropdown-style selectors. */
 data class Option<T>(val value: T, val label: String, val group: String? = null, val symbol: String? = null)
 
+/** One rendered row of the selection sheet: either a group header or an option. */
+private data class SheetRow<T>(
+    val key: String,
+    val header: String?,
+    val option: Option<T>?,
+)
+
 /**
  * Selector field: shows the current selection and opens a searchable sheet
  * when tapped. Used for units, currencies, activities and similar long lists.
@@ -253,6 +260,28 @@ private fun <T> SelectSheet(
                 (it.group?.contains(query, ignoreCase = true) == true)
         }
     }
+    // Hoist group boundaries into real list items so LazyColumn sees stable,
+    // unique keys. Mutating a captured `lastGroup` from item content is not
+    // reliable during lazy composition and could duplicate or drop headers.
+    val rows = remember(filtered) {
+        buildList<SheetRow<T>> {
+            var lastGroup: String? = null
+            filtered.forEachIndexed { index, option ->
+                val group = option.group
+                if (group != null && group != lastGroup) {
+                    add(SheetRow(key = "header:$index:$group", header = group, option = null))
+                    lastGroup = group
+                }
+                add(
+                    SheetRow(
+                        key = "option:$index:${option.value.hashCode()}:${option.label}",
+                        header = null,
+                        option = option,
+                    ),
+                )
+            }
+        }
+    }
     Column(Modifier.padding(horizontal = 16.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
         if (options.size > 8) {
@@ -273,49 +302,47 @@ private fun <T> SelectSheet(
                 .heightIn(max = 480.dp)
                 .padding(top = 4.dp),
         ) {
-            var lastGroup: String? = null
-            items(filtered, key = { it.value.hashCode().toString() + it.label }) { option ->
-                if (option.group != null && option.group != lastGroup) {
-                    lastGroup = option.group
+            items(rows, key = { it.key }) { row ->
+                val header = row.header
+                if (header != null) {
                     Text(
-                        option.group,
+                        header,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
                     )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickableRow { onSelect(option.value) }
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(option.label, style = MaterialTheme.typography.bodyLarge)
-                        if (option.group != null && option.group != lastGroup) {
-                            Text(option.group, style = MaterialTheme.typography.bodySmall)
+                } else {
+                    val option = row.option!!
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickableRow { onSelect(option.value) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                        }
+                        if (option.symbol != null) {
+                            Text(
+                                option.symbol,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (option.value == selected) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(20.dp),
+                            )
                         }
                     }
-                    if (option.symbol != null) {
-                        Text(
-                            option.symbol,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (option.value == selected) {
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .size(20.dp),
-                        )
-                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             }
         }
         Row(

@@ -336,6 +336,28 @@ class DcSolverTest {
         assertTrue("the floating part should be named: $message", message.isNotBlank())
     }
 
+    @Test fun veryHighValueResistorsStillGiveAnAnswer() {
+        // Two 10^15 ohm resistors in series carry 6 × 10^-15 A. Their
+        // conductance (10^-15 S) must not be mistaken for a singular matrix.
+        val circuit = Circuit(
+            components = listOf(
+                component("V1", ComponentKind.VOLTAGE_SOURCE, "V1", voltage = "12"),
+                component("R1", ComponentKind.RESISTOR, "R1", resistance = "1e15"),
+                component("R2", ComponentKind.RESISTOR, "R2", resistance = "1e15"),
+                component("GND", ComponentKind.GROUND, "GND"),
+            ),
+            wires = listOf(
+                wire("w1", "V1", 0, "R1", 0),
+                wire("w2", "R1", 1, "R2", 0),
+                wire("w3", "R2", 1, "V1", 1),
+                wire("w4", "V1", 1, "GND", 0),
+            ),
+        )
+        val solution = solve(circuit)
+        assertClose("the current is 6 × 10^-15 A", 6e-15, solution.totalSourceCurrent, 1e-18)
+        assertEquals("the equivalent resistance is 2 × 10^15 ohms", 2e15, solution.equivalentResistance!!, 1e9)
+    }
+
     // ------------------------------------------------------------- the checks
 
     @Test fun theCurrentFollowsKirchhoffsCurrentLawAtEveryNode() {

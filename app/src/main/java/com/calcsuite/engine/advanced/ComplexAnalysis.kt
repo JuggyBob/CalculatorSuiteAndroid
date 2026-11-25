@@ -106,6 +106,9 @@ object ComplexAnalysis {
         contour: Contour,
         samples: Int = 2000,
     ): ComplexNum? {
+        // Simpson's rule needs an even number of steps; a smaller or odd count
+        // cannot give a trustworthy value, so the integral is not attempted.
+        if (samples < 2 || samples % 2 != 0) return null
         val z = { node: Node, environment: Map<String, ComplexNum> ->
             ComplexEvaluator.eval(node, environment)
         }
@@ -218,24 +221,32 @@ object ComplexAnalysis {
         )
 
         // The residue is the coefficient of (z − z₀)^(−1). For a simple pole
-        // that is the limit above; for a pole of higher order it is the
-        // (order − 1)-st derivative of (z − z₀)^order·f(z) at the point, over
-        // the factorial.
-        val residue = when (classification) {
-            Singularity.REMOVABLE -> ComplexNum(0.0, 0.0)
-            Singularity.SIMPLE_POLE -> limit
-            else -> higherOrderResidue(function, variable, at, order)
+        // that is the limit above; for a higher-order pole it is picked out
+        // from (z − z₀)^order·f(z) on a small circle.
+        val residue = when {
+            classification == Singularity.REMOVABLE -> ComplexNum(0.0, 0.0)
+            classification == Singularity.SIMPLE_POLE -> limit
+            order <= 6 -> higherOrderResidue(function, variable, at, order)
+            else -> null
         }
-        steps.add("The residue is ${residue.cartesian()}.")
+        steps.add(
+            if (residue == null) {
+                "The residue of a pole above order six is not computed."
+            } else {
+                "The residue is ${residue.cartesian()}."
+            },
+        )
         return SingularityResult(classification, residue, order, steps)
     }
 
     /**
-     * The residue at a pole of order `k`, which is the (k − 1)-st derivative
-     * of `(z − z₀)^k·f(z)` at the point, over `(k − 1)!`.
+     * The residue at a pole of order `k`.
      *
-     * The derivative is taken by a central difference, so the answer is a
-     * numerical estimate.
+     * With `g(z) = (z − z₀)^k·f(z)`, which is analytic at the point, the
+     * residue is the coefficient of `(z − z₀)^(k−1)` in `g`. Averaging `g`
+     * around a small circle picks out exactly that coefficient: the other
+     * Fourier modes cancel. This works for every order and never asks for the
+     * value of `f` at the singularity itself.
      */
     private fun higherOrderResidue(
         function: Node,
@@ -243,42 +254,32 @@ object ComplexAnalysis {
         at: ComplexNum,
         order: Int,
     ): ComplexNum {
-        val h = 1e-4
-        fun g(offset: ComplexNum): ComplexNum? {
-            val point = at + offset
-            val value = evaluate(function, variable, point) ?: return null
+        val radius = 1e-3
+        val samples = 32
+        var scale = 1.0
+        repeat(order - 1) { scale *= radius }
+        var sum = ComplexNum(0.0, 0.0)
+        for (k in 0 until samples) {
+            val angle = 2 * Math.PI * k / samples
+            val offset = ComplexNum.euler(angle) * ComplexNum(radius, 0.0)
+            val value = evaluate(function, variable, at + offset) ?: return ComplexNum(0.0, 0.0)
             var product = value
             repeat(order) { product = product * offset }
-            return product
+            if (!product.modulus.isFinite()) return ComplexNum(0.0, 0.0)
+            sum = sum + product * ComplexNum.euler(-(order - 1) * angle)
         }
-        val derivative = when (order) {
-            2 -> {
-                val forward = g(ComplexNum(h, 0.0)) ?: return ComplexNum(0.0, 0.0)
-                val backward = g(ComplexNum(-h, 0.0)) ?: return ComplexNum(0.0, 0.0)
-                (forward - backward) / ComplexNum(2 * h, 0.0)
-            }
-            3 -> {
-                val a = g(ComplexNum(h, 0.0)) ?: return ComplexNum(0.0, 0.0)
-                val b = g(ComplexNum(0.0, 0.0)) ?: return ComplexNum(0.0, 0.0)
-                val c = g(ComplexNum(-h, 0.0)) ?: return ComplexNum(0.0, 0.0)
-                (a - ComplexNum(2.0, 0.0) * b + c) / ComplexNum(h * h, 0.0)
-            }
-            else -> {
-                // For a higher order the residue is not computed here, and the
-                // tool says so rather than guessing.
-                return ComplexNum(0.0, 0.0)
-            }
-        }
-        var factorial = 1.0
-        for (i in 1 until order) factorial *= i
-        return derivative / ComplexNum(factorial, 0.0)
+        return sum / ComplexNum(samples * scale, 0.0)
     }
 
     /**
      * The limit of `(z − z₀)^k·f(z)` as `z` approaches `z₀`.
      *
-     * The limit is taken along several directions and the values are averaged,
-     * which is a numerical estimate of the limit rather than a proof of it.
+     * The product is sampled on a small cross. When the largest sample grows
+     * as the step shrinks, this power is below the order of the pole and the
+     * product diverges. When it stays bounded the power is the order, and two
+     * step sizes cancel the leading sampling error; an absolute settling test
+     * would reject a genuine limit that approaches it only linearly in the
+     * step. The result is a numerical estimate, not a proof.
      */
     private fun limitOfProduct(
         function: Node,
@@ -287,6 +288,7 @@ object ComplexAnalysis {
         power: Int,
     ): ComplexNum? {
         var previous: ComplexNum? = null
+        var previousLargest = 0.0
         for (step in listOf(1e-2, 1e-3, 1e-4, 1e-5, 1e-6)) {
             val directions = listOf(
                 ComplexNum(step, 0.0),
@@ -295,31 +297,35 @@ object ComplexAnalysis {
                 ComplexNum(-step, step),
             )
             var sum = ComplexNum(0.0, 0.0)
+            var largest = 0.0
             var count = 0
             for (direction in directions) {
                 val point = at + direction
                 val value = evaluate(function, variable, point) ?: return null
                 var product = value
                 repeat(power) { product = product * direction }
-                if (!product.modulus.isFinite()) return null
+                val size = product.modulus
+                if (!size.isFinite()) return null
+                largest = maxOf(largest, size)
                 sum = sum + product
                 count++
             }
             if (count == 0) return null
             val average = sum / ComplexNum(count.toDouble(), 0.0)
+            if (!average.modulus.isFinite()) return null
             val earlier = previous
             if (earlier != null) {
-                val difference = abs(average.re - earlier.re) + abs(average.im - earlier.im)
-                val size = maxOf(average.modulus, 1.0)
-                if (difference < 1e-3 * size) {
-                    // The values have settled, so this is the limit.
-                    return average
-                }
-                // The values are not settling, so the limit does not exist for
-                // this power: the point is a pole of a higher order.
-                return null
+                // The cross shrinks tenfold each round, so a bounded product
+                // cannot double; growth means this power is too low.
+                if (largest > 2.0 * previousLargest) return null
+                // Remove the leading O(step) error of the asymmetric cross.
+                return ComplexNum(
+                    (10.0 * average.re - earlier.re) / 9.0,
+                    (10.0 * average.im - earlier.im) / 9.0,
+                )
             }
             previous = average
+            previousLargest = largest
         }
         return previous
     }

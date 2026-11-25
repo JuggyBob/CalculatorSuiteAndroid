@@ -64,6 +64,40 @@ class UpdateService(private val source: ReleaseSource) {
 /** Thrown when a package could not be downloaded. */
 class DownloadFailure(message: String) : Exception(message)
 
+/** The fallback name used when a release asset does not supply a plain file name. */
+private const val LOCAL_APK_NAME = "release.apk"
+
+/**
+ * Turns the name of a remote asset into a plain file name inside the updates
+ * folder.
+ *
+ * Release metadata is remote input: a name with a path in it (`../../x`, `a/b`,
+ * an absolute path, `.` or `..`) is never used as a file name. Such a name
+ * falls back to a fixed local name, so the download always stays in the folder
+ * the app owns.
+ */
+internal fun safeDownloadName(assetName: String): String {
+    val name = assetName.trim()
+    if (name.isEmpty() || name == "." || name == ".." ||
+        name.contains('/') || name.contains('\\') || File(name).name != name
+    ) {
+        return LOCAL_APK_NAME
+    }
+    return name
+}
+
+/**
+ * The canonical name of a digest algorithm this app checks, or null when the
+ * algorithm is not one of the two it supports.
+ */
+fun supportedDigest(algorithm: String): String? = when (
+    algorithm.trim().lowercase().replace("-", "")
+) {
+    "sha256" -> "SHA-256"
+    "sha512" -> "SHA-512"
+    else -> null
+}
+
 /**
  * Downloads the package of a release.
  *
@@ -72,6 +106,11 @@ class DownloadFailure(message: String) : Exception(message)
  * cut short is never mistaken for a finished one.
  */
 class ApkDownloader(private val folder: File) {
+
+    companion object {
+        /** The largest package this app is willing to write (512 MiB). */
+        const val MAX_DOWNLOAD_BYTES = 512L * 1024L * 1024L
+    }
 
     /**
      * Downloads the asset and returns the finished file.
@@ -82,8 +121,13 @@ class ApkDownloader(private val folder: File) {
     suspend fun download(asset: ReleaseAsset, onProgress: (Long, Long) -> Unit): File =
         withContext(Dispatchers.IO) {
             if (!folder.exists()) folder.mkdirs()
-            val target = File(folder, asset.name)
-            val partial = File(folder, asset.name + ".part")
+            // Never build a path out of a name supplied by the release JSON.
+            val localName = safeDownloadName(asset.name)
+            val target = File(folder, localName)
+            val partial = File(folder, "$localName.part")
+            if (!SafeLinks.isAllowedReleaseHost(asset.downloadUrl)) {
+                throw DownloadFailure("The download does not come from GitHub.")
+            }
             val connection = (URL(asset.downloadUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 20_000
@@ -92,12 +136,20 @@ class ApkDownloader(private val folder: File) {
             }
             try {
                 val status = connection.responseCode
+                // responseCode follows redirects; refuse a redirected address
+                // that is no longer one of GitHub's hosts.
+                if (!SafeLinks.isAllowedReleaseHost(connection.url.toString())) {
+                    throw DownloadFailure("The download was redirected away from GitHub.")
+                }
                 if (status !in 200..299) {
                     throw DownloadFailure(
                         "The download could not be started (the server answered with $status).",
                     )
                 }
                 val total = connection.contentLengthLong
+                if (total > MAX_DOWNLOAD_BYTES) {
+                    throw DownloadFailure("The download is too large to save on this phone.")
+                }
                 connection.inputStream.use { input ->
                     partial.outputStream().use { output ->
                         val chunk = ByteArray(64 * 1024)
@@ -108,6 +160,9 @@ class ApkDownloader(private val folder: File) {
                             }
                             val read = input.read(chunk)
                             if (read <= 0) break
+                            if (written + read > MAX_DOWNLOAD_BYTES) {
+                                throw DownloadFailure("The download is too large to save on this phone.")
+                            }
                             output.write(chunk, 0, read)
                             written += read
                             onProgress(written, if (total > 0) total else 0L)
@@ -120,14 +175,21 @@ class ApkDownloader(private val folder: File) {
                 if (total > 0 && partial.length() != total) {
                     throw DownloadFailure("The download was cut short. Try again.")
                 }
-                // The digest the release publishes, when there is one.
-                val digest = asset.digestParts
-                if (digest != null) {
-                    val algorithm = digest.first
-                    val expected = digest.second
+                // A digest is checked only when the release published one:
+                // GitHub does not publish digests for every asset, and the
+                // signature check in ApkInstaller (plus the person's own
+                // confirmation in the system installer) is the anchor of trust
+                // when it is absent. A digest that *is* present must be one we
+                // can actually verify, so an unreadable or unsupported one
+                // fails instead of silently skipping the check.
+                if (asset.digest != null) {
+                    val digest = asset.digestParts
+                        ?: throw DownloadFailure("The digest of the release could not be read.")
+                    val algorithm = supportedDigest(digest.first)
+                        ?: throw DownloadFailure("The digest of the release uses an unsupported algorithm.")
                     val actual = hashOf(partial, algorithm)
                         ?: throw DownloadFailure("The download could not be checked.")
-                    if (!actual.equals(expected, ignoreCase = true)) {
+                    if (!actual.equals(digest.second, ignoreCase = true)) {
                         throw DownloadFailure(
                             "The download does not match the digest of the release. It was not saved.",
                         )
@@ -167,11 +229,14 @@ class ApkDownloader(private val folder: File) {
 }
 
 /**
- * The digest of a file, or null when the algorithm is not one that is known.
+ * The digest of a file, or null when the algorithm is not one this app
+ * supports. Only SHA-256 and SHA-512 are accepted; a name supplied in release
+ * metadata must never choose an arbitrary provider algorithm.
  */
 fun hashOf(file: File, algorithm: String): String? {
+    val canonical = supportedDigest(algorithm) ?: return null
     val digest = try {
-        MessageDigest.getInstance(algorithm)
+        MessageDigest.getInstance(canonical)
     } catch (e: Exception) {
         return null
     }

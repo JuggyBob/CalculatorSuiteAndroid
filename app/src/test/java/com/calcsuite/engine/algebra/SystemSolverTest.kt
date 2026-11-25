@@ -234,4 +234,46 @@ class SystemSolverTest {
         val result = SystemSolver.solve("2z + 3y = 12", "x + y = 1")
         assertTrue("the equation is refused", result is CalcResult.Err)
     }
+
+    @Test fun inconsistentParallelLinesAreNotInfiniteForEveryMethod() {
+        for (method in listOf(
+            SystemMethod.Cramer,
+            SystemMethod.Substitution,
+            SystemMethod.Elimination,
+            SystemMethod.Comparison,
+        )) {
+            val answer = solve("x + y = 1", "x + y = 2", method)
+            assertEquals(
+                "$method must see the contradiction: ${answer.message}",
+                SystemOutcome.NoRealSolution,
+                answer.outcome,
+            )
+        }
+    }
+
+    @Test fun aContradictoryZeroRowIsNotReportedAsInfinite() {
+        val answer = solve("0 = 5", "0 = 0", SystemMethod.Cramer)
+        assertEquals(SystemOutcome.NoRealSolution, answer.outcome)
+    }
+
+    @Test fun eliminationDoesNotDivideByZeroOnABlankRow() {
+        val answer = solve("0 = 0", "2x + y = 3", SystemMethod.Elimination)
+        assertEquals(SystemOutcome.Unsupported, answer.outcome)
+    }
+
+    @Test fun aSystemWithoutYDoesNotDivideByZero() {
+        val answer = solve("x^2 = 4", "x = 2", SystemMethod.Elimination)
+        assertEquals(SystemOutcome.Infinite, answer.outcome)
+        assertTrue(answer.message.contains("not determined"))
+    }
+
+    @Test fun theFailureMessageNamesTheEquationThatWasActuallyRead() {
+        // The old mutable parse-failure field could report a previous call's reason.
+        SystemSolver.solve("2x + ", "x + y = 5")
+        val result = SystemSolver.solve("x + y = 5", "2x = 3 = 4")
+        assertTrue("the system should be refused", result is CalcResult.Err)
+        val message = (result as CalcResult.Err).error.message
+        assertTrue("the message should name the second equation: $message", message.contains("second"))
+        assertTrue("the message should give the real reason: $message", message.contains("one \"=\""))
+    }
 }

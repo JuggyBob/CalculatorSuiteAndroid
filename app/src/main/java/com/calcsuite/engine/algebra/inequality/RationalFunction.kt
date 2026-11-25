@@ -82,13 +82,16 @@ fun IExpr.toRationalFunction(variable: String): RatFun? {
         }
         is IExpr.Pow -> {
             val exponent = (b as? IExpr.Num)?.value?.toBigIntegerOrNull() ?: return null
+            // coerceAtMost used to silently turn x^65 into x^64 and give a
+            // confidently wrong answer. Let the numeric path handle big powers.
+            if (exponent.abs() > java.math.BigInteger.valueOf(64)) return null
             val base = a
             if (exponent.signum() >= 0) {
                 var acc = constant(Rat.ONE)
-                repeat(exponent.toInt().coerceAtMost(64)) { acc = acc * (base.toRationalFunction(variable) ?: return null) }
+                repeat(exponent.toInt()) { acc = acc * (base.toRationalFunction(variable) ?: return null) }
                 acc
             } else {
-                val positive = exponent.negate().toInt().coerceAtMost(64)
+                val positive = exponent.negate().toInt()
                 var acc = constant(Rat.ONE)
                 repeat(positive) { acc = acc * (base.toRationalFunction(variable) ?: return null) }
                 if (acc.num.isZero()) return null

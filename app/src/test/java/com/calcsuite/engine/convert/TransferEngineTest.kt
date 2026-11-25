@@ -104,7 +104,13 @@ class TransferEngineTest {
     @Test
     fun negativeRateIsRejectedByTransferTime() {
         val result = TransferEngine.transferTime(BigDecimal.ONE, "GB", BigDecimal("-100"), "Mbit_s")
-        expectError(ErrorKind.DivisionByZero, result, "greater than zero")
+        expectError(ErrorKind.Domain, result, "greater than zero")
+    }
+
+    @Test
+    fun negativeDurationIsRejectedByRequiredRate() {
+        val result = TransferEngine.requiredRate(BigDecimal.ONE, "GB", BigDecimal("-1"), false)
+        expectError(ErrorKind.Domain, result, "Duration")
     }
 
     @Test

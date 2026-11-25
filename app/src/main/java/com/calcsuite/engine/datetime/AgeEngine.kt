@@ -12,6 +12,7 @@ import java.time.LocalTime
 import java.time.Period
 import java.time.Year
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /**
  * Age between a birth date and a reference date.
@@ -123,13 +124,19 @@ object AgeEngine {
     fun dateOf(year: Int, month: Int, day: Int): CalcResult<LocalDate> = try {
         ok(LocalDate.of(year, month, day))
     } catch (_: DateTimeException) {
-        err(ErrorKind.InvalidInput, "%04d-%02d-%02d is not a valid calendar date".format(year, month, day))
+        err(
+            ErrorKind.InvalidInput,
+            "%04d-%02d-%02d is not a valid calendar date".format(Locale.ROOT, year, month, day),
+        )
     }
 
     /** Builds a time from user-entered parts, reporting invalid values. */
     fun timeOf(hour: Int, minute: Int, second: Int = 0): CalcResult<LocalTime> = try {
         ok(LocalTime.of(hour, minute, second))
     } catch (_: DateTimeException) {
-        err(ErrorKind.InvalidInput, "%02d:%02d:%02d is not a valid time of day".format(hour, minute, second))
+        err(
+            ErrorKind.InvalidInput,
+            "%02d:%02d:%02d is not a valid time of day".format(Locale.ROOT, hour, minute, second),
+        )
     }
 }

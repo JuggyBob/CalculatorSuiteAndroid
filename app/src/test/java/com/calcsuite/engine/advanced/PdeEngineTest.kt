@@ -2,6 +2,7 @@ package com.calcsuite.engine.advanced
 
 import com.calcsuite.core.CalcResult
 import com.calcsuite.engine.calculus.CalculusParser
+import com.calcsuite.engine.calculus.Evaluator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -533,5 +534,125 @@ class PdeEngineTest {
             solution.values[i][j],
             1e-6,
         )
+    }
+
+    @Test fun precomputingTheSourceLeavesTheAnswerUnchanged() {
+        // The source used to be evaluated inside the sweep. This reference is
+        // that original formula, including its stopping rule, so that every
+        // published value has to match it exactly.
+        val boundary = parse("sin(pi*x)")
+        val source = parse("1 + x + y")
+        val n = 17
+        val maxSweeps = 800
+        val answer = PdeEngine.solve2D(
+            kind = PdeKind.POISSON,
+            boundary = boundary,
+            source = source,
+            xVar = "x",
+            yVar = "y",
+            size = 1.0,
+            gridPoints = n,
+            iterations = maxSweeps,
+        )!!
+
+        val h = 1.0 / (n - 1)
+        val reference = Array(n) { DoubleArray(n) }
+        for (i in 0 until n) {
+            for (j in 0 until n) {
+                if (i == 0 || i == n - 1 || j == 0 || j == n - 1) {
+                    reference[i][j] = Evaluator.eval(
+                        boundary,
+                        mapOf("x" to j * h, "y" to i * h),
+                    ).valueOrNull() ?: 0.0
+                }
+            }
+        }
+        var referenceSweeps = 0
+        for (iteration in 1..maxSweeps) {
+            var largestChange = 0.0
+            for (i in 1 until n - 1) {
+                for (j in 1 until n - 1) {
+                    val f = Evaluator.eval(
+                        source,
+                        mapOf("x" to j * h, "y" to i * h),
+                    ).valueOrNull() ?: 0.0
+                    val old = reference[i][j]
+                    val updated = (reference[i - 1][j] + reference[i + 1][j] +
+                        reference[i][j - 1] + reference[i][j + 1] - h * h * f) / 4.0
+                    reference[i][j] = updated
+                    val change = abs(updated - old)
+                    if (change > largestChange) largestChange = change
+                }
+            }
+            referenceSweeps = iteration
+            if (largestChange < 1e-8) break
+        }
+
+        assertEquals("the number of sweeps must not change", referenceSweeps, answer.iterations)
+        for (i in 0 until n) {
+            for (j in 0 until n) {
+                assertEquals(
+                    "the value at ($i, $j) must match the original formula",
+                    reference[i][j],
+                    answer.values[i][j],
+                    1e-12,
+                )
+            }
+        }
+
+        // The known torsion answer is still reproduced by the constant source.
+        val known = PdeEngine.solve2D(
+            kind = PdeKind.POISSON,
+            boundary = parse("0"),
+            source = parse("1"),
+            xVar = "x",
+            yVar = "y",
+            size = 1.0,
+            gridPoints = 30,
+            iterations = 5000,
+        )!!
+        assertEquals("the middle of the square", -0.0737, known.values[15][15], 0.002)
+    }
+
+    @Test fun anUnusableSourceValueActsAsZero() {
+        // The source overflows on every point. As before, an unreadable or
+        // non-finite source value contributes zero rather than spreading
+        // NaN or infinity through the relaxation.
+        val solution = PdeEngine.solve2D(
+            kind = PdeKind.POISSON,
+            boundary = parse("0"),
+            source = parse("1e308*1e308"),
+            xVar = "x",
+            yVar = "y",
+            size = 1.0,
+            gridPoints = 9,
+            iterations = 100,
+        )!!
+        for (row in solution.values) {
+            for (value in row) {
+                assertEquals("an unusable source must contribute zero", 0.0, value, 1e-12)
+            }
+        }
+    }
+
+    @Test fun theLargestGridStaysFinite() {
+        val solution = PdeEngine.solve2D(
+            kind = PdeKind.POISSON,
+            boundary = parse("sin(pi*x)"),
+            source = parse("1 + x + y"),
+            xVar = "x",
+            yVar = "y",
+            size = 1.0,
+            gridPoints = PdeEngine.MAX_POINTS,
+            iterations = 200,
+        )!!
+        assertEquals(PdeEngine.MAX_POINTS, solution.x.size)
+        assertEquals(PdeEngine.MAX_POINTS, solution.values.size)
+        assertEquals(200, solution.iterations)
+        for (row in solution.values) {
+            for (value in row) {
+                assertTrue("a value on the largest grid was not finite: $value", value.isFinite())
+            }
+        }
     }
 }

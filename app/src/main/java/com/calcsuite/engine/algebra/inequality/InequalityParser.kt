@@ -58,6 +58,9 @@ object InequalityParser {
 
     private const val FUNCTIONS = "sqrt,cbrt,abs,ln,log,log2,exp,sin,cos,tan,asin,acos,atan,sign,floor,ceil,round,fact"
 
+    /** Deepest expression nesting accepted; deeper input would exhaust the stack. */
+    private const val MAX_NESTING_DEPTH = 128
+
     // ------------------------------------------------------------- tokenizer
 
     private fun tokenize(input: String): List<Token> {
@@ -143,6 +146,22 @@ object InequalityParser {
 
         /** How many absolute-value bars are currently open. */
         private var absDepth = 0
+
+        /** How many nested expressions are currently being parsed. */
+        private var nestingDepth = 0
+
+        /** Guards every recursive descent into a nested expression. */
+        private inline fun <T> deeper(block: () -> T): T {
+            nestingDepth++
+            if (nestingDepth > MAX_NESTING_DEPTH) {
+                throw InequalityParseException("The inequality is nested too deeply")
+            }
+            return try {
+                block()
+            } finally {
+                nestingDepth--
+            }
+        }
 
         private fun peek(): Token = tokens[pos]
 
@@ -256,11 +275,11 @@ object InequalityParser {
         private fun parseFactor(): IExpr {
             if (peek().type == T.MINUS) {
                 advance()
-                return IExpr.Neg(parseFactor())
+                return IExpr.Neg(deeper { parseFactor() })
             }
             if (peek().type == T.PLUS) {
                 advance()
-                return parseFactor()
+                return deeper { parseFactor() }
             }
             return parsePower()
         }
@@ -269,7 +288,7 @@ object InequalityParser {
             val base = parsePrimary()
             if (peek().type == T.CARET) {
                 advance()
-                return IExpr.Pow(base, parseFactor())
+                return IExpr.Pow(base, deeper { parseFactor() })
             }
             return base
         }
@@ -285,7 +304,7 @@ object InequalityParser {
                     // |expression| — absolute value.
                     advance()
                     absDepth++
-                    val inner = parseExpression()
+                    val inner = deeper { parseExpression() }
                     absDepth--
                     if (peek().type != T.PIPE) {
                         throw InequalityParseException("Absolute value needs a closing |")
@@ -295,13 +314,13 @@ object InequalityParser {
                 }
                 T.LPAREN -> {
                     advance()
-                    val inner = parseExpression()
+                    val inner = deeper { parseExpression() }
                     expect(T.RPAREN, "a closing bracket")
                     return inner
                 }
                 T.LBRACKET -> {
                     advance()
-                    val inner = parseExpression()
+                    val inner = deeper { parseExpression() }
                     expect(T.RBRACKET, "a closing bracket")
                     return inner
                 }
@@ -312,10 +331,10 @@ object InequalityParser {
                         advance()
                         val args = mutableListOf<IExpr>()
                         if (peek().type != T.RPAREN) {
-                            args.add(parseExpression())
+                            args.add(deeper { parseExpression() })
                             while (peek().type == T.COMMA) {
                                 advance()
-                                args.add(parseExpression())
+                                args.add(deeper { parseExpression() })
                             }
                         }
                         expect(T.RPAREN, "a closing bracket")
@@ -349,19 +368,25 @@ object InequalityParser {
         if (text.any { it == '=' && text.contains("==") }) {
             throw InequalityParseException("An inequality needs a single comparison, such as <, >, ≤ or ≥")
         }
-        val parser = Parser(tokenize(text))
-        val relation = parser.parseSystem()
-        val variables = relationVariables(relation)
-        if (variables.size > expectedVariables) {
-            throw InequalityParseException(
-                "This tool solves in one variable, but the input mentions ${variables.joinToString(", ")}",
-            )
+        return try {
+            val parser = Parser(tokenize(text))
+            val relation = parser.parseSystem()
+            val variables = relationVariables(relation)
+            if (variables.size > expectedVariables) {
+                throw InequalityParseException(
+                    "This tool solves in one variable, but the input mentions ${variables.joinToString(", ")}",
+                )
+            }
+            if (variables.isEmpty()) {
+                throw InequalityParseException("The inequality needs a variable, for example x")
+            }
+            val ordered = variables.sortedBy { VARIABLE_ORDER.indexOf(it).let { if (it < 0) 99 else it } }
+            ParsedInequality(relation, ordered.first(), ordered, parser.chainCount, countRelations(relation))
+        } catch (_: StackOverflowError) {
+            // A last resort if a future grammar change adds recursion the depth
+            // counter does not cover. Keep the parser's existing error shape.
+            throw InequalityParseException("The inequality is nested too deeply")
         }
-        if (variables.isEmpty()) {
-            throw InequalityParseException("The inequality needs a variable, for example x")
-        }
-        val ordered = variables.sortedBy { VARIABLE_ORDER.indexOf(it).let { if (it < 0) 99 else it } }
-        return ParsedInequality(relation, ordered.first(), ordered, parser.chainCount, countRelations(relation))
     }
 
     /** The conventional order for variables, so x comes before y before z. */

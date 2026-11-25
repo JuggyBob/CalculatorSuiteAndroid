@@ -102,7 +102,9 @@ class SeriesParallelReducer(
             if (parallel != null) {
                 val first = parallel[0]
                 val second = parallel[1]
-                val combined = first.resistance * second.resistance / (first.resistance + second.resistance)
+                // Add the conductances rather than multiplying the resistances:
+                // the product of two large ones would overflow to infinity.
+                val combined = 1.0 / (1.0 / first.resistance + 1.0 / second.resistance)
                 steps.add(
                     Reduction(
                         kind = ReductionKind.PARALLEL,
@@ -136,8 +138,7 @@ class SeriesParallelReducer(
                 }
             }
             val series = degrees.entries.firstOrNull { entry ->
-                entry.value.size == 2 && entry.value.none { it.isSource } &&
-                    entry.value[0].a != entry.value[1].a
+                entry.value.size == 2 && entry.value.none { it.isSource }
             }
             if (series != null) {
                 val first = series.value[0]
@@ -155,14 +156,15 @@ class SeriesParallelReducer(
                 )
                 edges.remove(first)
                 edges.remove(second)
-                val other = if (first.a == series.key) second.b else first.b
-                val end = if (first.a == series.key) first.b else second.b
+                // Both parts meet at the shared node; the combined part runs
+                // between the two *other* ends, not back through that node.
+                fun farEnd(edge: Edge): Int = if (edge.a == series.key) edge.b else edge.a
                 edges.add(
                     Edge(
                         id = first.id + "+" + second.id,
                         label = "${first.label} and ${second.label}",
-                        a = other,
-                        b = end,
+                        a = farEnd(first),
+                        b = farEnd(second),
                         resistance = combined,
                     ),
                 )

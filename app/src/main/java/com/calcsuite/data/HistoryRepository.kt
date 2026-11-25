@@ -43,8 +43,15 @@ class HistoryRepository(context: Context) {
 
     suspend fun add(entry: HistoryEntry) = store.edit { prefs ->
         val current = decode(prefs[KEY_HISTORY] ?: "")
-        val updated = (listOf(entry) + current).take(MAX_ENTRIES)
-        prefs[KEY_HISTORY] = encode(updated)
+        // Bound the new entry before it is written, so nothing oversized can
+        // accumulate even if a tool passes a very long summary or result.
+        val bounded = entry.copy(
+            input = HistoryLimits.limitText(entry.input),
+            result = HistoryLimits.limitText(entry.result),
+            values = HistoryLimits.limitValues(entry.values),
+        )
+        val updated = HistoryLimits.limitEntries(listOf(bounded) + current)
+        prefs[KEY_HISTORY] = encodeWithinLimit(updated)
     }
 
     /**
@@ -52,7 +59,8 @@ class HistoryRepository(context: Context) {
      * other calculation.
      *
      * Only the text of the answer is kept: the picture the problem was read
-     * from is never stored.
+     * from is never stored. A long answer is cut to the same [HistoryLimits]
+     * bound as any other result, so one copy cannot grow the history forever.
      */
     suspend fun addCopy(text: String) = add(
         HistoryEntry(
@@ -61,20 +69,20 @@ class HistoryRepository(context: Context) {
             toolTitle = "AI problem solver",
             category = "Calculator",
             input = "Problem solved from a picture",
-            result = text,
+            result = HistoryLimits.limitText(text),
             timestamp = System.currentTimeMillis(),
         ),
     )
 
     suspend fun remove(id: Long) = store.edit { prefs ->
         val current = decode(prefs[KEY_HISTORY] ?: "")
-        prefs[KEY_HISTORY] = encode(current.filterNot { it.id == id })
+        prefs[KEY_HISTORY] = encodeWithinLimit(current.filterNot { it.id == id })
     }
 
     suspend fun clear() = store.edit { prefs -> prefs.remove(KEY_HISTORY) }
 
     companion object {
-        const val MAX_ENTRIES = 500
+        const val MAX_ENTRIES = HistoryLimits.MAX_ENTRIES
         private val KEY_HISTORY = stringPreferencesKey("history_v1")
 
         fun encode(entries: List<HistoryEntry>): String {
@@ -105,6 +113,20 @@ class HistoryRepository(context: Context) {
         }
 
         /**
+         * Encodes the newest entries first, dropping the oldest until the
+         * whole document fits in [HistoryLimits.MAX_STORED_JSON_LENGTH].
+         */
+        private fun encodeWithinLimit(entries: List<HistoryEntry>): String {
+            var bounded = HistoryLimits.limitEntries(entries)
+            var json = encode(bounded)
+            while (json.length > HistoryLimits.MAX_STORED_JSON_LENGTH && bounded.isNotEmpty()) {
+                bounded = bounded.dropLast(1)
+                json = encode(bounded)
+            }
+            return json
+        }
+
+        /**
          * The values of an entry, read back.
          *
          * An entry that was saved before the values were kept has none, and
@@ -112,33 +134,42 @@ class HistoryRepository(context: Context) {
          */
         private fun readValues(obj: JSONObject?): Map<String, String> {
             if (obj == null) return emptyMap()
-            val out = mutableMapOf<String, String>()
+            val out = LinkedHashMap<String, String>(HistoryLimits.MAX_VALUES_PER_ENTRY)
             val keys = obj.keys()
-            while (keys.hasNext()) {
+            while (keys.hasNext() && out.size < HistoryLimits.MAX_VALUES_PER_ENTRY) {
                 val name = keys.next()
                 val value = obj.opt(name)
-                if (value is String && value.isNotBlank()) out[name] = value
+                if (value is String && value.isNotBlank()) {
+                    out[name] = HistoryLimits.limitValue(value)
+                }
             }
             return out
         }
 
         fun decode(json: String): List<HistoryEntry> {
             if (json.isBlank()) return emptyList()
+            if (!HistoryLimits.jsonWithinLimit(json)) return emptyList()
             return try {
                 val array = JSONArray(json)
-                (0 until array.length()).mapNotNull { i ->
+                // A hostile document may contain far more entries than the cap.
+                val count = minOf(array.length(), HistoryLimits.MAX_ENTRIES)
+                (0 until count).mapNotNull { i ->
                     val obj = array.optJSONObject(i) ?: return@mapNotNull null
                     HistoryEntry(
                         id = obj.optLong("id"),
                         toolId = obj.optString("toolId"),
                         toolTitle = obj.optString("toolTitle"),
                         category = obj.optString("category"),
-                        input = obj.optString("input"),
-                        result = obj.optString("result"),
+                        input = HistoryLimits.limitText(obj.optString("input")),
+                        result = HistoryLimits.limitText(obj.optString("result")),
                         timestamp = obj.optLong("timestamp"),
                         values = readValues(obj.optJSONObject("values")),
                     )
                 }
+                // Deeply nested JSON can recurse until the stack is exhausted;
+                // that is just as unreadable as malformed JSON.
+            } catch (_: StackOverflowError) {
+                emptyList()
             } catch (_: Exception) {
                 emptyList()
             }

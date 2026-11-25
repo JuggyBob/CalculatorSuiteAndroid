@@ -34,14 +34,14 @@ Source root: `app/src/main/java/com/calcsuite/`
 | `engine.electrical` | The circuit model, the topology, the DC solver (modified nodal analysis), the validator, the explainer, the series/parallel reducer, the units and the electrical calculators | No |
 | `engine.advanced` | The advanced mathematics: complex numbers and analysis, matrices and linear algebra, the Fourier engine, the finite-difference PDE engine, the measure and topology models, and the shared `Explanation` model | No |
 | `data` | `ToolRegistry` (the catalogue), `SettingsRepository`, `HistoryRepository`, `CurrencyRepository`, `CircuitRepository`, `ToolDestinations` (which AI tool opens which screen), icon definitions | Yes |
-| `updater` | The in-app update: the version rules, the release model and its JSON reader, the GitHub release client, the download, the package checks and the notes reader | Partly (HTTP, the package manager) |
+| `updater` | The in-app update: the version rules, the prompt policy, the release model and its JSON reader, the GitHub release client, safe-link checking, the download, the package checks and the notes reader | Partly (HTTP, the package manager) |
 | `ai` | The AI feature: the ten providers, the HTTP client, the credential store, the image loader, the tool registry and the pipeline | Yes (keystore, HTTP) |
 | `ui.components` | Shared Compose widgets: scaffolding, forms, result cards, inputs, formatting | Yes |
-| `ui.screens` | Main menu, categories, search, history, settings, scientific, onboarding, the calculator panel | Yes |
-| `ui.theme` | Colour, typography, shape, `CalcSuiteTheme` | Yes |
+| `ui.screens` | Main menu, categories, search, history, settings (a hub plus four pages), scientific, onboarding, the calculator panel | Yes |
+| `ui.theme` | Colour, typography, shape, `CalcSuiteTheme`, the four theme modes and `AppNightMode` | Yes |
 | `ui.tools` | One screen per tool, grouped by category, plus per-domain dispatchers | Yes |
 | `ui.ai` | The AI problem solver: its screen, its settings screen and its view model | Yes |
-| `ui.update` | The update card and the About dialog, and the view model that drives them | Yes |
+| `ui.update` | The startup `UpdateGate`, the update card on the About page and the About dialog, and the view model that drives them | Yes |
 
 **The rule:** `core`, `expr` and every `engine.*` package must compile and run without the Android framework. `java.math`, `java.time` and the rest of the JDK are fine; `android.*` is not.
 
@@ -89,16 +89,16 @@ The string stored in history is the **formatted** display string, while the copy
 
 ## The tool registry
 
-`data/ToolRegistry.kt` is the single source of truth for all 66 tools:
+`data/ToolRegistry.kt` is the single source of truth for all 66 tools, spread across nine categories: Algebra (10), Geometry (2), Converters (23), Finance (6), Health (3), Date & Time (3), Other (2), Calculus (14) and Advanced Math (3).
 
 ```kotlin
 ToolDef(
-    id = "algebra.calculus",
-    title = "Calculus",
+    id = "algebra.percentage",
+    title = "Percentage",
     category = ToolCategory.ALGEBRA,
-    description = "Derivatives, integrals, limits, series, equations and graphs",
-    synonyms = listOf("derivative", "integral", "limit", "series", "taylor"),
-    icon = CalculusIcon,
+    description = "Percent of a number, percent change, percentage points",
+    synonyms = listOf("percent", "%", "increase", "decrease", "discount", "change"),
+    icon = PercentIcon,
 )
 ```
 
@@ -135,7 +135,7 @@ Routes.MAIN ──▶ CategoryScreen ──▶ ToolHostScreen ──▶ <Domain>
 
 Routes are string constants in `Routes`. `onOpenTool` marks the tool as recently used and pushes `tool/{toolId}`; `ToolHostScreen` resolves the id through `ToolRegistry.byId`, and an id that is not in this build gets a screen that says so instead of an empty page.
 
-A tool may be **renamed** without breaking the things that point at it. `ToolRegistry` keeps a table of the ids that have changed, so a history entry, a favourite or a recently-used item made with the old id still opens the tool that is there now.
+A tool may be **renamed** without breaking the things that point at it. `ToolRegistry` keeps a table of legacy ids as aliases — `algebra.calculus` resolves to `calculus.derivatives`, and `other.ohms_law` to `other.electrical_circuits`, both dating from before the Calculus category existed. These are aliases rather than extra tools: `byId` maps them to the current tool, so a history entry, a favourite or a recently-used item made with an old id still opens the tool that is there now.
 
 Above the `NavHost`, `CalcSuiteApp` shows the onboarding flow while `settings.onboardingComplete` is false. Settings are collected as a **nullable** value so the welcome pages cannot flash for a user who has already been through them.
 
@@ -229,10 +229,10 @@ Three repositories over one shared DataStore instance (`Context.appDataStore`, n
 
 | Repository | Keys | Shape |
 |---|---|---|
-| `SettingsRepository` | `theme_mode`, `angle_mode`, `precision`, `grouping`, `thousands_separator`, `haptics`, `dynamic_color`, `onboarding_complete`, `favorites`, `recents` | Scalars and small collections |
+| `SettingsRepository` | `theme_mode`, `accent`, `angle_mode`, `precision`, `grouping`, `thousands_separator`, `haptics`, `dynamic_color`, `onboarding_complete`, `favorites`, `recents` | Scalars and small collections |
 | `HistoryRepository` | `history` | A JSON array of entries, capped at 500, oldest dropped first |
 | `CurrencyRepository` | `currency_rates` | Rates plus the fetch timestamp, so results survive a restart and work offline |
-| `ReleaseCache` | `last_release`, `last_release_at` | The last release that was read, so the About screen can show its notes offline |
+| `ReleaseCache` | `last_release`, `last_release_at`, `suppressed_release_tags`, `last_auto_check` | The last release that was read, so the About screen can show its notes offline; the tags the user chose not to see again; and the time of the last automatic check |
 
 History is a JSON array rather than a database because it is a bounded, flat list — a database would be more machinery than the problem needs.
 
@@ -244,13 +244,17 @@ Three places, and no more.
 
 **The AI problem solver.** `ai/AiClient` sends one HTTPS `POST` to the provider the user chose, on `Dispatchers.IO`, with the picture as base64 in that provider's own image format, the question, the list of eligible tools and the user's API key in the provider's own authentication header. The transport is behind the `AiTransport` interface, so the whole path can be exercised with a fake transport and no network at all. The credential is held by `ai/AiConfigRepository`, which encrypts it with AES/GCM under a key in the Android keystore and never writes it in plain text.
 
-**The update check.** `updater/GitHubReleaseClient` reads the project's own releases from `api.github.com` with a single unauthenticated HTTPS `GET`, on `Dispatchers.IO`. The endpoint is the public one for the latest published release, so no token is embedded in the app and none is needed. The reply is parsed into a `ReleaseInfo`; the version of the release is compared with the installed one; and a release that publishes exactly one installable APK can be downloaded into the app's own cache and handed to Android's installer. The file is checked before it is offered — the digest the release publishes when it publishes one, and then the package name, the version code and the signing certificate. The app never installs anything by itself: Android shows its own confirmation.
+**The update check.** `updater/GitHubReleaseClient` reads the project's own releases from `api.github.com` with a single unauthenticated HTTPS `GET`, on `Dispatchers.IO`. The endpoint is the public one for the latest published release, so no token is embedded in the app and none is needed. The reply is parsed into a `ReleaseInfo`; the version of the release is compared with the installed one; and a release that publishes exactly one installable APK can be downloaded into the app's own cache and handed to Android's installer. The file is checked before it is offered — the digest the release publishes when it publishes one, and then the package name, the version code and the signing certificate. The app never installs anything by itself: Android shows its own confirmation. Release-page and download links are restricted to the project's GitHub host by `updater/SafeLinks.kt`.
+
+A startup gate, `ui/update/UpdateGate.kt`, drives the flow: it checks for a release when the app starts, but throttles automatic checks to one every three hours, recorded as `last_auto_check`. The decision of whether a found release becomes a popup is a pure rule in `ui/update/UpdatePromptPolicy.kt`, which considers the version rules, the throttle, cached notes and suppressed tags. The dialog appears only for a newer, installable release that the user has not asked to hide; only that release's tag is suppressed, so a later one can prompt again.
 
 There is no other network code in the project: no telemetry, no crash reporting and no font or icon download.
 
 ## Theme
 
-`CalcSuiteTheme` is the single theme entry point, resolving a `ThemeMode` plus an optional Android 12+ dynamic palette into a Material 3 `ColorScheme`. `MainActivity` separately keeps the *window* background and system-bar appearance in sync with the chosen mode, so there is no white flash on launch and the system bars match the app. The bars are hidden app-wide.
+`CalcSuiteTheme` is the single theme entry point, resolving a `ThemeMode` plus an optional Android 12+ dynamic palette into a Material 3 `ColorScheme`. There are four modes: **System**, **Light**, **Dark** and **Amoled**. Amoled uses true black (`#000000`) for its background and surfaces, so an AMOLED panel can switch those pixels off; it is a distinct scheme, not another name for Dark. `ui/theme/AppNightMode.kt` maps the chosen mode to an app-level night mode (`Auto`, `No` or `Yes`), which `MainActivity` applies alongside the window background and system-bar appearance so the bars match the app. The bars are hidden app-wide.
+
+One platform caveat: the system draws the *starting window* before the process exists, so the very first cold start cannot read the saved mode from DataStore. Applying the saved choice once at app level requests the matching night mode, but the platform starting window is resolved from the system configuration: on stock Android with the system in light mode the splash is still white (~1.2 s) even for Amoled, while MIUI launches dark. Only the app's first composed frame is guaranteed dark. The platform may recreate the activity once when the night mode changes; a guard, together with the helper's unchanged-value check, stops that from repeating.
 
 ## Orientation
 
@@ -258,17 +262,19 @@ Locked to portrait twice over: `android:screenOrientation="portrait"` in the man
 
 ## Testing
 
-1464 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
+1779 JUnit 4 tests, all JVM — no emulator, no instrumentation, no Robolectric. That is possible precisely because engines are pure Kotlin.
 
 ```
 app/src/test/java/com/calcsuite/engine/
-    algebra/     convert/     calculus/     datetime/
-    finance/     geometry/    health/       other/
+    advanced/    algebra/     calculus/     convert/
+    datetime/    electrical/  finance/      geometry/
+    health/      other/
+app/src/test/java/com/calcsuite/ui/       # UI logic: graph viewport, formatting, prompt policy
+app/src/test/java/com/calcsuite/updater/  # version rules, release reader, update decision, notes
+app/src/test/java/com/calcsuite/ai/       # tool registry and argument checking
 ```
 
-plus `app/src/test/java/com/calcsuite/updater/` for the version rules, the release reader, the update decision and the notes reader.
-
-plus `core/`, `expr/` and a few UI-logic tests (the graph viewport transform, formatting).
+plus `core/` and `expr/` for the shared numerics and the expression language.
 
 Conventions:
 

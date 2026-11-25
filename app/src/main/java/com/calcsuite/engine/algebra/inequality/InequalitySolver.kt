@@ -88,7 +88,16 @@ data class PlaneSystem(
  */
 object InequalitySolver {
 
-    fun solve(input: String, mode: InequalityMode = InequalityMode.SINGLE): InequalityResult {
+    fun solve(input: String, mode: InequalityMode = InequalityMode.SINGLE): InequalityResult =
+        try {
+            solveImpl(input, mode)
+        } catch (_: StackOverflowError) {
+            // Parsing has a depth guard; this covers any deeper recursive walk
+            // (absolute-value expansion, relation combination, expression use).
+            InequalityResult.Failed("The inequality is nested too deeply")
+        }
+
+    private fun solveImpl(input: String, mode: InequalityMode): InequalityResult {
         if (input.isBlank()) return InequalityResult.Failed("Enter an inequality to solve")
         val parsed = try {
             InequalityParser.parse(input, expectedVariables = if (mode == InequalityMode.TWO_VARIABLE) 2 else 1)
@@ -311,7 +320,9 @@ object InequalitySolver {
                 if (threshold.signum() < 0) {
                     impossible()
                 } else {
-                    Rel.And(
+                    // |g| = a when g = a OR g = −a; requiring both would make
+                    // every positive threshold unsatisfiable.
+                    Rel.Or(
                         listOf(
                             Rel.Simple(inner, CompareOp.EQ, a),
                             Rel.Simple(inner, CompareOp.EQ, minusA),
@@ -328,7 +339,7 @@ object InequalitySolver {
 
     /** A relation that every value satisfies. */
     private fun everything(): Rel =
-        Rel.Simple(IExpr.Num(Rat.ONE), CompareOp.LE, IExpr.Num(Rat.ZERO))
+        Rel.Simple(IExpr.Num(Rat.ZERO), CompareOp.LE, IExpr.Num(Rat.ONE))
 
     // ------------------------------------------------------ solving one part
 

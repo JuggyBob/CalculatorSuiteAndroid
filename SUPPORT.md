@@ -16,7 +16,7 @@ Calculator Suite is maintained by one person in their spare time. There is no su
 
 ## Frequently asked, in one line each
 
-- **Does it work offline?** Yes — every tool except Currency works with no network. Currency keeps working from its cached rates.
+- **Does it work offline?** Yes — every tool except Currency works with no network; Currency keeps working from its cached rates, and the AI problem solver needs a connection only if you turn it on. The update check is network-aware and falls back to cached release details when you are offline.
 - **Is it free?** Yes, and there is no advertising, no in-app purchase and no account.
 - **Can I use it commercially?** No. It is licensed under the PolyForm Noncommercial License 1.0.0. See [LICENSE](LICENSE).
 - **Does it collect anything about me?** No. See [PRIVACY.md](PRIVACY.md).
@@ -59,7 +59,7 @@ The APK is signed with a release key, so Android will show a warning the first t
 - Verify the download first:
 
   ```bash
-  sha256sum CalculatorSuite-v3.0.1.apk
+  sha256sum CalculatorSuite-v3.1.0.apk
   # compare with the .sha256 file published alongside it
   ```
 
